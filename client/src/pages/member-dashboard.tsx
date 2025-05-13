@@ -105,7 +105,7 @@ export default function MemberDashboard() {
             <Card className="overflow-hidden">
               <div 
                 className="h-40 bg-cover bg-center" 
-                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1574854957998-260b9250e657?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=320&q=80')" }}
+                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1584622781564-1d987f7333c1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=320&q=80')" }}
               >
                 <div className="h-full w-full bg-gradient-to-r from-primary/70 to-transparent p-6 flex items-end">
                   <div>

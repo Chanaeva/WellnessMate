@@ -326,7 +326,7 @@ export default function AuthPage() {
             {/* Wellness center interior image */}
             <div 
               className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1574854957998-260b9250e657?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=800&q=80')" }}
+              style={{ backgroundImage: "url('https://images.unsplash.com/photo-1584622650111-993a426bcf0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=800&q=80')" }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-b from-primary/70 to-primary/30"></div>
             <div className="relative p-8 flex flex-col h-full justify-end text-white">

@@ -52,7 +52,10 @@ const Header = () => {
                 <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
                   WW
                 </div>
-                <h1 className="text-xl font-heading font-semibold text-neutral-dark ml-2">WolfMother Wellness</h1>
+                <div className="ml-2">
+                  <h1 className="text-xl font-heading font-semibold text-neutral-dark">WolfMother Wellness</h1>
+                  <p className="text-xs text-neutral-dark opacity-70">Thermal Wellness Center</p>
+                </div>
               </a>
             </Link>
           </div>

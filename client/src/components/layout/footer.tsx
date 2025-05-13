@@ -11,10 +11,10 @@ const Footer = () => {
           <div className="mb-4 md:mb-0">
             <div className="flex items-center">
               <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-2">
-                HW
+                WW
               </div>
               <span className="text-sm text-gray-600">
-                © {currentYear} Harmony Wellness Center. All rights reserved.
+                © {currentYear} WolfMother Wellness - Thermal Wellness Center. All rights reserved.
               </span>
             </div>
           </div>

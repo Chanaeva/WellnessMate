@@ -117,9 +117,9 @@ export default function AuthPage() {
                   </svg>
                 </div>
               </div>
-              <CardTitle className="text-2xl text-center">Harmony Wellness Center</CardTitle>
+              <CardTitle className="text-2xl text-center">WolfMother Wellness</CardTitle>
               <CardDescription className="text-center">
-                Manage your membership and wellness journey
+                Manage your thermal wellness journey
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -330,16 +330,16 @@ export default function AuthPage() {
             ></div>
             <div className="absolute inset-0 bg-gradient-to-b from-primary/70 to-primary/30"></div>
             <div className="relative p-8 flex flex-col h-full justify-end text-white">
-              <h2 className="text-3xl font-bold mb-4">Welcome to Harmony Wellness Center</h2>
-              <p className="text-lg mb-6">Your journey to wellness begins here. Our center offers state-of-the-art facilities designed to help you achieve your health and fitness goals.</p>
+              <h2 className="text-3xl font-bold mb-4">Welcome to WolfMother Wellness</h2>
+              <p className="text-lg mb-6">Your thermal wellness journey begins here. Our center offers state-of-the-art thermal facilities designed to help you achieve optimal health and relaxation.</p>
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="font-semibold mb-1">Premium Facilities</h3>
-                  <p className="text-sm">Access to gym, pool, sauna and more</p>
+                  <h3 className="font-semibold mb-1">Thermal Facilities</h3>
+                  <p className="text-sm">Access to sauna, hot tubs, cold plunge and more</p>
                 </div>
                 <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="font-semibold mb-1">Expert Trainers</h3>
-                  <p className="text-sm">Personalized training and guidance</p>
+                  <h3 className="font-semibold mb-1">Wellness Guides</h3>
+                  <p className="text-sm">Expert guidance for thermal therapy</p>
                 </div>
                 <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
                   <h3 className="font-semibold mb-1">Flexible Plans</h3>

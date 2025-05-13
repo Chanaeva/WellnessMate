@@ -50,9 +50,9 @@ const Header = () => {
             <Link href={isAdmin ? '/admin' : '/'}>
               <a className="flex items-center">
                 <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-                  HW
+                  WW
                 </div>
-                <h1 className="text-xl font-heading font-semibold text-neutral-dark ml-2">Harmony Wellness Center</h1>
+                <h1 className="text-xl font-heading font-semibold text-neutral-dark ml-2">WolfMother Wellness</h1>
               </a>
             </Link>
           </div>

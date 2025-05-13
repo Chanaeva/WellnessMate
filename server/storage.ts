@@ -80,21 +80,21 @@ export class MemStorage implements IStorage {
         planType: 'basic',
         name: 'Basic',
         monthlyPrice: 4900, // $49.00
-        description: 'Basic access to gym facilities',
+        description: 'Basic access to thermal facilities',
         features: [
-          'Gym access (6AM-10PM)',
-          '5 classes per month'
+          'Thermal facilities access (6AM-10PM)',
+          '5 guided sessions per month'
         ]
       },
       {
         planType: 'premium',
         name: 'Premium',
         monthlyPrice: 8900, // $89.00
-        description: 'Full access to all facilities and classes',
+        description: 'Full access to all thermal wellness facilities',
         features: [
-          '24/7 gym access',
-          'Unlimited classes',
-          'Pool and spa access',
+          '24/7 thermal facilities access',
+          'Unlimited guided sessions',
+          'Private sauna booking',
           '2 guest passes/month'
         ]
       },

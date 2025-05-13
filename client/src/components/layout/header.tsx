@@ -37,6 +37,7 @@ const Header = () => {
     { href: "/admin/check-ins", label: "Check-ins", active: location === "/admin/check-ins" }
   ] : [
     { href: "/", label: "Dashboard", active: location === "/" },
+    { href: "/thermal-treatments", label: "Thermal Treatments", active: location === "/thermal-treatments" },
     { href: "/qr-code", label: "My QR Code", active: location === "/qr-code" },
     { href: "/membership", label: "Membership", active: location === "/membership" },
     { href: "/payments", label: "Payments", active: location === "/payments" }

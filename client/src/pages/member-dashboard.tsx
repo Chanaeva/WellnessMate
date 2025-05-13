@@ -131,11 +131,11 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
-            {/* Today's Schedule */}
+            {/* Today's Thermal Sessions */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold">Today's Schedule</h3>
+                  <h3 className="text-lg font-bold">Today's Thermal Sessions</h3>
                   <Button variant="link" className="text-primary">
                     View All
                   </Button>
@@ -213,7 +213,7 @@ export default function MemberDashboard() {
                   </Link>
                   <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
                     <Calendar className="h-6 w-6 text-primary mb-2" />
-                    <span className="text-sm text-center">Schedule Class</span>
+                    <span className="text-sm text-center">Book Thermal Session</span>
                   </Button>
                   <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
                     <Settings className="h-6 w-6 text-primary mb-2" />
@@ -234,18 +234,18 @@ export default function MemberDashboard() {
                 </div>
                 <div className="space-y-3">
                   <div className="border-l-4 border-[#FF7F50] bg-[#FF7F50]/5 p-3 rounded-r-lg">
-                    <h4 className="font-medium text-sm">New Class Schedule</h4>
-                    <p className="text-sm text-gray-600 mt-1">The Fall schedule is now available. Check it out!</p>
+                    <h4 className="font-medium text-sm">New Thermal Sessions</h4>
+                    <p className="text-sm text-gray-600 mt-1">New guided sauna sessions added to the schedule. Reserve now!</p>
                     <p className="text-xs text-gray-500 mt-1">2 hours ago</p>
                   </div>
                   <div className="border-l-4 border-green-500 bg-green-500/5 p-3 rounded-r-lg">
                     <h4 className="font-medium text-sm">Payment Successful</h4>
-                    <p className="text-sm text-gray-600 mt-1">Your monthly membership payment was processed successfully.</p>
+                    <p className="text-sm text-gray-600 mt-1">Your thermal wellness membership payment was processed successfully.</p>
                     <p className="text-xs text-gray-500 mt-1">Yesterday</p>
                   </div>
                   <div className="border-l-4 border-gray-300 bg-gray-50 p-3 rounded-r-lg">
                     <h4 className="font-medium text-sm">Maintenance Notice</h4>
-                    <p className="text-sm text-gray-600 mt-1">The pool will be closed for maintenance on Saturday.</p>
+                    <p className="text-sm text-gray-600 mt-1">The Finnish sauna will be closed for maintenance on Saturday.</p>
                     <p className="text-xs text-gray-500 mt-1">2 days ago</p>
                   </div>
                 </div>

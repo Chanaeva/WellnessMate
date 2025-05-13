@@ -18,10 +18,13 @@ const MemberCard = ({
 }: MemberCardProps) => {
   return (
     <Card className="bg-gradient-to-r from-primary to-secondary rounded-xl shadow-lg text-white relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 py-1 px-3 text-center text-xs bg-black/30">
+        WolfMother Thermal Wellness
+      </div>
       <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -translate-y-20 translate-x-20"></div>
       <div className="absolute bottom-0 left-0 h-24 w-24 bg-white/10 rounded-full translate-y-12 -translate-x-12"></div>
       
-      <CardContent className="relative p-6">
+      <CardContent className="relative p-6 pt-8">
         <div className="flex justify-between items-start mb-10">
           <div>
             <h3 className="font-heading font-semibold text-lg">{planName}</h3>

@@ -45,7 +45,7 @@ export default function QRCodePage() {
       return await apiRequest("POST", "/api/check-in", { 
         userId: user?.id,
         membershipId,
-        location: "Main Entrance" 
+        location: "Thermal Wellness Center Entrance" 
       });
     },
     onSuccess: () => {
@@ -103,8 +103,8 @@ export default function QRCodePage() {
         <div className="max-w-2xl mx-auto">
           <Card className="mb-6">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold">Your Member QR Code</CardTitle>
-              <CardDescription>Use this code to check in at our facility</CardDescription>
+              <CardTitle className="text-2xl font-bold">Your WolfMother Wellness QR Code</CardTitle>
+              <CardDescription>Use this code to check in at our thermal wellness center</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="view" value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -196,14 +196,14 @@ export default function QRCodePage() {
                       <Scan className="h-5 w-5 text-primary" />
                     </div>
                     <h4 className="font-medium text-sm">Step 2</h4>
-                    <p className="text-sm text-gray-600 mt-1">Visit the check-in kiosk at the entrance</p>
+                    <p className="text-sm text-gray-600 mt-1">Visit the check-in station at the thermal center entrance</p>
                   </div>
                   <div className="p-4">
                     <div className="bg-primary/10 h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-3">
                       <CheckCircle className="h-5 w-5 text-primary" />
                     </div>
                     <h4 className="font-medium text-sm">Step 3</h4>
-                    <p className="text-sm text-gray-600 mt-1">Scan your code and enjoy your visit</p>
+                    <p className="text-sm text-gray-600 mt-1">Scan your code and enjoy your thermal wellness experience</p>
                   </div>
                 </div>
               </div>

@@ -52,33 +52,33 @@ export default function MemberDashboard() {
   const formattedEndDate = membership ? format(membershipEndDate, "MMMM d, yyyy") : "N/A";
   const currentPlan = membershipPlans?.find(plan => plan.planType === membership?.planType);
   
-  // Example class schedule data (would come from API in a real app)
+  // Example wellness session schedule data (would come from API in a real app)
   const classSchedule = [
     {
       id: 1,
-      name: "Morning Volleyball Flow",
+      name: "Morning Sauna Session",
       time: "7:00 AM - 8:30 AM",
-      location: "Studio 2",
+      location: "Finnish Sauna",
       instructor: "Sarah Johnson",
-      icon: <Volleyball className="h-5 w-5" />,
+      icon: <Heart className="h-5 w-5" />,
       iconColor: "bg-primary/10 text-primary",
       available: true
     },
     {
       id: 2,
-      name: "Cardio Kickboxing",
+      name: "Hot & Cold Therapy",
       time: "12:00 PM - 1:00 PM",
-      location: "Studio 1",
+      location: "Thermal Suite",
       instructor: "Mike Thompson",
-      icon: <Heart className="h-5 w-5" />,
+      icon: <Sparkles className="h-5 w-5" />,
       iconColor: "bg-secondary/10 text-secondary",
       available: false
     },
     {
       id: 3,
-      name: "Evening Meditation",
+      name: "Evening Thermal Meditation",
       time: "6:30 PM - 7:30 PM",
-      location: "Studio 3",
+      location: "Relaxation Room",
       instructor: "Emma Lewis",
       icon: <Sparkles className="h-5 w-5" />,
       iconColor: "bg-purple-100 text-purple-700",
@@ -151,31 +151,31 @@ export default function MemberDashboard() {
             {/* Facilities */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4">Our Facilities</h3>
+                <h3 className="text-lg font-bold mb-4">Our Thermal Facilities</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Facility Item 1 */}
                   <div className="rounded-lg overflow-hidden shadow-sm">
                     <img 
-                      src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&h=300&q=80" 
-                      alt="Gym Facility" 
+                      src="https://images.unsplash.com/photo-1584622781564-1d987f7333c1?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&h=300&q=80" 
+                      alt="Sauna Facility" 
                       className="w-full h-40 object-cover"
                     />
                     <div className="p-4">
-                      <h4 className="font-medium">Fitness Center</h4>
-                      <p className="text-sm text-gray-500 mt-1">Open 24/7 • State-of-the-art equipment</p>
+                      <h4 className="font-medium">Finnish Saunas</h4>
+                      <p className="text-sm text-gray-500 mt-1">Open 24/7 • Traditional dry heat therapy</p>
                     </div>
                   </div>
                   
                   {/* Facility Item 2 */}
                   <div className="rounded-lg overflow-hidden shadow-sm">
                     <img 
-                      src="https://images.unsplash.com/photo-1599901860904-17e6ed7083a0?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&h=300&q=80" 
-                      alt="Volleyball Studio" 
+                      src="https://images.unsplash.com/photo-1613725193525-2fd537614b3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&h=300&q=80" 
+                      alt="Cold Plunge Pool" 
                       className="w-full h-40 object-cover"
                     />
                     <div className="p-4">
-                      <h4 className="font-medium">Volleyball Studios</h4>
-                      <p className="text-sm text-gray-500 mt-1">3 fully equipped studios • Classes daily</p>
+                      <h4 className="font-medium">Cold Plunge Pools</h4>
+                      <p className="text-sm text-gray-500 mt-1">Invigorating cold therapy • Health benefits</p>
                     </div>
                   </div>
                 </div>

@@ -102,11 +102,11 @@ export class MemStorage implements IStorage {
         planType: 'vip',
         name: 'VIP',
         monthlyPrice: 12900, // $129.00
-        description: 'VIP access with personal training sessions',
+        description: 'VIP access with personalized thermal therapy',
         features: [
           'All Premium features',
-          'Personal trainer (2x/month)',
-          'Nutrition consultation',
+          'Personalized thermal therapy sessions (2x/month)',
+          'Wellness consultation',
           '4 guest passes/month'
         ]
       },
@@ -114,10 +114,10 @@ export class MemStorage implements IStorage {
         planType: 'daily',
         name: 'Day Pass',
         monthlyPrice: 1500, // $15.00
-        description: 'Single day access',
+        description: 'Single day access to thermal facilities',
         features: [
-          'Full day access to gym',
-          'Access to group classes',
+          'Full day access to thermal facilities',
+          'Access to guided sessions',
           'Valid for one day only'
         ]
       }

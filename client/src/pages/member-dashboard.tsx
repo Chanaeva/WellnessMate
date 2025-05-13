@@ -181,6 +181,44 @@ export default function MemberDashboard() {
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Thermal Wellness Benefits */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-bold mb-4">Thermal Wellness Benefits</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="bg-primary/10 p-2 rounded-lg">
+                      <Heart className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Improved Circulation</h4>
+                      <p className="text-sm text-gray-500 mt-1">Regular sauna sessions can improve cardiovascular health and blood flow</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <div className="bg-secondary/10 p-2 rounded-lg">
+                      <Sparkles className="h-5 w-5 text-secondary" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Stress Reduction</h4>
+                      <p className="text-sm text-gray-500 mt-1">Thermal therapy helps reduce cortisol levels and promotes relaxation</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <div className="bg-purple-100 p-2 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Immune System Support</h4>
+                      <p className="text-sm text-gray-500 mt-1">Hot and cold contrast therapy can help strengthen your immune response</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column (1/3) */}

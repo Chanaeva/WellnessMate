@@ -2,26 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 20 14.3% 4.1%;
-  --muted: 60 4.8% 95.9%;
-  --muted-foreground: 25 5.3% 44.7%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 20 14.3% 4.1%;
+  /* Wolf Mother earth-toned color palette */
+  --background: 36 33% 97%;     /* Light cream/beige background */
+  --foreground: 24 15% 15%;     /* Dark brown text */
+  --muted: 35 25% 92%;          /* Muted beige */
+  --muted-foreground: 30 8% 35%;/* Muted brown text */
+  --popover: 36 33% 97%;
+  --popover-foreground: 24 15% 15%;
   --card: 0 0% 100%;
-  --card-foreground: 20 14.3% 4.1%;
-  --border: 20 5.9% 90%;
-  --input: 20 5.9% 90%;
-  --primary: 15 80% 50%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 220 70% 50%;
-  --secondary-foreground: 210 40% 98%;
-  --accent: 60 4.8% 95.9%;
-  --accent-foreground: 24 9.8% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 60 9.1% 97.8%;
-  --ring: 20 14.3% 4.1%;
+  --card-foreground: 24 15% 15%;
+  --border: 30 15% 90%;
+  --input: 30 15% 90%;
+  --primary: 24 56% 35%;        /* Earthy brown */
+  --primary-foreground: 36 33% 97%;
+  --secondary: 196 50% 40%;     /* Cool blue for cold plunge */
+  --secondary-foreground: 0 0% 100%;
+  --accent: 15 30% 60%;         /* Warm terracotta accent */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 45%;     /* Deep red */
+  --destructive-foreground: 0 0% 100%;
+  --ring: 24 56% 35%;
   --radius: 0.5rem;
 }
 

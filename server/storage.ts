@@ -4,6 +4,11 @@ import {
   checkIns, type CheckIn, type InsertCheckIn,
   payments, type Payment, type InsertPayment,
   membershipPlans, type MembershipPlan, type InsertMembershipPlan,
+  memberPreferences, type MemberPreferences, type InsertMemberPreferences,
+  therapySessions, type TherapySession, type InsertTherapySession,
+  healthMetrics, type HealthMetrics, type InsertHealthMetrics,
+  stravaIntegrations, type StravaIntegration, type InsertStravaIntegration,
+  treatmentTypeEnum
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -66,12 +71,20 @@ export class MemStorage implements IStorage {
   private checkIns: CheckIn[];
   private payments: Payment[];
   private membershipPlans: Map<string, MembershipPlan>;
+  private memberPreferences: Map<number, MemberPreferences>;
+  private therapySessions: TherapySession[];
+  private healthMetrics: HealthMetrics[];
+  private stravaIntegrations: Map<number, StravaIntegration>;
   sessionStore: session.SessionStore;
 
   private currentUserId: number;
   private currentCheckInId: number;
   private currentPaymentId: number;
   private currentMembershipPlanId: number;
+  private currentMemberPreferencesId: number;
+  private currentTherapySessionId: number;
+  private currentHealthMetricsId: number;
+  private currentStravaIntegrationId: number;
 
   constructor() {
     this.users = new Map();
@@ -79,11 +92,19 @@ export class MemStorage implements IStorage {
     this.checkIns = [];
     this.payments = [];
     this.membershipPlans = new Map();
+    this.memberPreferences = new Map();
+    this.therapySessions = [];
+    this.healthMetrics = [];
+    this.stravaIntegrations = new Map();
     
     this.currentUserId = 1;
     this.currentCheckInId = 1;
     this.currentPaymentId = 1;
     this.currentMembershipPlanId = 1;
+    this.currentMemberPreferencesId = 1;
+    this.currentTherapySessionId = 1;
+    this.currentHealthMetricsId = 1;
+    this.currentStravaIntegrationId = 1;
 
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
@@ -287,6 +308,171 @@ export class MemStorage implements IStorage {
       const plan: MembershipPlan = { ...insertPlan, id };
       this.membershipPlans.set(insertPlan.planType, plan);
       return plan;
+    }
+  }
+  
+  // Member preferences methods
+  async getMemberPreferences(userId: number): Promise<MemberPreferences | undefined> {
+    return this.memberPreferences.get(userId);
+  }
+
+  async createOrUpdateMemberPreferences(preferences: InsertMemberPreferences): Promise<MemberPreferences> {
+    const existingPreferences = this.memberPreferences.get(preferences.userId);
+    
+    if (existingPreferences) {
+      const updatedPreferences = {
+        ...existingPreferences,
+        ...preferences,
+        updatedAt: new Date()
+      };
+      this.memberPreferences.set(preferences.userId, updatedPreferences);
+      return updatedPreferences;
+    } else {
+      const newPreferences: MemberPreferences = {
+        id: this.currentMemberPreferencesId++,
+        ...preferences,
+        updatedAt: new Date()
+      };
+      this.memberPreferences.set(preferences.userId, newPreferences);
+      return newPreferences;
+    }
+  }
+
+  // Therapy session methods
+  async getTherapySessionsByUserId(userId: number): Promise<TherapySession[]> {
+    return this.therapySessions
+      .filter(session => session.userId === userId)
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  }
+
+  async createTherapySession(session: InsertTherapySession): Promise<TherapySession> {
+    const newSession: TherapySession = {
+      id: this.currentTherapySessionId++,
+      ...session,
+      createdAt: new Date()
+    };
+    this.therapySessions.push(newSession);
+    return newSession;
+  }
+
+  async getTherapySessionStats(userId: number): Promise<any> {
+    const sessions = this.therapySessions.filter(session => session.userId === userId);
+    
+    // No sessions yet
+    if (sessions.length === 0) {
+      return {
+        totalSessions: 0,
+        totalDuration: 0,
+        typeBreakdown: {},
+        averageStressReduction: 0,
+        averageHeartRateChange: 0
+      };
+    }
+
+    // Count by type
+    const typeBreakdown: Record<string, number> = {};
+    sessions.forEach(session => {
+      const type = session.treatmentType;
+      typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+    });
+
+    // Calculate metrics
+    const totalDuration = sessions.reduce((sum, session) => sum + session.duration, 0);
+    
+    // Calculate stress reduction (where available)
+    const sessionsWithStressData = sessions.filter(
+      session => session.stressLevelBefore !== undefined && session.stressLevelAfter !== undefined
+    );
+    
+    const averageStressReduction = sessionsWithStressData.length > 0
+      ? sessionsWithStressData.reduce(
+          (sum, session) => sum + ((session.stressLevelBefore || 0) - (session.stressLevelAfter || 0)), 
+          0
+        ) / sessionsWithStressData.length
+      : 0;
+    
+    // Calculate heart rate change (where available)
+    const sessionsWithHeartRateData = sessions.filter(
+      session => session.heartRateBefore !== undefined && session.heartRateAfter !== undefined
+    );
+    
+    const averageHeartRateChange = sessionsWithHeartRateData.length > 0
+      ? sessionsWithHeartRateData.reduce(
+          (sum, session) => sum + ((session.heartRateBefore || 0) - (session.heartRateAfter || 0)), 
+          0
+        ) / sessionsWithHeartRateData.length
+      : 0;
+
+    return {
+      totalSessions: sessions.length,
+      totalDuration,
+      typeBreakdown,
+      averageStressReduction,
+      averageHeartRateChange,
+      recentSessions: sessions.slice(0, 5)
+    };
+  }
+  
+  // Health metrics methods
+  async getHealthMetricsByUserId(userId: number): Promise<HealthMetrics[]> {
+    return this.healthMetrics
+      .filter(metrics => metrics.userId === userId)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  async createHealthMetrics(metrics: InsertHealthMetrics): Promise<HealthMetrics> {
+    const newMetrics: HealthMetrics = {
+      id: this.currentHealthMetricsId++,
+      ...metrics,
+      createdAt: new Date()
+    };
+    this.healthMetrics.push(newMetrics);
+    return newMetrics;
+  }
+
+  async getHealthMetricsTimeline(userId: number, days: number = 30): Promise<HealthMetrics[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    return this.healthMetrics
+      .filter(metrics => 
+        metrics.userId === userId && 
+        new Date(metrics.date).getTime() >= startDate.getTime()
+      )
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  // Strava integration methods
+  async getStravaIntegration(userId: number): Promise<StravaIntegration | undefined> {
+    return this.stravaIntegrations.get(userId);
+  }
+
+  async createOrUpdateStravaIntegration(integration: InsertStravaIntegration): Promise<StravaIntegration> {
+    const existingIntegration = this.stravaIntegrations.get(integration.userId);
+    
+    if (existingIntegration) {
+      const updatedIntegration = {
+        ...existingIntegration,
+        ...integration,
+      };
+      this.stravaIntegrations.set(integration.userId, updatedIntegration);
+      return updatedIntegration;
+    } else {
+      const newIntegration: StravaIntegration = {
+        id: this.currentStravaIntegrationId++,
+        ...integration,
+        createdAt: new Date()
+      };
+      this.stravaIntegrations.set(integration.userId, newIntegration);
+      return newIntegration;
+    }
+  }
+
+  async disconnectStravaIntegration(userId: number): Promise<void> {
+    const integration = this.stravaIntegrations.get(userId);
+    if (integration) {
+      integration.isActive = false;
+      this.stravaIntegrations.set(userId, integration);
     }
   }
 }

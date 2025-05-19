@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -50,6 +50,12 @@ export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'successfu
 
 // Payment method enum
 export const paymentMethodEnum = pgEnum('payment_method', ['credit_card', 'debit_card', 'cash', 'check']);
+
+// Treatment type enum
+export const treatmentTypeEnum = pgEnum('treatment_type', ['sauna', 'cold_plunge', 'infrared', 'steam', 'contrast', 'kneipp', 'hammam']);
+
+// Booking status enum
+export const bookingStatusEnum = pgEnum('booking_status', ['scheduled', 'completed', 'cancelled', 'no_show']);
 
 // Payments table definition
 export const payments = pgTable("payments", {
@@ -113,6 +119,96 @@ export type Payment = typeof payments.$inferSelect;
 
 export type InsertMembershipPlan = z.infer<typeof insertMembershipPlanSchema>;
 export type MembershipPlan = typeof membershipPlans.$inferSelect;
+
+// Member Temperature Preferences table
+export const memberPreferences = pgTable("member_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  saunaTemperature: integer("sauna_temperature"), // Preferred temperature in Celsius
+  coldPlungeTemperature: integer("cold_plunge_temperature"), // Preferred temperature in Celsius
+  preferredDuration: integer("preferred_duration"), // Preferred duration in minutes
+  favoriteTherapies: treatmentTypeEnum("favorite_therapies").array(),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Thermal Therapy Sessions table (for tracking effectiveness and stats)
+export const therapySessions = pgTable("therapy_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  treatmentType: treatmentTypeEnum("treatment_type").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  duration: integer("duration_minutes").notNull(),
+  temperature: integer("temperature_celsius"),
+  heartRateBefore: integer("heart_rate_before"),
+  heartRateAfter: integer("heart_rate_after"),
+  stressLevelBefore: integer("stress_level_before"), // Scale 1-10
+  stressLevelAfter: integer("stress_level_after"), // Scale 1-10
+  notes: text("notes"),
+  shareWithStrava: boolean("share_with_strava").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Health Metrics table - for tracking wellness outcomes
+export const healthMetrics = pgTable("health_metrics", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  date: date("date").notNull(),
+  sleepQuality: integer("sleep_quality"), // Scale 1-10
+  energyLevel: integer("energy_level"), // Scale 1-10
+  stressLevel: integer("stress_level"), // Scale 1-10
+  recoveryScore: integer("recovery_score"), // Scale 1-100
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Strava Integration table 
+export const stravaIntegrations = pgTable("strava_integrations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  athleteId: text("athlete_id"),
+  lastSyncAt: timestamp("last_sync_at"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Create insert schemas for new tables
+export const insertMemberPreferencesSchema = createInsertSchema(memberPreferences).omit({
+  id: true,
+  updatedAt: true
+});
+
+export const insertTherapySessionSchema = createInsertSchema(therapySessions).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertHealthMetricsSchema = createInsertSchema(healthMetrics).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertStravaIntegrationSchema = createInsertSchema(stravaIntegrations).omit({
+  id: true,
+  createdAt: true
+});
+
+// Create types for the new tables
+export type InsertMemberPreferences = z.infer<typeof insertMemberPreferencesSchema>;
+export type MemberPreferences = typeof memberPreferences.$inferSelect;
+
+export type InsertTherapySession = z.infer<typeof insertTherapySessionSchema>;
+export type TherapySession = typeof therapySessions.$inferSelect;
+
+export type InsertHealthMetrics = z.infer<typeof insertHealthMetricsSchema>;
+export type HealthMetrics = typeof healthMetrics.$inferSelect;
+
+export type InsertStravaIntegration = z.infer<typeof insertStravaIntegrationSchema>;
+export type StravaIntegration = typeof stravaIntegrations.$inferSelect;
 
 // Define login schema
 export const loginSchema = z.object({

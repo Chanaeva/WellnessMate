@@ -37,6 +37,25 @@ export interface IStorage {
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
   createOrUpdateMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
 
+  // Member preferences methods
+  getMemberPreferences(userId: number): Promise<MemberPreferences | undefined>;
+  createOrUpdateMemberPreferences(preferences: InsertMemberPreferences): Promise<MemberPreferences>;
+
+  // Therapy session methods
+  getTherapySessionsByUserId(userId: number): Promise<TherapySession[]>;
+  createTherapySession(session: InsertTherapySession): Promise<TherapySession>;
+  getTherapySessionStats(userId: number): Promise<any>; // Summary stats for user's sessions
+
+  // Health metrics methods
+  getHealthMetricsByUserId(userId: number): Promise<HealthMetrics[]>;
+  createHealthMetrics(metrics: InsertHealthMetrics): Promise<HealthMetrics>;
+  getHealthMetricsTimeline(userId: number, days: number): Promise<HealthMetrics[]>;
+
+  // Strava integration methods
+  getStravaIntegration(userId: number): Promise<StravaIntegration | undefined>;
+  createOrUpdateStravaIntegration(integration: InsertStravaIntegration): Promise<StravaIntegration>;
+  disconnectStravaIntegration(userId: number): Promise<void>;
+  
   // Session store
   sessionStore: session.SessionStore;
 }

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, pgEnum, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, pgEnum, jsonb, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -57,6 +57,9 @@ export const treatmentTypeEnum = pgEnum('treatment_type', ['sauna', 'cold_plunge
 // Booking status enum
 export const bookingStatusEnum = pgEnum('booking_status', ['scheduled', 'completed', 'cancelled', 'no_show']);
 
+// Punch card status enum
+export const punchCardStatusEnum = pgEnum('punch_card_status', ['active', 'expired', 'exhausted']);
+
 // Payments table definition
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
@@ -77,6 +80,20 @@ export const membershipPlans = pgTable("membership_plans", {
   monthlyPrice: integer("monthly_price").notNull(), // Stored in cents
   description: text("description").notNull(),
   features: text("features").array().notNull(),
+});
+
+// Punch cards table for day pass packages
+export const punchCards = pgTable("punch_cards", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(), // e.g., "5-Day Pass Package"
+  totalPunches: integer("total_punches").notNull(), // Number of day passes included
+  remainingPunches: integer("remaining_punches").notNull(),
+  pricePerPunch: integer("price_per_punch").notNull(), // Stored in cents
+  totalPrice: integer("total_price").notNull(), // Stored in cents
+  status: punchCardStatusEnum("status").default('active'),
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+  expiresAt: timestamp("expires_at"), // Optional expiration date
 });
 
 // Create insert schemas
@@ -102,6 +119,11 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 
 export const insertMembershipPlanSchema = createInsertSchema(membershipPlans).omit({
   id: true,
+});
+
+export const insertPunchCardSchema = createInsertSchema(punchCards).omit({
+  id: true,
+  purchasedAt: true,
 });
 
 // Define types for insert and select

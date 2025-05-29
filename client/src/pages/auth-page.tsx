@@ -117,7 +117,7 @@ export default function AuthPage() {
                   </svg>
                 </div>
               </div>
-              <CardTitle className="text-2xl text-center">WolfMother Wellness</CardTitle>
+              <CardTitle className="text-2xl text-center">Wolf Mother Wellness</CardTitle>
               <CardDescription className="text-center">
                 Manage your thermal wellness journey
               </CardDescription>
@@ -330,7 +330,7 @@ export default function AuthPage() {
             ></div>
             <div className="absolute inset-0 bg-gradient-to-b from-primary/70 to-primary/30"></div>
             <div className="relative p-8 flex flex-col h-full justify-end text-white">
-              <h2 className="text-3xl font-bold mb-4">Welcome to WolfMother Wellness</h2>
+              <h2 className="text-3xl font-bold mb-4">Welcome to Wolf Mother Wellness</h2>
               <p className="text-lg mb-6">Your thermal wellness journey begins here. Our center offers state-of-the-art thermal facilities designed to help you achieve optimal health and relaxation.</p>
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">

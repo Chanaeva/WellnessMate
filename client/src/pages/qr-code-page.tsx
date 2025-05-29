@@ -103,7 +103,7 @@ export default function QRCodePage() {
         <div className="max-w-2xl mx-auto">
           <Card className="mb-6">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold">Your WolfMother Wellness QR Code</CardTitle>
+              <CardTitle className="text-2xl font-bold">Your Wolf Mother Wellness QR Code</CardTitle>
               <CardDescription>Use this code to check in at our thermal wellness center</CardDescription>
             </CardHeader>
             <CardContent>

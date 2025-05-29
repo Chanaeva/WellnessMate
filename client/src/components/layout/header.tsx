@@ -54,7 +54,7 @@ const Header = () => {
                   WW
                 </div>
                 <div className="ml-2">
-                  <h1 className="text-xl font-heading font-semibold text-neutral-dark">WolfMother Wellness</h1>
+                  <h1 className="text-xl font-heading font-semibold text-neutral-dark">Wolf Mother Wellness</h1>
                   <p className="text-xs text-neutral-dark opacity-70">Thermal Wellness Center</p>
                 </div>
               </a>

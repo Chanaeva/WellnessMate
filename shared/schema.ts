@@ -142,6 +142,9 @@ export type Payment = typeof payments.$inferSelect;
 export type InsertMembershipPlan = z.infer<typeof insertMembershipPlanSchema>;
 export type MembershipPlan = typeof membershipPlans.$inferSelect;
 
+export type InsertPunchCard = z.infer<typeof insertPunchCardSchema>;
+export type PunchCard = typeof punchCards.$inferSelect;
+
 // Member Temperature Preferences table
 export const memberPreferences = pgTable("member_preferences", {
   id: serial("id").primaryKey(),

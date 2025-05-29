@@ -4,6 +4,7 @@ import {
   checkIns, type CheckIn, type InsertCheckIn,
   payments, type Payment, type InsertPayment,
   membershipPlans, type MembershipPlan, type InsertMembershipPlan,
+  punchCards, type PunchCard, type InsertPunchCard,
   memberPreferences, type MemberPreferences, type InsertMemberPreferences,
   therapySessions, type TherapySession, type InsertTherapySession,
   healthMetrics, type HealthMetrics, type InsertHealthMetrics,
@@ -42,6 +43,13 @@ export interface IStorage {
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
   createOrUpdateMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
 
+  // Punch card methods
+  getPunchCardsByUserId(userId: number): Promise<PunchCard[]>;
+  getPunchCardById(id: number): Promise<PunchCard | undefined>;
+  createPunchCard(punchCard: InsertPunchCard): Promise<PunchCard>;
+  usePunchCardEntry(id: number): Promise<PunchCard>;
+  getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>;
+
   // Member preferences methods
   getMemberPreferences(userId: number): Promise<MemberPreferences | undefined>;
   createOrUpdateMemberPreferences(preferences: InsertMemberPreferences): Promise<MemberPreferences>;
@@ -71,6 +79,7 @@ export class MemStorage implements IStorage {
   private checkIns: CheckIn[];
   private payments: Payment[];
   private membershipPlans: Map<string, MembershipPlan>;
+  private punchCards: PunchCard[];
   private memberPreferences: Map<number, MemberPreferences>;
   private therapySessions: TherapySession[];
   private healthMetrics: HealthMetrics[];
@@ -85,6 +94,7 @@ export class MemStorage implements IStorage {
   private currentTherapySessionId: number;
   private currentHealthMetricsId: number;
   private currentStravaIntegrationId: number;
+  private currentPunchCardId: number;
 
   constructor() {
     this.users = new Map();
@@ -92,6 +102,7 @@ export class MemStorage implements IStorage {
     this.checkIns = [];
     this.payments = [];
     this.membershipPlans = new Map();
+    this.punchCards = [];
     this.memberPreferences = new Map();
     this.therapySessions = [];
     this.healthMetrics = [];
@@ -105,6 +116,7 @@ export class MemStorage implements IStorage {
     this.currentTherapySessionId = 1;
     this.currentHealthMetricsId = 1;
     this.currentStravaIntegrationId = 1;
+    this.currentPunchCardId = 1;
 
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,

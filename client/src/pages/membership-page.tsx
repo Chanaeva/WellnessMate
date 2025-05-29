@@ -1,16 +1,19 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
-import { Membership, MembershipPlan } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Membership, MembershipPlan, PunchCard } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Edit, Calendar, CreditCard, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Check, X, Edit, Calendar, CreditCard, AlertTriangle, Ticket, Star } from "lucide-react";
 import { format } from "date-fns";
 
 export default function MembershipPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Fetch membership data
   const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
@@ -21,6 +24,39 @@ export default function MembershipPage() {
   // Fetch membership plans
   const { data: membershipPlans, isLoading: isPlansLoading } = useQuery<MembershipPlan[]>({
     queryKey: ["/api/membership-plans"],
+  });
+
+  // Fetch punch card options
+  const { data: punchCardOptions, isLoading: isPunchCardOptionsLoading } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
+    queryKey: ["/api/punch-cards/options"],
+  });
+
+  // Fetch user's punch cards
+  const { data: userPunchCards, isLoading: isUserPunchCardsLoading } = useQuery<PunchCard[]>({
+    queryKey: ["/api/punch-cards"],
+    enabled: !!user,
+  });
+
+  // Purchase punch card mutation
+  const purchasePunchCardMutation = useMutation({
+    mutationFn: async (punchCardData: any) => {
+      const res = await apiRequest("POST", "/api/punch-cards", punchCardData);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      toast({
+        title: "Purchase successful",
+        description: "Your punch card has been purchased successfully!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Purchase failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Helper function to convert cents to dollars
@@ -126,7 +162,7 @@ export default function MembershipPage() {
               </div>
 
               {/* Available Plans */}
-              <div>
+              <div className="mb-8">
                 <h3 className="text-lg font-bold mb-4">Available Plans</h3>
                 {isPlansLoading ? (
                   <div className="p-6 text-center">Loading available plans...</div>
@@ -167,6 +203,130 @@ export default function MembershipPage() {
                               disabled={isCurrentPlan}
                             >
                               {isCurrentPlan ? 'Current Plan' : plan.monthlyPrice < (currentPlan?.monthlyPrice || 0) ? 'Downgrade' : 'Upgrade'}
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Your Punch Cards */}
+              {userPunchCards && userPunchCards.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-lg font-bold mb-4">Your Digital Punch Cards</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {userPunchCards.map((card) => (
+                      <Card key={card.id} className="overflow-hidden border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+                        <CardHeader className="bg-gradient-to-r from-amber-600 to-orange-600 text-white p-4">
+                          <div className="flex items-center justify-between">
+                            <Ticket className="h-6 w-6" />
+                            <Badge className={`${card.status === 'active' ? 'bg-green-500' : card.status === 'exhausted' ? 'bg-red-500' : 'bg-gray-500'}`}>
+                              {card.status}
+                            </Badge>
+                          </div>
+                          <CardTitle className="text-lg font-bold mt-2">{card.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Remaining Visits:</span>
+                              <span className="font-bold text-lg">{card.remainingPunches} / {card.totalPunches}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${(card.remainingPunches / card.totalPunches) * 100}%` }}
+                              ></div>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Purchased: {format(new Date(card.purchasedAt || ''), "MMM d, yyyy")}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Digital Punch Cards */}
+              <div>
+                <div className="flex items-center mb-4">
+                  <Ticket className="h-6 w-6 text-amber-600 mr-2" />
+                  <h3 className="text-lg font-bold">Digital Day Pass Packages</h3>
+                </div>
+                <p className="text-gray-600 mb-6">
+                  Perfect for occasional visits or trying out our thermal wellness center. Buy a package of day passes and save money on individual visits.
+                </p>
+                {isPunchCardOptionsLoading ? (
+                  <div className="p-6 text-center">Loading punch card options...</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {punchCardOptions?.map((option, index) => {
+                      const savings = (option.totalPunches * 2500) - option.totalPrice; // Assuming $25 regular day pass price
+                      const savingsPercentage = Math.round((savings / (option.totalPunches * 2500)) * 100);
+                      
+                      return (
+                        <Card key={index} className="overflow-hidden border-2 border-amber-200 hover:border-amber-300 transition-colors">
+                          <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-4 relative">
+                            {index === 1 && (
+                              <Badge className="absolute top-2 right-2 bg-white text-amber-600">
+                                <Star className="h-3 w-3 mr-1" />
+                                Popular
+                              </Badge>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <Ticket className="h-6 w-6" />
+                              <div className="text-right">
+                                <div className="text-sm opacity-90">Save {savingsPercentage}%</div>
+                              </div>
+                            </div>
+                            <CardTitle className="text-xl font-bold mt-2">{option.name}</CardTitle>
+                            <div className="text-2xl font-bold mt-1">
+                              {formatPrice(option.totalPrice)}
+                              <div className="text-sm font-normal opacity-90 mt-1">
+                                {formatPrice(option.pricePerPunch)} per visit
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-4">
+                            <ul className="space-y-2">
+                              <li className="flex items-center">
+                                <Check className="text-green-500 mr-2 h-4 w-4" />
+                                <span className="text-sm">{option.totalPunches} thermal wellness visits</span>
+                              </li>
+                              <li className="flex items-center">
+                                <Check className="text-green-500 mr-2 h-4 w-4" />
+                                <span className="text-sm">Access to all thermal facilities</span>
+                              </li>
+                              <li className="flex items-center">
+                                <Check className="text-green-500 mr-2 h-4 w-4" />
+                                <span className="text-sm">No expiration date</span>
+                              </li>
+                              <li className="flex items-center">
+                                <Check className="text-green-500 mr-2 h-4 w-4" />
+                                <span className="text-sm">Save {formatPrice(savings)} total</span>
+                              </li>
+                            </ul>
+                          </CardContent>
+                          <CardFooter className="p-4 pt-0">
+                            <Button 
+                              className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white"
+                              onClick={() => {
+                                purchasePunchCardMutation.mutate({
+                                  name: option.name,
+                                  totalPunches: option.totalPunches,
+                                  remainingPunches: option.totalPunches,
+                                  pricePerPunch: option.pricePerPunch,
+                                  totalPrice: option.totalPrice,
+                                  status: 'active'
+                                });
+                              }}
+                              disabled={purchasePunchCardMutation.isPending}
+                            >
+                              {purchasePunchCardMutation.isPending ? 'Processing...' : 'Purchase Package'}
                             </Button>
                           </CardFooter>
                         </Card>

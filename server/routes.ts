@@ -6,7 +6,8 @@ import {
   insertMembershipSchema, 
   insertCheckInSchema, 
   insertPaymentSchema, 
-  insertMembershipPlanSchema 
+  insertMembershipPlanSchema,
+  insertPunchCardSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -191,6 +192,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.errors });
       }
       res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Punch card routes
+
+  // Get available punch card options
+  app.get("/api/punch-cards/options", async (req, res) => {
+    try {
+      const options = await storage.getAvailablePunchCardOptions();
+      res.json(options);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Get user's punch cards
+  app.get("/api/punch-cards", isAuthenticated, async (req, res) => {
+    try {
+      const punchCards = await storage.getPunchCardsByUserId(req.user.id);
+      res.json(punchCards);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Purchase a punch card
+  app.post("/api/punch-cards", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertPunchCardSchema.parse({
+        ...req.body,
+        userId: req.user.id,
+      });
+      const punchCard = await storage.createPunchCard(validatedData);
+      res.status(201).json(punchCard);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Use a punch from a card
+  app.post("/api/punch-cards/:id/use", isAuthenticated, async (req, res) => {
+    try {
+      const cardId = Number(req.params.id);
+      const punchCard = await storage.getPunchCardById(cardId);
+      
+      if (!punchCard) {
+        return res.status(404).json({ message: "Punch card not found" });
+      }
+      
+      if (punchCard.userId !== req.user.id) {
+        return res.status(403).json({ message: "Not your punch card" });
+      }
+
+      const updatedCard = await storage.usePunchCardEntry(cardId);
+      res.json(updatedCard);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
   });
 

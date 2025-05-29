@@ -487,6 +487,69 @@ export class MemStorage implements IStorage {
       this.stravaIntegrations.set(userId, integration);
     }
   }
+
+  // Punch card methods
+  async getPunchCardsByUserId(userId: number): Promise<PunchCard[]> {
+    return this.punchCards.filter(card => card.userId === userId);
+  }
+
+  async getPunchCardById(id: number): Promise<PunchCard | undefined> {
+    return this.punchCards.find(card => card.id === id);
+  }
+
+  async createPunchCard(insertPunchCard: InsertPunchCard): Promise<PunchCard> {
+    const id = this.currentPunchCardId++;
+    const punchCard: PunchCard = { 
+      ...insertPunchCard, 
+      id, 
+      purchasedAt: new Date() 
+    };
+    this.punchCards.push(punchCard);
+    return punchCard;
+  }
+
+  async usePunchCardEntry(id: number): Promise<PunchCard> {
+    const punchCard = this.punchCards.find(card => card.id === id);
+    if (!punchCard) {
+      throw new Error('Punch card not found');
+    }
+    if (punchCard.remainingPunches <= 0) {
+      throw new Error('No remaining punches on this card');
+    }
+    if (punchCard.status !== 'active') {
+      throw new Error('Punch card is not active');
+    }
+
+    punchCard.remainingPunches -= 1;
+    if (punchCard.remainingPunches === 0) {
+      punchCard.status = 'exhausted';
+    }
+
+    return punchCard;
+  }
+
+  async getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]> {
+    return [
+      {
+        name: "5-Day Pass Package",
+        totalPunches: 5,
+        totalPrice: 12000, // $120 in cents
+        pricePerPunch: 2400  // $24 in cents
+      },
+      {
+        name: "10-Day Pass Package",
+        totalPunches: 10,
+        totalPrice: 22000, // $220 in cents
+        pricePerPunch: 2200  // $22 in cents
+      },
+      {
+        name: "20-Day Pass Package",
+        totalPunches: 20,
+        totalPrice: 40000, // $400 in cents
+        pricePerPunch: 2000  // $20 in cents
+      }
+    ];
+  }
 }
 
 export const storage = new MemStorage();

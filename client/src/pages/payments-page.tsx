@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, CreditCard } from "lucide-react";
+import { Download, CreditCard, Shield, Lock } from "lucide-react";
 import { format } from "date-fns";
 
 export default function PaymentsPage() {
@@ -77,8 +77,17 @@ export default function PaymentsPage() {
         <div className="max-w-4xl mx-auto">
           <Card className="mb-8">
             <CardHeader className="bg-primary text-white">
-              <CardTitle className="text-2xl font-bold">Payment History</CardTitle>
-              <CardDescription className="text-white/80">View and manage your billing information</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-bold">Payment History</CardTitle>
+                  <CardDescription className="text-white/80">View and manage your billing information</CardDescription>
+                </div>
+                <div className="flex items-center space-x-2 text-white/90">
+                  <Shield className="h-5 w-5" />
+                  <span className="text-sm font-medium">Secure Payments</span>
+                  <Lock className="h-4 w-4" />
+                </div>
+              </div>
             </CardHeader>
             
             <CardContent className="p-6">

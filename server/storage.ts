@@ -11,10 +11,12 @@ import {
   stravaIntegrations, type StravaIntegration, type InsertStravaIntegration,
   treatmentTypeEnum
 } from "@shared/schema";
+import { db, pool } from "./db";
+import { eq, desc, and, gte } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   // User methods
@@ -70,375 +72,253 @@ export interface IStorage {
   disconnectStravaIntegration(userId: number): Promise<void>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private memberships: Map<string, Membership>;
-  private checkIns: CheckIn[];
-  private payments: Payment[];
-  private membershipPlans: Map<string, MembershipPlan>;
-  private punchCards: PunchCard[];
-  private memberPreferences: Map<number, MemberPreferences>;
-  private therapySessions: TherapySession[];
-  private healthMetrics: HealthMetrics[];
-  private stravaIntegrations: Map<number, StravaIntegration>;
-  sessionStore: session.SessionStore;
-
-  private currentUserId: number;
-  private currentCheckInId: number;
-  private currentPaymentId: number;
-  private currentMembershipPlanId: number;
-  private currentMemberPreferencesId: number;
-  private currentTherapySessionId: number;
-  private currentHealthMetricsId: number;
-  private currentStravaIntegrationId: number;
-  private currentPunchCardId: number;
+export class DatabaseStorage implements IStorage {
+  sessionStore: any;
 
   constructor() {
-    this.users = new Map();
-    this.memberships = new Map();
-    this.checkIns = [];
-    this.payments = [];
-    this.membershipPlans = new Map();
-    this.punchCards = [];
-    this.memberPreferences = new Map();
-    this.therapySessions = [];
-    this.healthMetrics = [];
-    this.stravaIntegrations = new Map();
-    
-    this.currentUserId = 1;
-    this.currentCheckInId = 1;
-    this.currentPaymentId = 1;
-    this.currentMembershipPlanId = 1;
-    this.currentMemberPreferencesId = 1;
-    this.currentTherapySessionId = 1;
-    this.currentHealthMetricsId = 1;
-    this.currentStravaIntegrationId = 1;
-    this.currentPunchCardId = 1;
-
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      createTableIfMissing: true 
     });
-
-    // Initialize with default membership plans
+    
     this.initializeMembershipPlans();
   }
 
-  private initializeMembershipPlans() {
-    const plans: InsertMembershipPlan[] = [
+  private async initializeMembershipPlans() {
+    // Initialize default membership plans if they don't exist
+    const defaultPlans = [
       {
-        planType: 'basic',
-        name: 'Basic',
-        monthlyPrice: 4900, // $49.00
-        description: 'Basic access to thermal facilities',
-        features: [
-          'Thermal facilities access (6AM-10PM)',
-          '5 guided sessions per month'
-        ]
+        name: "Basic Membership",
+        planType: "basic" as const,
+        description: "Access to basic wellness facilities",
+        monthlyPrice: 4900, // $49/month in cents
+        features: ["Sauna access", "Cold plunge access", "Basic facilities"]
       },
       {
-        planType: 'premium',
-        name: 'Premium',
-        monthlyPrice: 8900, // $89.00
-        description: 'Full access to all thermal wellness facilities',
-        features: [
-          '24/7 thermal facilities access',
-          'Unlimited guided sessions',
-          'Private sauna booking',
-          '2 guest passes/month'
-        ]
+        name: "Premium Membership", 
+        planType: "premium" as const,
+        description: "Enhanced wellness experience with additional perks",
+        monthlyPrice: 8900, // $89/month in cents
+        features: ["All basic features", "Infrared therapy", "Steam room", "Priority booking"]
       },
       {
-        planType: 'vip',
-        name: 'VIP',
-        monthlyPrice: 12900, // $129.00
-        description: 'VIP access with personalized thermal therapy',
-        features: [
-          'All Premium features',
-          'Personalized thermal therapy sessions (2x/month)',
-          'Wellness consultation',
-          '4 guest passes/month'
-        ]
+        name: "VIP Membership",
+        planType: "vip" as const,
+        description: "Complete wellness package with exclusive benefits",
+        monthlyPrice: 12900, // $129/month in cents
+        features: ["All premium features", "Personal consultation", "Exclusive hours", "Guest passes"]
       },
       {
-        planType: 'daily',
-        name: 'Day Pass',
-        monthlyPrice: 1500, // $15.00
-        description: 'Single day access to thermal facilities',
-        features: [
-          'Full day access to thermal facilities',
-          'Access to guided sessions',
-          'Valid for one day only'
-        ]
+        name: "Day Pass",
+        planType: "daily" as const,
+        description: "Single day access to all facilities",
+        monthlyPrice: 2500, // $25/day in cents
+        features: ["Full day access", "All thermal treatments", "No commitment"]
       }
     ];
 
-    plans.forEach(plan => {
-      this.createOrUpdateMembershipPlan(plan);
-    });
+    for (const plan of defaultPlans) {
+      try {
+        await db.insert(membershipPlans).values(plan).onConflictDoNothing();
+      } catch (error) {
+        // Plans might already exist, continue
+      }
+    }
   }
 
-  // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { ...insertUser, id, createdAt: new Date() };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
-  // Membership methods
   async getMembershipByUserId(userId: number): Promise<Membership | undefined> {
-    return Array.from(this.memberships.values()).find(
-      (membership) => membership.userId === userId,
-    );
+    const [membership] = await db.select().from(memberships).where(eq(memberships.userId, userId));
+    return membership || undefined;
   }
 
   async getMembershipById(id: string): Promise<Membership | undefined> {
-    return this.memberships.get(id);
+    const [membership] = await db.select().from(memberships).where(eq(memberships.membershipId, id));
+    return membership || undefined;
   }
 
   async createMembership(insertMembership: InsertMembership): Promise<Membership> {
-    const membership: Membership = { 
-      ...insertMembership,
-      id: this.memberships.size + 1, 
-      createdAt: new Date() 
-    };
-    this.memberships.set(insertMembership.membershipId, membership);
+    const [membership] = await db
+      .insert(memberships)
+      .values(insertMembership)
+      .returning();
     return membership;
   }
 
   async updateMembership(id: string, data: Partial<Membership>): Promise<Membership> {
-    const membership = this.memberships.get(id);
-    if (!membership) {
-      throw new Error('Membership not found');
-    }
-
-    const updatedMembership = { ...membership, ...data };
-    this.memberships.set(id, updatedMembership);
-    return updatedMembership;
+    const [membership] = await db
+      .update(memberships)
+      .set(data)
+      .where(eq(memberships.membershipId, id))
+      .returning();
+    return membership;
   }
 
   async getAllMembers(): Promise<(User & {membership?: Membership})[]> {
-    return Array.from(this.users.values()).map(user => {
-      const membership = Array.from(this.memberships.values()).find(
-        membership => membership.userId === user.id
-      );
-      return { ...user, membership };
-    });
+    const allUsers = await db.select().from(users);
+    const result = [];
+    
+    for (const user of allUsers) {
+      const membership = await this.getMembershipByUserId(user.id);
+      result.push({ ...user, membership });
+    }
+    
+    return result;
   }
 
-  // Check-in methods
   async getCheckInsByUserId(userId: number): Promise<CheckIn[]> {
-    return this.checkIns.filter(checkIn => checkIn.userId === userId)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return await db.select().from(checkIns).where(eq(checkIns.userId, userId)).orderBy(desc(checkIns.timestamp));
   }
 
   async createCheckIn(insertCheckIn: InsertCheckIn): Promise<CheckIn> {
-    const id = this.currentCheckInId++;
-    const checkIn: CheckIn = { 
-      ...insertCheckIn, 
-      id, 
-      timestamp: new Date() 
-    };
-    this.checkIns.push(checkIn);
+    const [checkIn] = await db
+      .insert(checkIns)
+      .values(insertCheckIn)
+      .returning();
     return checkIn;
   }
 
   async getAllCheckIns(page: number, limit: number): Promise<{data: CheckIn[], total: number, page: number, limit: number}> {
-    const sortedCheckIns = [...this.checkIns].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const data = sortedCheckIns.slice(start, end);
+    const allCheckIns = await db.select().from(checkIns).orderBy(desc(checkIns.timestamp));
+    const total = allCheckIns.length;
+    const startIndex = (page - 1) * limit;
+    const data = allCheckIns.slice(startIndex, startIndex + limit);
     
-    return {
-      data,
-      total: this.checkIns.length,
-      page,
-      limit
-    };
+    return { data, total, page, limit };
   }
 
   async getTodayCheckIns(): Promise<CheckIn[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    return this.checkIns.filter(checkIn => {
-      const checkInDate = new Date(checkIn.timestamp);
-      checkInDate.setHours(0, 0, 0, 0);
-      return checkInDate.getTime() === today.getTime();
-    }).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return await db.select().from(checkIns)
+      .where(gte(checkIns.timestamp, today))
+      .orderBy(desc(checkIns.timestamp));
   }
 
-  // Payment methods
   async getPaymentsByUserId(userId: number): Promise<Payment[]> {
-    return this.payments.filter(payment => payment.userId === userId)
-      .sort((a, b) => b.transactionDate.getTime() - a.transactionDate.getTime());
+    return await db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.transactionDate));
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const id = this.currentPaymentId++;
-    const payment: Payment = { 
-      ...insertPayment, 
-      id, 
-      transactionDate: new Date() 
-    };
-    this.payments.push(payment);
+    const [payment] = await db
+      .insert(payments)
+      .values(insertPayment)
+      .returning();
     return payment;
   }
 
-  // Membership plan methods
   async getAllMembershipPlans(): Promise<MembershipPlan[]> {
-    return Array.from(this.membershipPlans.values());
+    return await db.select().from(membershipPlans);
   }
 
   async createOrUpdateMembershipPlan(insertPlan: InsertMembershipPlan): Promise<MembershipPlan> {
-    // Check if plan with this type already exists
-    const existingPlan = Array.from(this.membershipPlans.values()).find(
-      plan => plan.planType === insertPlan.planType
-    );
-
-    if (existingPlan) {
-      // Update existing plan
-      const updatedPlan = { ...existingPlan, ...insertPlan };
-      this.membershipPlans.set(insertPlan.planType, updatedPlan);
-      return updatedPlan;
-    } else {
-      // Create new plan
-      const id = this.currentMembershipPlanId++;
-      const plan: MembershipPlan = { ...insertPlan, id };
-      this.membershipPlans.set(insertPlan.planType, plan);
-      return plan;
-    }
+    const [plan] = await db
+      .insert(membershipPlans)
+      .values(insertPlan)
+      .onConflictDoUpdate({
+        target: membershipPlans.planType,
+        set: insertPlan
+      })
+      .returning();
+    return plan;
   }
-  
-  // Member preferences methods
+
   async getMemberPreferences(userId: number): Promise<MemberPreferences | undefined> {
-    return this.memberPreferences.get(userId);
+    const [preferences] = await db.select().from(memberPreferences).where(eq(memberPreferences.userId, userId));
+    return preferences || undefined;
   }
 
   async createOrUpdateMemberPreferences(preferences: InsertMemberPreferences): Promise<MemberPreferences> {
-    const existingPreferences = this.memberPreferences.get(preferences.userId);
+    const existing = await this.getMemberPreferences(preferences.userId);
     
-    if (existingPreferences) {
-      const updatedPreferences = {
-        ...existingPreferences,
-        ...preferences,
-        updatedAt: new Date()
-      };
-      this.memberPreferences.set(preferences.userId, updatedPreferences);
-      return updatedPreferences;
+    if (existing) {
+      const [updated] = await db
+        .update(memberPreferences)
+        .set(preferences)
+        .where(eq(memberPreferences.userId, preferences.userId))
+        .returning();
+      return updated;
     } else {
-      const newPreferences: MemberPreferences = {
-        id: this.currentMemberPreferencesId++,
-        ...preferences,
-        updatedAt: new Date()
-      };
-      this.memberPreferences.set(preferences.userId, newPreferences);
-      return newPreferences;
+      const [created] = await db
+        .insert(memberPreferences)
+        .values(preferences)
+        .returning();
+      return created;
     }
   }
 
-  // Therapy session methods
   async getTherapySessionsByUserId(userId: number): Promise<TherapySession[]> {
-    return this.therapySessions
-      .filter(session => session.userId === userId)
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    return await db.select().from(therapySessions).where(eq(therapySessions.userId, userId)).orderBy(desc(therapySessions.createdAt));
   }
 
   async createTherapySession(session: InsertTherapySession): Promise<TherapySession> {
-    const newSession: TherapySession = {
-      id: this.currentTherapySessionId++,
-      ...session,
-      createdAt: new Date()
-    };
-    this.therapySessions.push(newSession);
+    const [newSession] = await db
+      .insert(therapySessions)
+      .values(session)
+      .returning();
     return newSession;
   }
 
   async getTherapySessionStats(userId: number): Promise<any> {
-    const sessions = this.therapySessions.filter(session => session.userId === userId);
+    const sessions = await this.getTherapySessionsByUserId(userId);
     
-    // No sessions yet
-    if (sessions.length === 0) {
-      return {
-        totalSessions: 0,
-        totalDuration: 0,
-        typeBreakdown: {},
-        averageStressReduction: 0,
-        averageHeartRateChange: 0
-      };
-    }
-
-    // Count by type
-    const typeBreakdown: Record<string, number> = {};
-    sessions.forEach(session => {
-      const type = session.treatmentType;
-      typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
-    });
-
-    // Calculate metrics
-    const totalDuration = sessions.reduce((sum, session) => sum + session.duration, 0);
+    // Calculate various stats
+    const totalSessions = sessions.length;
+    const totalDuration = sessions.reduce((sum, session) => {
+      const start = new Date(session.startTime!);
+      const end = new Date(session.endTime!);
+      return sum + (end.getTime() - start.getTime()) / (1000 * 60); // minutes
+    }, 0);
     
-    // Calculate stress reduction (where available)
-    const sessionsWithStressData = sessions.filter(
-      session => session.stressLevelBefore !== undefined && session.stressLevelAfter !== undefined
-    );
+    const avgDuration = totalSessions > 0 ? totalDuration / totalSessions : 0;
     
-    const averageStressReduction = sessionsWithStressData.length > 0
-      ? sessionsWithStressData.reduce(
-          (sum, session) => sum + ((session.stressLevelBefore || 0) - (session.stressLevelAfter || 0)), 
-          0
-        ) / sessionsWithStressData.length
-      : 0;
+    const treatmentCounts = sessions.reduce((counts, session) => {
+      counts[session.treatmentType] = (counts[session.treatmentType] || 0) + 1;
+      return counts;
+    }, {} as Record<string, number>);
     
-    // Calculate heart rate change (where available)
-    const sessionsWithHeartRateData = sessions.filter(
-      session => session.heartRateBefore !== undefined && session.heartRateAfter !== undefined
-    );
+    const favoritetreatment = Object.entries(treatmentCounts)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] || null;
     
-    const averageHeartRateChange = sessionsWithHeartRateData.length > 0
-      ? sessionsWithHeartRateData.reduce(
-          (sum, session) => sum + ((session.heartRateBefore || 0) - (session.heartRateAfter || 0)), 
-          0
-        ) / sessionsWithHeartRateData.length
-      : 0;
-
     return {
-      totalSessions: sessions.length,
-      totalDuration,
-      typeBreakdown,
-      averageStressReduction,
-      averageHeartRateChange,
-      recentSessions: sessions.slice(0, 5)
+      totalSessions,
+      totalDuration: Math.round(totalDuration),
+      avgDuration: Math.round(avgDuration),
+      favoritetreatment,
+      treatmentCounts
     };
   }
-  
-  // Health metrics methods
+
   async getHealthMetricsByUserId(userId: number): Promise<HealthMetrics[]> {
-    return this.healthMetrics
-      .filter(metrics => metrics.userId === userId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return await db.select().from(healthMetrics).where(eq(healthMetrics.userId, userId)).orderBy(desc(healthMetrics.createdAt));
   }
 
   async createHealthMetrics(metrics: InsertHealthMetrics): Promise<HealthMetrics> {
-    const newMetrics: HealthMetrics = {
-      id: this.currentHealthMetricsId++,
-      ...metrics,
-      createdAt: new Date()
-    };
-    this.healthMetrics.push(newMetrics);
+    const [newMetrics] = await db
+      .insert(healthMetrics)
+      .values(metrics)
+      .returning();
     return newMetrics;
   }
 
@@ -446,110 +326,91 @@ export class MemStorage implements IStorage {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     
-    return this.healthMetrics
-      .filter(metrics => 
-        metrics.userId === userId && 
-        new Date(metrics.date).getTime() >= startDate.getTime()
-      )
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return await db.select().from(healthMetrics)
+      .where(and(
+        eq(healthMetrics.userId, userId),
+        gte(healthMetrics.createdAt, startDate)
+      ))
+      .orderBy(desc(healthMetrics.createdAt));
   }
 
-  // Strava integration methods
   async getStravaIntegration(userId: number): Promise<StravaIntegration | undefined> {
-    return this.stravaIntegrations.get(userId);
+    const [integration] = await db.select().from(stravaIntegrations).where(eq(stravaIntegrations.userId, userId));
+    return integration || undefined;
   }
 
   async createOrUpdateStravaIntegration(integration: InsertStravaIntegration): Promise<StravaIntegration> {
-    const existingIntegration = this.stravaIntegrations.get(integration.userId);
+    const existing = await this.getStravaIntegration(integration.userId);
     
-    if (existingIntegration) {
-      const updatedIntegration = {
-        ...existingIntegration,
-        ...integration,
-      };
-      this.stravaIntegrations.set(integration.userId, updatedIntegration);
-      return updatedIntegration;
+    if (existing) {
+      const [updated] = await db
+        .update(stravaIntegrations)
+        .set(integration)
+        .where(eq(stravaIntegrations.userId, integration.userId))
+        .returning();
+      return updated;
     } else {
-      const newIntegration: StravaIntegration = {
-        id: this.currentStravaIntegrationId++,
-        ...integration,
-        createdAt: new Date()
-      };
-      this.stravaIntegrations.set(integration.userId, newIntegration);
-      return newIntegration;
+      const [created] = await db
+        .insert(stravaIntegrations)
+        .values(integration)
+        .returning();
+      return created;
     }
   }
 
   async disconnectStravaIntegration(userId: number): Promise<void> {
-    const integration = this.stravaIntegrations.get(userId);
-    if (integration) {
-      integration.isActive = false;
-      this.stravaIntegrations.set(userId, integration);
-    }
+    await db.delete(stravaIntegrations).where(eq(stravaIntegrations.userId, userId));
   }
 
-  // Punch card methods
   async getPunchCardsByUserId(userId: number): Promise<PunchCard[]> {
-    return this.punchCards.filter(card => card.userId === userId);
+    return await db.select().from(punchCards).where(eq(punchCards.userId, userId)).orderBy(desc(punchCards.purchasedAt));
   }
 
   async getPunchCardById(id: number): Promise<PunchCard | undefined> {
-    return this.punchCards.find(card => card.id === id);
+    const [card] = await db.select().from(punchCards).where(eq(punchCards.id, id));
+    return card || undefined;
   }
 
   async createPunchCard(insertPunchCard: InsertPunchCard): Promise<PunchCard> {
-    const id = this.currentPunchCardId++;
-    const punchCard: PunchCard = { 
-      ...insertPunchCard, 
-      id, 
-      purchasedAt: new Date() 
-    };
-    this.punchCards.push(punchCard);
+    const [punchCard] = await db
+      .insert(punchCards)
+      .values(insertPunchCard)
+      .returning();
     return punchCard;
   }
 
   async usePunchCardEntry(id: number): Promise<PunchCard> {
-    const punchCard = this.punchCards.find(card => card.id === id);
-    if (!punchCard) {
-      throw new Error('Punch card not found');
-    }
-    if (punchCard.remainingPunches <= 0) {
-      throw new Error('No remaining punches on this card');
-    }
-    if (punchCard.status !== 'active') {
-      throw new Error('Punch card is not active');
+    const card = await this.getPunchCardById(id);
+    if (!card) {
+      throw new Error("Punch card not found");
     }
 
-    punchCard.remainingPunches -= 1;
-    if (punchCard.remainingPunches === 0) {
-      punchCard.status = 'exhausted';
+    if (card.remainingPunches <= 0) {
+      throw new Error("No remaining punches on this card");
     }
 
-    return punchCard;
+    const newRemaining = card.remainingPunches - 1;
+    const newStatus = newRemaining === 0 ? "exhausted" : card.status;
+
+    const [updatedCard] = await db
+      .update(punchCards)
+      .set({ 
+        remainingPunches: newRemaining,
+        status: newStatus
+      })
+      .where(eq(punchCards.id, id))
+      .returning();
+
+    return updatedCard;
   }
 
   async getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]> {
     return [
-      {
-        name: "5-Day Pass Package",
-        totalPunches: 5,
-        totalPrice: 12000, // $120 in cents
-        pricePerPunch: 2400  // $24 in cents
-      },
-      {
-        name: "10-Day Pass Package",
-        totalPunches: 10,
-        totalPrice: 22000, // $220 in cents
-        pricePerPunch: 2200  // $22 in cents
-      },
-      {
-        name: "20-Day Pass Package",
-        totalPunches: 20,
-        totalPrice: 40000, // $400 in cents
-        pricePerPunch: 2000  // $20 in cents
-      }
+      { name: "5-Day Pass", totalPunches: 5, totalPrice: 10000, pricePerPunch: 2000 }, // $100 total, $20 per punch
+      { name: "10-Day Pass", totalPunches: 10, totalPrice: 18000, pricePerPunch: 1800 }, // $180 total, $18 per punch (10% savings)
+      { name: "20-Day Pass", totalPunches: 20, totalPrice: 32000, pricePerPunch: 1600 }, // $320 total, $16 per punch (20% savings)
     ];
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

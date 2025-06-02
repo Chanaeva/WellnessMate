@@ -96,8 +96,8 @@ export default function PaymentsPage() {
                 <Card>
                   <CardContent className="p-4">
                     <h4 className="text-sm text-gray-500 mb-1">Current Plan</h4>
-                    <p className="font-medium">{membership?.planType === 'premium' ? 'Premium Membership' : membership?.planType === 'vip' ? 'VIP Membership' : 'Basic Membership'}</p>
-                    <p className="text-sm text-gray-500 mt-2">{membership ? formatPrice(membership.planType === 'premium' ? 8900 : membership.planType === 'vip' ? 12900 : 4900) : '$0.00'}/month</p>
+                    <p className="font-medium">{membership?.planType === 'daily' ? 'Drop-in Pass' : 'Monthly Membership'}</p>
+                    <p className="text-sm text-gray-500 mt-2">{membership ? formatPrice(membership.planType === 'daily' ? 3000 : 6500) : '$0.00'}{membership?.planType === 'daily' ? '/day' : '/month'}</p>
                   </CardContent>
                 </Card>
                 

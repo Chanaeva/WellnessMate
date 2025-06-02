@@ -265,8 +265,8 @@ export default function MembershipPage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {punchCardOptions?.map((option, index) => {
-                      const savings = (option.totalPunches * 2500) - option.totalPrice; // Assuming $25 regular day pass price
-                      const savingsPercentage = Math.round((savings / (option.totalPunches * 2500)) * 100);
+                      const savings = (option.totalPunches * 3000) - option.totalPrice; // Assuming $30 regular day pass price
+                      const savingsPercentage = Math.round((savings / (option.totalPunches * 3000)) * 100);
                       
                       return (
                         <Card key={index} className="overflow-hidden border-2 border-amber-200 hover:border-amber-300 transition-colors">

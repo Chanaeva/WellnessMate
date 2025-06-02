@@ -91,31 +91,17 @@ export class DatabaseStorage implements IStorage {
     // Initialize default membership plans if they don't exist
     const defaultPlans = [
       {
-        name: "Basic Membership",
+        name: "Monthly Membership",
         planType: "basic" as const,
-        description: "Access to basic wellness facilities",
-        monthlyPrice: 4900, // $49/month in cents
-        features: ["Sauna access", "Cold plunge access", "Basic facilities"]
+        description: "Full access to all wellness facilities",
+        monthlyPrice: 6500, // $65/month in cents
+        features: ["Unlimited sauna access", "Cold plunge access", "Infrared therapy", "Steam room", "All thermal treatments"]
       },
       {
-        name: "Premium Membership", 
-        planType: "premium" as const,
-        description: "Enhanced wellness experience with additional perks",
-        monthlyPrice: 8900, // $89/month in cents
-        features: ["All basic features", "Infrared therapy", "Steam room", "Priority booking"]
-      },
-      {
-        name: "VIP Membership",
-        planType: "vip" as const,
-        description: "Complete wellness package with exclusive benefits",
-        monthlyPrice: 12900, // $129/month in cents
-        features: ["All premium features", "Personal consultation", "Exclusive hours", "Guest passes"]
-      },
-      {
-        name: "Day Pass",
+        name: "Drop-in Pass",
         planType: "daily" as const,
         description: "Single day access to all facilities",
-        monthlyPrice: 2500, // $25/day in cents
+        monthlyPrice: 3000, // $30/day in cents
         features: ["Full day access", "All thermal treatments", "No commitment"]
       }
     ];
@@ -406,9 +392,9 @@ export class DatabaseStorage implements IStorage {
 
   async getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]> {
     return [
-      { name: "5-Day Pass", totalPunches: 5, totalPrice: 10000, pricePerPunch: 2000 }, // $100 total, $20 per punch
-      { name: "10-Day Pass", totalPunches: 10, totalPrice: 18000, pricePerPunch: 1800 }, // $180 total, $18 per punch (10% savings)
-      { name: "20-Day Pass", totalPunches: 20, totalPrice: 32000, pricePerPunch: 1600 }, // $320 total, $16 per punch (20% savings)
+      { name: "5-Day Pass", totalPunches: 5, totalPrice: 13500, pricePerPunch: 2700 }, // $135 total, $27 per punch (10% savings)
+      { name: "10-Day Pass", totalPunches: 10, totalPrice: 24000, pricePerPunch: 2400 }, // $240 total, $24 per punch (20% savings)
+      { name: "20-Day Pass", totalPunches: 20, totalPrice: 42000, pricePerPunch: 2100 }, // $420 total, $21 per punch (30% savings)
     ];
   }
 }

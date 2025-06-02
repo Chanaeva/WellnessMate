@@ -58,7 +58,7 @@ export default function MemberDashboard() {
   const currentMonth = new Date().getMonth();
   const checkInsThisMonth = checkIns?.filter(checkIn => {
     if (!checkIn.timestamp) return false;
-    const checkInDate = new Date(checkIn.timestamp);
+    const checkInDate = new Date(checkIn.timestamp.toString());
     return checkInDate.getMonth() === currentMonth;
   }).length || 0;
 

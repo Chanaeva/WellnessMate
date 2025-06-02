@@ -52,43 +52,12 @@ export default function MemberDashboard() {
   const formattedEndDate = membership ? format(membershipEndDate, "MMMM d, yyyy") : "N/A";
   const currentPlan = membershipPlans?.find(plan => plan.planType === membership?.planType);
   
-  // Example wellness session schedule data (would come from API in a real app)
-  const classSchedule = [
-    {
-      id: 1,
-      name: "Morning Sauna Session",
-      time: "7:00 AM - 8:30 AM",
-      location: "Finnish Sauna",
-      instructor: "Sarah Johnson",
-      icon: <Heart className="h-5 w-5" />,
-      iconColor: "bg-primary/10 text-primary",
-      available: true
-    },
-    {
-      id: 2,
-      name: "Hot & Cold Therapy",
-      time: "12:00 PM - 1:00 PM",
-      location: "Thermal Suite",
-      instructor: "Mike Thompson",
-      icon: <Sparkles className="h-5 w-5" />,
-      iconColor: "bg-secondary/10 text-secondary",
-      available: false
-    },
-    {
-      id: 3,
-      name: "Evening Thermal Meditation",
-      time: "6:30 PM - 7:30 PM",
-      location: "Relaxation Room",
-      instructor: "Emma Lewis",
-      icon: <Sparkles className="h-5 w-5" />,
-      iconColor: "bg-purple-100 text-purple-700",
-      available: true
-    }
-  ];
+
 
   // Calculate total check-ins this month
   const currentMonth = new Date().getMonth();
   const checkInsThisMonth = checkIns?.filter(checkIn => {
+    if (!checkIn.timestamp) return false;
     const checkInDate = new Date(checkIn.timestamp);
     return checkInDate.getMonth() === currentMonth;
   }).length || 0;
@@ -131,22 +100,7 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
-            {/* Today's Thermal Sessions */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold">Today's Thermal Sessions</h3>
-                  <Button variant="link" className="text-primary">
-                    View All
-                  </Button>
-                </div>
-                <div className="space-y-4">
-                  {classSchedule.map((item) => (
-                    <ScheduleItem key={item.id} item={item} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+
 
             {/* Facilities */}
             <Card>
@@ -249,10 +203,12 @@ export default function MemberDashboard() {
                       <span className="text-sm text-center">Payment History</span>
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
-                    <Calendar className="h-6 w-6 text-primary mb-2" />
-                    <span className="text-sm text-center">Book Thermal Session</span>
-                  </Button>
+                  <Link href="/thermal-treatments">
+                    <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
+                      <Calendar className="h-6 w-6 text-primary mb-2" />
+                      <span className="text-sm text-center">Thermal Treatments</span>
+                    </Button>
+                  </Link>
                   <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
                     <Settings className="h-6 w-6 text-primary mb-2" />
                     <span className="text-sm text-center">Account Settings</span>

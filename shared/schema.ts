@@ -54,9 +54,6 @@ export const paymentMethodEnum = pgEnum('payment_method', ['credit_card', 'debit
 // Treatment type enum
 export const treatmentTypeEnum = pgEnum('treatment_type', ['sauna', 'cold_plunge', 'infrared', 'steam', 'contrast', 'kneipp', 'hammam']);
 
-// Booking status enum
-export const bookingStatusEnum = pgEnum('booking_status', ['scheduled', 'completed', 'cancelled', 'no_show']);
-
 // Punch card status enum
 export const punchCardStatusEnum = pgEnum('punch_card_status', ['active', 'expired', 'exhausted']);
 

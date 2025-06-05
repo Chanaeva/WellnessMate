@@ -13,7 +13,7 @@ import {
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, lt, gte } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -180,11 +180,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async cleanupExpiredTokens(): Promise<void> {
+    const now = new Date();
     await db
       .delete(passwordResetTokens)
       .where(and(
         eq(passwordResetTokens.used, false),
-        gte(new Date(), passwordResetTokens.expiresAt)
+        lt(passwordResetTokens.expiresAt, now)
       ));
   }
 

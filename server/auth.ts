@@ -136,4 +136,65 @@ export function setupAuth(app: Express) {
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
+
+  // Password reset request endpoint
+  app.post("/api/password-reset-request", async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists for security
+        return res.status(200).json({ message: "If an account with that email exists, a reset link has been sent." });
+      }
+
+      // Generate secure reset token
+      const token = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+      // Store reset token
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        token,
+        expiresAt,
+        used: false
+      });
+
+      // For now, just return success (email would be sent here with SendGrid)
+      res.status(200).json({ 
+        message: "If an account with that email exists, a reset link has been sent.",
+        // In development, include the token for testing
+        ...(process.env.NODE_ENV === 'development' && { resetToken: token })
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Password reset endpoint
+  app.post("/api/password-reset", async (req, res, next) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      // Find and validate token
+      const resetToken = await storage.getPasswordResetToken(token);
+      if (!resetToken || resetToken.used || new Date() > new Date(resetToken.expiresAt!)) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Update user password
+      await storage.updateUserPassword(resetToken.userId, hashedPassword);
+
+      // Mark token as used
+      await storage.markTokenAsUsed(resetToken.id);
+
+      res.status(200).json({ message: "Password reset successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
 }

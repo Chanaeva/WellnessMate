@@ -134,8 +134,7 @@ export default function MembershipPage() {
                   </>
                 ) : (
                   <div className="bg-neutral-light rounded-lg p-6 border border-gray-200 text-center">
-                    <p className="text-gray-600 mb-4">You don't have an active thermal wellness membership yet.</p>
-                    <Button className="bg-primary hover:bg-primary/90">Start Your Thermal Wellness Journey</Button>
+                    <p className="text-gray-600 mb-4">You don't have an active membership yet.</p>
                   </div>
                 )}
               </div>

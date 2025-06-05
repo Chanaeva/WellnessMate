@@ -17,6 +17,16 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Password reset tokens table
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Membership plan types enum
 export const planTypeEnum = pgEnum('plan_type', ['basic', 'premium', 'vip', 'daily']);
 

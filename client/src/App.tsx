@@ -13,7 +13,6 @@ import MemberDashboard from "@/pages/member-dashboard";
 import QRCodePage from "@/pages/qr-code-page";
 import MembershipPage from "@/pages/membership-page";
 import PaymentsPage from "@/pages/payments-page";
-import ThermalTreatmentsPage from "@/pages/thermal-treatments-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminCheckIns from "@/pages/admin/check-ins";
@@ -27,7 +26,6 @@ function Router() {
       
       {/* Member routes */}
       <ProtectedRoute path="/" component={MemberDashboard} />
-      <ProtectedRoute path="/thermal-treatments" component={ThermalTreatmentsPage} />
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
       <ProtectedRoute path="/membership" component={MembershipPage} />
       <ProtectedRoute path="/payments" component={PaymentsPage} />

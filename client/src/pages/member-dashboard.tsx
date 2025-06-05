@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Membership, CheckIn, MembershipPlan } from "@shared/schema";
+import { Membership, CheckIn, MembershipPlan, PunchCard } from "@shared/schema";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MemberCard from "@/components/dashboard/member-card";
 import StatsCard from "@/components/dashboard/stats-card";
@@ -22,7 +23,8 @@ import {
   XCircle,
   Volleyball,
   Heart,
-  Sparkles
+  Sparkles,
+  Ticket
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -44,6 +46,12 @@ export default function MemberDashboard() {
   // Fetch membership plans
   const { data: membershipPlans } = useQuery<MembershipPlan[]>({
     queryKey: ["/api/membership-plans"],
+  });
+
+  // Fetch user's punch cards
+  const { data: userPunchCards } = useQuery<PunchCard[]>({
+    queryKey: ["/api/punch-cards"],
+    enabled: !!user,
   });
 
   // Calculate membership status and information
@@ -186,6 +194,49 @@ export default function MemberDashboard() {
               memberSince="Jan 2023"
             />
 
+            {/* Digital Punch Cards - Show when purchased */}
+            {userPunchCards && userPunchCards.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center">
+                    <Ticket className="h-5 w-5 text-amber-600 mr-2" />
+                    Your Digital Punch Cards
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 pt-0">
+                  <div className="space-y-3">
+                    {userPunchCards.map((card) => (
+                      <div key={card.id} className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-amber-800">{card.name}</h4>
+                          <Badge className={`${card.status === 'active' ? 'bg-green-500' : card.status === 'exhausted' ? 'bg-red-500' : 'bg-gray-500'} text-white`}>
+                            {card.status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">Remaining:</span>
+                          <span className="font-bold text-amber-700">{card.remainingPunches} visits</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm mt-1">
+                          <span className="text-gray-600">Total:</span>
+                          <span className="text-gray-700">{card.totalPunches} visits</span>
+                        </div>
+                        {card.status === 'active' && (
+                          <div className="mt-3">
+                            <Link href="/qr-code">
+                              <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700">
+                                Use for Check-in
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Quick Actions */}
             <Card>
               <CardContent className="p-6">
@@ -203,10 +254,10 @@ export default function MemberDashboard() {
                       <span className="text-sm text-center">Payment History</span>
                     </Button>
                   </Link>
-                  <Link href="/thermal-treatments">
+                  <Link href="/membership">
                     <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
-                      <Calendar className="h-6 w-6 text-primary mb-2" />
-                      <span className="text-sm text-center">Thermal Treatments</span>
+                      <Users className="h-6 w-6 text-primary mb-2" />
+                      <span className="text-sm text-center">Membership</span>
                     </Button>
                   </Link>
                   <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">

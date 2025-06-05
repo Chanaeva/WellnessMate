@@ -16,7 +16,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20",
+  apiVersion: "2025-05-28.basil",
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -260,6 +260,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedCard);
     } catch (error) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Payment management routes
+  
+  // Create or get Stripe customer
+  app.post("/api/stripe/customer", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      
+      if (user.stripeCustomerId) {
+        // Return existing customer
+        const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        return res.json({ customer });
+      }
+      
+      // Create new Stripe customer
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`,
+        metadata: { userId: user.id.toString() }
+      });
+      
+      // Save customer ID to user
+      await storage.updateUserStripeCustomerId(user.id, customer.id);
+      
+      res.json({ customer });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to create customer: " + error.message });
+    }
+  });
+
+  // Get user's payment methods
+  app.get("/api/payment-methods", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const paymentMethods = await storage.getPaymentMethodsByUserId(user.id);
+      res.json(paymentMethods);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch payment methods: " + error.message });
+    }
+  });
+
+  // Create setup intent for adding new payment method
+  app.post("/api/stripe/setup-intent", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      
+      // Ensure user has Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: { userId: user.id.toString() }
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomerId(user.id, customerId);
+      }
+      
+      const setupIntent = await stripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        usage: 'off_session'
+      });
+      
+      res.json({ clientSecret: setupIntent.client_secret });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to create setup intent: " + error.message });
+    }
+  });
+
+  // Save payment method after successful setup
+  app.post("/api/payment-methods", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { paymentMethodId } = req.body;
+      
+      // Retrieve payment method from Stripe
+      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      
+      if (!paymentMethod.card) {
+        return res.status(400).json({ message: "Invalid payment method" });
+      }
+      
+      // Check if this is the user's first payment method to make it default
+      const existingMethods = await storage.getPaymentMethodsByUserId(user.id);
+      const isDefault = existingMethods.length === 0;
+      
+      // Save to database
+      const savedMethod = await storage.createPaymentMethod({
+        userId: user.id,
+        stripePaymentMethodId: paymentMethod.id,
+        cardLast4: paymentMethod.card.last4,
+        cardBrand: paymentMethod.card.brand,
+        cardExpMonth: paymentMethod.card.exp_month,
+        cardExpYear: paymentMethod.card.exp_year,
+        isDefault
+      });
+      
+      res.json(savedMethod);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to save payment method: " + error.message });
+    }
+  });
+
+  // Set default payment method
+  app.put("/api/payment-methods/:paymentMethodId/default", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { paymentMethodId } = req.params;
+      
+      await storage.setDefaultPaymentMethod(user.id, paymentMethodId);
+      res.json({ message: "Default payment method updated" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to update default payment method: " + error.message });
+    }
+  });
+
+  // Delete payment method
+  app.delete("/api/payment-methods/:paymentMethodId", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { paymentMethodId } = req.params;
+      
+      // Detach from Stripe
+      await stripe.paymentMethods.detach(paymentMethodId);
+      
+      // Remove from database
+      await storage.deletePaymentMethod(paymentMethodId);
+      
+      res.json({ message: "Payment method deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to delete payment method: " + error.message });
+    }
+  });
+
+  // Create payment intent for membership or day pass
+  app.post("/api/create-payment-intent", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { amount, description, paymentMethodId } = req.body;
+      
+      // Ensure user has Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: { userId: user.id.toString() }
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomerId(user.id, customerId);
+      }
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'usd',
+        customer: customerId,
+        payment_method: paymentMethodId,
+        confirmation_method: 'manual',
+        confirm: true,
+        description,
+        metadata: {
+          userId: user.id.toString(),
+          description
+        }
+      });
+      
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to create payment intent: " + error.message });
+    }
+  });
+
+  // Confirm payment and record in database
+  app.post("/api/confirm-payment", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { paymentIntentId, membershipId, description } = req.body;
+      
+      // Retrieve payment intent from Stripe
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status === 'succeeded') {
+        // Record payment in database
+        const payment = await storage.createPayment({
+          userId: user.id,
+          membershipId: membershipId || 'day-pass',
+          amount: paymentIntent.amount, // Already in cents
+          description,
+          status: 'successful',
+          method: 'credit_card',
+          stripePaymentIntentId: paymentIntent.id,
+          stripePaymentMethodId: paymentIntent.payment_method as string
+        });
+        
+        res.json({ payment, message: "Payment successful" });
+      } else {
+        res.status(400).json({ message: "Payment not completed" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to confirm payment: " + error.message });
     }
   });
 

@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   role: roleEnum("role").notNull().default('member'),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -76,7 +77,22 @@ export const payments = pgTable("payments", {
   description: text("description").notNull(),
   status: paymentStatusEnum("status").notNull(),
   method: paymentMethodEnum("method").notNull(),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripePaymentMethodId: text("stripe_payment_method_id"),
   transactionDate: timestamp("transaction_date").defaultNow(),
+});
+
+// Payment methods table for storing user's saved cards
+export const paymentMethods = pgTable("payment_methods", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  stripePaymentMethodId: text("stripe_payment_method_id").notNull().unique(),
+  cardLast4: text("card_last4").notNull(),
+  cardBrand: text("card_brand").notNull(),
+  cardExpMonth: integer("card_exp_month").notNull(),
+  cardExpYear: integer("card_exp_year").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Plan pricing table
@@ -133,6 +149,11 @@ export const insertPunchCardSchema = createInsertSchema(punchCards).omit({
   purchasedAt: true,
 });
 
+export const insertPaymentMethodSchema = createInsertSchema(paymentMethods).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Define types for insert and select
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -151,6 +172,9 @@ export type MembershipPlan = typeof membershipPlans.$inferSelect;
 
 export type InsertPunchCard = z.infer<typeof insertPunchCardSchema>;
 export type PunchCard = typeof punchCards.$inferSelect;
+
+export type InsertPaymentMethod = z.infer<typeof insertPaymentMethodSchema>;
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
 
 // Member Temperature Preferences table
 export const memberPreferences = pgTable("member_preferences", {

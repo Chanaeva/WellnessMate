@@ -4,6 +4,7 @@ import {
   memberships, type Membership, type InsertMembership,
   checkIns, type CheckIn, type InsertCheckIn,
   payments, type Payment, type InsertPayment,
+  paymentMethods, type PaymentMethod, type InsertPaymentMethod,
   membershipPlans, type MembershipPlan, type InsertMembershipPlan,
   punchCards, type PunchCard, type InsertPunchCard,
   memberPreferences, type MemberPreferences, type InsertMemberPreferences,
@@ -49,6 +50,13 @@ export interface IStorage {
   // Payment methods
   getPaymentsByUserId(userId: number): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
+
+  // Stripe customer and payment method management
+  updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User>;
+  getPaymentMethodsByUserId(userId: number): Promise<PaymentMethod[]>;
+  createPaymentMethod(paymentMethod: InsertPaymentMethod): Promise<PaymentMethod>;
+  deletePaymentMethod(paymentMethodId: string): Promise<void>;
+  setDefaultPaymentMethod(userId: number, paymentMethodId: string): Promise<void>;
 
   // Membership plan methods
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
@@ -268,6 +276,54 @@ export class DatabaseStorage implements IStorage {
       .values(insertPayment)
       .returning();
     return payment;
+  }
+
+  async updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ stripeCustomerId })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async getPaymentMethodsByUserId(userId: number): Promise<PaymentMethod[]> {
+    return await db
+      .select()
+      .from(paymentMethods)
+      .where(eq(paymentMethods.userId, userId))
+      .orderBy(desc(paymentMethods.isDefault), desc(paymentMethods.createdAt));
+  }
+
+  async createPaymentMethod(insertPaymentMethod: InsertPaymentMethod): Promise<PaymentMethod> {
+    const [paymentMethod] = await db
+      .insert(paymentMethods)
+      .values(insertPaymentMethod)
+      .returning();
+    return paymentMethod;
+  }
+
+  async deletePaymentMethod(stripePaymentMethodId: string): Promise<void> {
+    await db
+      .delete(paymentMethods)
+      .where(eq(paymentMethods.stripePaymentMethodId, stripePaymentMethodId));
+  }
+
+  async setDefaultPaymentMethod(userId: number, stripePaymentMethodId: string): Promise<void> {
+    // First, unset all existing default payment methods for this user
+    await db
+      .update(paymentMethods)
+      .set({ isDefault: false })
+      .where(eq(paymentMethods.userId, userId));
+
+    // Then set the specified payment method as default
+    await db
+      .update(paymentMethods)
+      .set({ isDefault: true })
+      .where(and(
+        eq(paymentMethods.userId, userId),
+        eq(paymentMethods.stripePaymentMethodId, stripePaymentMethodId)
+      ));
   }
 
   async getAllMembershipPlans(): Promise<MembershipPlan[]> {

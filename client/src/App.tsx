@@ -7,6 +7,8 @@ import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
+import ForgotPasswordPage from "@/pages/forgot-password-page";
+import ResetPasswordPage from "@/pages/reset-password-page";
 import MemberDashboard from "@/pages/member-dashboard";
 import QRCodePage from "@/pages/qr-code-page";
 import MembershipPage from "@/pages/membership-page";
@@ -20,6 +22,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       
       {/* Member routes */}
       <ProtectedRoute path="/" component={MemberDashboard} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -180,7 +180,14 @@ export default function AuthPage() {
                       </Button>
                     </form>
                   </Form>
-                  <div className="text-center mt-4">
+                  <div className="text-center mt-4 space-y-2">
+                    <div>
+                      <Link href="/forgot-password">
+                        <Button variant="link" className="text-sm text-muted-foreground p-0">
+                          Forgot your password?
+                        </Button>
+                      </Link>
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Don't have an account?{" "}
                       <Button variant="link" onClick={() => setActiveTab("register")} className="p-0">

@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock, User } from "lucide-react";
+import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 
 // Login schema
 const loginSchema = z.object({
@@ -336,21 +337,30 @@ export default function AuthPage() {
               style={{ backgroundImage: "url('https://images.unsplash.com/photo-1584622650111-993a426bcf0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=800&q=80')" }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-b from-primary/70 to-primary/30"></div>
-            <div className="relative p-8 flex flex-col h-full justify-end text-white">
-              <h2 className="text-3xl font-bold mb-4">Welcome to Wolf Mother Wellness</h2>
-              <p className="text-lg mb-6">Your thermal wellness journey begins here. Our center offers state-of-the-art thermal facilities designed to help you achieve optimal health and relaxation.</p>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="font-semibold mb-1">Thermal Facilities</h3>
-                  <p className="text-sm">Access to sauna, hot tubs, cold plunge and more</p>
-                </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="font-semibold mb-1">Wellness Guides</h3>
-                  <p className="text-sm">Expert guidance for thermal therapy</p>
-                </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="font-semibold mb-1">Flexible Plans</h3>
-                  <p className="text-sm">Choose a plan that fits your needs</p>
+            <div className="relative p-8 flex flex-col h-full justify-between text-white">
+              <div className="flex items-center justify-center mb-8">
+                <img 
+                  src={logoMossGreen} 
+                  alt="Wolf Mother Wellness" 
+                  className="h-24 w-24 object-contain filter brightness-0 invert"
+                />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold mb-4">Welcome to Wolf Mother Wellness</h2>
+                <p className="text-lg mb-6">Your thermal wellness journey begins here. Our center offers state-of-the-art thermal facilities designed to help you achieve optimal health and relaxation.</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                    <h3 className="font-semibold mb-1">Thermal Facilities</h3>
+                    <p className="text-sm">Access to sauna, hot tubs, cold plunge and more</p>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                    <h3 className="font-semibold mb-1">Wellness Guides</h3>
+                    <p className="text-sm">Expert guidance for thermal therapy</p>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4">
+                    <h3 className="font-semibold mb-1">Flexible Plans</h3>
+                    <p className="text-sm">Choose a plan that fits your needs</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -359,4 +369,6 @@ export default function AuthPage() {
       </div>
     </div>
   );
-}
+};
+
+export default AuthPage;

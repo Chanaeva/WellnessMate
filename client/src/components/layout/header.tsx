@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, ChevronDown, User, Settings, LogOut } from "lucide-react";
+import logoBlack from "@assets/WM Emblem Black.png";
+import logoTransparent from "@assets/WM Emblem BLK transparent.png";
 
 const Header = () => {
   const [location] = useLocation();
@@ -48,10 +50,12 @@ const Header = () => {
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center">
             <Link href={isAdmin ? '/admin' : '/'} className="flex items-center">
-              <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-                WW
-              </div>
-              <div className="ml-2">
+              <img 
+                src={logoBlack} 
+                alt="Wolf Mother Wellness" 
+                className="h-12 w-12 object-contain"
+              />
+              <div className="ml-3">
                 <h1 className="text-xl font-heading font-semibold text-neutral-dark">Wolf Mother Wellness</h1>
                 <p className="text-xs text-neutral-dark opacity-70">Thermal Wellness Center</p>
               </div>

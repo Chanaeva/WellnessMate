@@ -1,5 +1,6 @@
 import { 
   users, type User, type InsertUser,
+  passwordResetTokens, type PasswordResetToken, type InsertPasswordResetToken,
   memberships, type Membership, type InsertMembership,
   checkIns, type CheckIn, type InsertCheckIn,
   payments, type Payment, type InsertPayment,
@@ -22,7 +23,15 @@ export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserPassword(userId: number, newPassword: string): Promise<User>;
+
+  // Password reset methods
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markTokenAsUsed(tokenId: number): Promise<void>;
+  cleanupExpiredTokens(): Promise<void>;
   
   // Membership methods
   getMembershipByUserId(userId: number): Promise<Membership | undefined>;
@@ -125,12 +134,58 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async updateUserPassword(userId: number, newPassword: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ password: newPassword })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async createPasswordResetToken(insertToken: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [token] = await db
+      .insert(passwordResetTokens)
+      .values(insertToken)
+      .returning();
+    return token;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+    return resetToken || undefined;
+  }
+
+  async markTokenAsUsed(tokenId: number): Promise<void> {
+    await db
+      .update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.id, tokenId));
+  }
+
+  async cleanupExpiredTokens(): Promise<void> {
+    await db
+      .delete(passwordResetTokens)
+      .where(and(
+        eq(passwordResetTokens.used, false),
+        gte(new Date(), passwordResetTokens.expiresAt)
+      ));
   }
 
   async getMembershipByUserId(userId: number): Promise<Membership | undefined> {

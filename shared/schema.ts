@@ -249,3 +249,25 @@ export const loginSchema = z.object({
 });
 
 export type LoginData = z.infer<typeof loginSchema>;
+
+// Password reset schema
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// Password reset request schema
+export const passwordResetRequestSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+export const passwordResetSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  newPassword: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export type PasswordResetRequestData = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetData = z.infer<typeof passwordResetSchema>;

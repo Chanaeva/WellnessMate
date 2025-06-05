@@ -1,20 +1,28 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Payment, Membership } from "@shared/schema";
+import { Payment, Membership, PaymentMethod } from "@shared/schema";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, CreditCard, Shield, Lock } from "lucide-react";
+import { Download, CreditCard, Shield, Lock, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { AddPaymentMethod } from "@/components/payment/add-payment-method";
+import { PaymentMethodCard } from "@/components/payment/payment-method-card";
+
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
 
 export default function PaymentsPage() {
   const { user } = useAuth();
   const [timeFilter, setTimeFilter] = useState("3months");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const itemsPerPage = 5;
 
   // Fetch membership data
@@ -26,6 +34,12 @@ export default function PaymentsPage() {
   // Fetch payments data
   const { data: payments, isLoading: isPaymentsLoading } = useQuery<Payment[]>({
     queryKey: ["/api/payments"],
+    enabled: !!user,
+  });
+
+  // Fetch payment methods
+  const { data: paymentMethods, isLoading: isPaymentMethodsLoading } = useQuery<PaymentMethod[]>({
+    queryKey: ["/api/payment-methods"],
     enabled: !!user,
   });
 
@@ -242,6 +256,89 @@ export default function PaymentsPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Methods Section */}
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Payment Methods
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Manage your saved credit cards for secure payments
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={() => setShowAddPaymentMethod(true)}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Card
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {/* Security Notice */}
+              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-emerald-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-emerald-800">Secure Payment Processing</h4>
+                    <p className="text-sm text-emerald-700 mt-1">
+                      Your payment information is encrypted and stored securely with Stripe. 
+                      <Lock className="h-3 w-3 inline mx-1" />
+                      We never store your full card details on our servers.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {showAddPaymentMethod ? (
+                <Elements stripe={stripePromise}>
+                  <AddPaymentMethod
+                    onSuccess={() => setShowAddPaymentMethod(false)}
+                    onCancel={() => setShowAddPaymentMethod(false)}
+                  />
+                </Elements>
+              ) : (
+                <div className="space-y-4">
+                  {isPaymentMethodsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                      <span className="ml-2 text-gray-600">Loading payment methods...</span>
+                    </div>
+                  ) : paymentMethods && paymentMethods.length > 0 ? (
+                    <div className="grid gap-4">
+                      {paymentMethods.map((method) => (
+                        <PaymentMethodCard
+                          key={method.id}
+                          paymentMethod={method}
+                          showActions={true}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Payment Methods</h3>
+                      <p className="text-gray-600 mb-4">
+                        Add a credit card to make payments for memberships and day passes.
+                      </p>
+                      <Button
+                        onClick={() => setShowAddPaymentMethod(true)}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Card
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

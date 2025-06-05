@@ -45,7 +45,7 @@ const registerSchema = insertUserSchema
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function AuthPage() {
+function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
@@ -369,6 +369,6 @@ export default function AuthPage() {
       </div>
     </div>
   );
-};
+}
 
 export default AuthPage;

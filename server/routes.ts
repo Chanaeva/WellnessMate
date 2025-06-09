@@ -108,6 +108,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create or update membership plan (public endpoint for pricing management)
+  app.post("/api/membership-plans", async (req, res) => {
+    console.log('POST /api/membership-plans hit with body:', req.body);
+    try {
+      const validatedData = insertMembershipPlanSchema.parse(req.body);
+      console.log('Validated data:', validatedData);
+      const plan = await storage.createOrUpdateMembershipPlan(validatedData);
+      console.log('Created plan:', plan);
+      res.status(201).json(plan);
+    } catch (error) {
+      console.error('Membership plan creation error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Check in using QR code
   app.post("/api/check-in", isAuthenticated, async (req, res) => {
     try {

@@ -266,12 +266,27 @@ export default function MemberDashboard() {
                   </Link>
                 </div>
                 
-                {/* Admin Access Section */}
-                <div className="border-t pt-4">
+                {/* External Links Section */}
+                <div className="border-t border-border pt-4 space-y-3">
+                  <a 
+                    href="https://www.wolfmothertulsa.com/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <Button variant="outline" className="w-full flex items-center justify-center bg-primary/5 hover:bg-primary/10 py-3 border-primary/20">
+                      <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                      </svg>
+                      <span className="text-sm text-primary font-medium">Visit Our Website</span>
+                    </Button>
+                  </a>
+                  
+                  {/* Admin Access */}
                   <Link href="/admin-login">
-                    <Button variant="outline" className="w-full flex items-center justify-center bg-gray-50 hover:bg-gray-100 py-3 border-gray-300">
-                      <Settings className="h-5 w-5 text-gray-600 mr-2" />
-                      <span className="text-sm text-gray-700">Admin Login</span>
+                    <Button variant="outline" className="w-full flex items-center justify-center bg-muted hover:bg-muted/80 py-3">
+                      <Settings className="h-5 w-5 text-muted-foreground mr-2" />
+                      <span className="text-sm text-muted-foreground">Admin Login</span>
                     </Button>
                   </Link>
                 </div>

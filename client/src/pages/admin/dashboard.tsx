@@ -24,7 +24,8 @@ import {
   QrCode,
   CheckCircle,
   Download,
-  Printer
+  Printer,
+  DollarSign
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,6 +35,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import Header from "@/components/layout/header";
 import QRCode from "qrcode";
+import PricingManagement from "./pricing";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -317,10 +319,11 @@ export default function AdminDashboard() {
 
           {/* Main Tabbed Interface */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="checkins">Check-ins</TabsTrigger>
+              <TabsTrigger value="pricing">Pricing</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
@@ -757,6 +760,11 @@ export default function AdminDashboard() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Pricing Management Tab */}
+            <TabsContent value="pricing" className="space-y-6">
+              <PricingManagement />
             </TabsContent>
 
             {/* Analytics Tab */}

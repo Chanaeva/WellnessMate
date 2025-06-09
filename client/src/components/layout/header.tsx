@@ -34,9 +34,7 @@ const Header = () => {
   };
 
   const navLinks = isAdmin ? [
-    { href: "/admin", label: "Dashboard", active: location === "/admin" },
-    { href: "/admin/members", label: "Members", active: location === "/admin/members" },
-    { href: "/admin/check-ins", label: "Check-ins", active: location === "/admin/check-ins" }
+    // Admin users only see the admin dashboard link, internal navigation handled by tabs
   ] : [
     { href: "/", label: "Dashboard", active: location === "/" },
     { href: "/qr-code", label: "My QR Code", active: location === "/qr-code" },

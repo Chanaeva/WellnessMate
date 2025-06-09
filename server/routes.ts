@@ -108,9 +108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create or update membership plan (public endpoint for pricing management)
-  app.post("/api/membership-plans", async (req, res) => {
-    console.log('POST /api/membership-plans hit with body:', req.body);
+  // Create or update membership plan (admin-only endpoint)
+  app.post("/api/admin/membership-plans", isAdmin, async (req, res) => {
+    console.log('POST /api/admin/membership-plans hit with body:', req.body);
     try {
       const validatedData = insertMembershipPlanSchema.parse(req.body);
       console.log('Validated data:', validatedData);

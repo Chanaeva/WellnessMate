@@ -33,7 +33,7 @@ export default function PricingManagement() {
   // Create/Update plan mutation
   const planMutation = useMutation({
     mutationFn: async (planData: InsertMembershipPlan) => {
-      const res = await apiRequest("POST", "/api/membership-plans", planData);
+      const res = await apiRequest("POST", "/api/admin/membership-plans", planData);
       return await res.json();
     },
     onSuccess: () => {

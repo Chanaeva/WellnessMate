@@ -469,6 +469,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin analytics routes
+  app.get("/api/admin/dashboard-summary", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const summary = await storage.getDashboardSummary();
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/visit-analytics", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const period = req.query.period as string || 'week';
+      const analytics = await storage.getVisitAnalytics(period);
+      res.json(analytics);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/peak-hours", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const peakHours = await storage.getPeakHoursAnalytics();
+      res.json(peakHours);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Manual check-in for staff
+  app.post("/api/admin/manual-checkin", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const { membershipId } = req.body;
+      
+      // Find user by membership ID
+      const user = await storage.getUserByMembershipId(membershipId);
+      if (!user) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      // Create check-in record
+      const checkIn = await storage.createCheckIn({
+        userId: user.id,
+        timestamp: new Date(),
+        method: 'manual'
+      });
+
+      res.status(201).json({ 
+        message: "Check-in successful",
+        checkIn,
+        member: { username: user.username, email: user.email }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create HTTP server
   const httpServer = createServer(app);
 

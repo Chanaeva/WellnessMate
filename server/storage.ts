@@ -14,7 +14,7 @@ import {
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, and, lt, gte } from "drizzle-orm";
+import { eq, desc, and, lt, gte, lte } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -541,7 +541,7 @@ export class DatabaseStorage implements IStorage {
 
     // Group by date for chart data
     const visitsByDate = checkInResults.reduce((acc: any, checkIn) => {
-      const date = new Date(checkIn.timestamp).toDateString();
+      const date = new Date(checkIn.timestamp!).toDateString();
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {});

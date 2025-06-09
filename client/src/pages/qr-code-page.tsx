@@ -154,10 +154,11 @@ export default function QRCodePage() {
   // Handle QR code scan
   const handleScan = (data: string) => {
     try {
-      // In a real app, this would validate the QR code data
-      // For now, we'll assume the scanned data is the membership ID
-      if (data && membership?.membershipId) {
-        checkInMutation.mutate(membership.membershipId);
+      // Parse the QR code data
+      const qrData = JSON.parse(data);
+      
+      if (qrData.membershipId) {
+        checkInMutation.mutate(qrData.membershipId);
       } else {
         toast({
           title: "Invalid QR code",
@@ -166,11 +167,16 @@ export default function QRCodePage() {
         });
       }
     } catch (error) {
-      toast({
-        title: "Error processing QR code",
-        description: "Unable to process the scanned QR code.",
-        variant: "destructive",
-      });
+      // If it's not JSON, treat it as a plain membership ID
+      if (data && data.trim()) {
+        checkInMutation.mutate(data.trim());
+      } else {
+        toast({
+          title: "Error processing QR code",
+          description: "Unable to process the scanned QR code.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

@@ -19,7 +19,7 @@ const Footer = () => {
             </div>
           </div>
           <div className="flex space-x-4">
-            <a href="#" className="text-gray-600 hover:text-primary" aria-label="Instagram">
+            <a href="https://www.instagram.com/wolfmothertulsa" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-primary" aria-label="Instagram">
               <Instagram className="h-5 w-5" />
             </a>
             <a href="#" className="text-gray-600 hover:text-primary" aria-label="Facebook">

@@ -196,6 +196,7 @@ export default function MemberDashboard() {
               membershipEndDate={formattedEndDate}
               planName={currentPlan?.name || "Basic Membership"}
               memberSince="Jan 2023"
+              currentPlan={currentPlan}
             />
 
             {/* Digital Punch Cards - Show when purchased */}

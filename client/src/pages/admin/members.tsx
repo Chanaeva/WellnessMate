@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { User, Membership } from "@shared/schema";
+import { User, Membership, insertUserSchema, insertMembershipSchema } from "@shared/schema";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import Sidebar from "@/components/layout/sidebar";
@@ -9,6 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   UserPlus, 
   Search, 
@@ -28,19 +35,76 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 
+// Form schema for adding new member
+const newMemberSchema = insertUserSchema.extend({
+  confirmPassword: z.string().min(1, "Please confirm password"),
+  planType: z.enum(['basic', 'premium', 'vip', 'daily']),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+type NewMemberFormData = z.infer<typeof newMemberSchema>;
+
 export default function AdminMembers() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const itemsPerPage = 10;
+
+  // Form for adding new member
+  const newMemberForm = useForm<NewMemberFormData>({
+    resolver: zodResolver(newMemberSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      username: "",
+      password: "",
+      confirmPassword: "",
+      planType: "basic",
+      role: "member",
+    },
+  });
+
+  // Add new member mutation
+  const addMemberMutation = useMutation({
+    mutationFn: async (data: NewMemberFormData) => {
+      const response = await apiRequest("POST", "/api/admin/create-member", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Member Added",
+        description: "New member has been successfully created.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      setIsAddMemberOpen(false);
+      newMemberForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create member",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch members data
   const { data: members, isLoading } = useQuery<(User & {membership?: Membership})[]>({
     queryKey: ["/api/admin/members"],
     enabled: !!user && user.role === 'admin',
   });
+
+  // Handle form submission
+  const onSubmitNewMember = (data: NewMemberFormData) => {
+    addMemberMutation.mutate(data);
+  };
 
   // Filter and search members
   const filteredMembers = members?.filter(member => {
@@ -89,9 +153,147 @@ export default function AdminMembers() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl font-bold">Member Management</CardTitle>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <UserPlus className="mr-2 h-4 w-4" /> Add New Member
-                </Button>
+                <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-primary hover:bg-primary/90">
+                      <UserPlus className="mr-2 h-4 w-4" /> Add New Member
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add New Member</DialogTitle>
+                    </DialogHeader>
+                    <Form {...newMemberForm}>
+                      <form onSubmit={newMemberForm.handleSubmit(onSubmitNewMember)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={newMemberForm.control}
+                            name="firstName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>First Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="John" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={newMemberForm.control}
+                            name="lastName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Last Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Doe" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={newMemberForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input type="email" placeholder="john@example.com" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={newMemberForm.control}
+                          name="username"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Username</FormLabel>
+                              <FormControl>
+                                <Input placeholder="johndoe" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={newMemberForm.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                  <Input type="password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={newMemberForm.control}
+                            name="confirmPassword"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Confirm Password</FormLabel>
+                                <FormControl>
+                                  <Input type="password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        <FormField
+                          control={newMemberForm.control}
+                          name="planType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Membership Plan</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a plan" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="basic">Basic</SelectItem>
+                                  <SelectItem value="premium">Premium</SelectItem>
+                                  <SelectItem value="vip">VIP</SelectItem>
+                                  <SelectItem value="daily">Daily Pass</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="flex justify-end space-x-2 pt-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsAddMemberOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={addMemberMutation.isPending}
+                          >
+                            {addMemberMutation.isPending ? "Creating..." : "Create Member"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               
               <CardContent>

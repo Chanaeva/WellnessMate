@@ -14,10 +14,7 @@ import QRCodePage from "@/pages/qr-code-page";
 import MembershipPage from "@/pages/membership-page";
 import PaymentsPage from "@/pages/payments-page";
 import AdminDashboard from "@/pages/admin/dashboard";
-import AdminMembers from "@/pages/admin/members";
-import AdminCheckIns from "@/pages/admin/check-ins";
 import StaffCheckIn from "@/pages/staff-checkin";
-import { AdminRoute } from "./lib/admin-route";
 
 function Router() {
   return (
@@ -38,8 +35,6 @@ function Router() {
       
       {/* Admin routes */}
       <ProtectedRoute path="/admin" component={AdminDashboard} />
-      <ProtectedRoute path="/admin/members" component={AdminMembers} />
-      <ProtectedRoute path="/admin/check-ins" component={AdminCheckIns} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

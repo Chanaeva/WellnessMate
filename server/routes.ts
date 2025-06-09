@@ -542,12 +542,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique membership ID
       const membershipId = `WM-${String(newUser.id).padStart(3, '0')}`;
       
-      // Create membership
+      // Create membership with required dates
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 1); // 1 month from now
+      
       const membership = await storage.createMembership({
         userId: newUser.id,
         membershipId,
         planType,
         status: 'active',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
       });
 
       res.json({ 

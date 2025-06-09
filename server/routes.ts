@@ -484,8 +484,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/admin/visit-analytics", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'admin') {
-      return res.sendStatus(403);
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
     }
     
     try {
@@ -498,8 +498,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/admin/peak-hours", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'admin') {
-      return res.sendStatus(403);
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
     }
     
     try {
@@ -512,8 +512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Manual check-in for staff
   app.post("/api/admin/manual-checkin", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
-      return res.sendStatus(403);
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
     }
     
     try {

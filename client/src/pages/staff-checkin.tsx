@@ -121,6 +121,11 @@ export default function StaffCheckIn() {
                 <li>• Click "Check In Member" to complete the process</li>
                 <li>• A confirmation will appear when successful</li>
               </ul>
+              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                <p className="text-xs text-yellow-700">
+                  <strong>Test ID:</strong> Try using "WM-001" for testing
+                </p>
+              </div>
             </div>
 
             {/* Quick Stats */}

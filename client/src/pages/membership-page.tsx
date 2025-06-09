@@ -83,29 +83,52 @@ export default function MembershipPage() {
   // Purchase membership plan through Stripe payment
   const purchaseMembershipMutation = useMutation({
     mutationFn: async (planData: any) => {
-      // First create a payment intent
-      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
-        amount: planData.monthlyPrice / 100, // Convert cents to dollars
-        description: `Wolf Mother Wellness - ${planData.name} Membership`
-      });
-      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+      try {
+        console.log("Starting membership purchase for:", planData);
+        
+        // First create a payment intent
+        const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+          amount: planData.monthlyPrice / 100, // Convert cents to dollars
+          description: `Wolf Mother Wellness - ${planData.name} Membership`
+        });
+        
+        if (!paymentIntentRes.ok) {
+          const errorData = await paymentIntentRes.text();
+          throw new Error(`Payment intent creation failed: ${errorData}`);
+        }
+        
+        const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+        console.log("Payment intent created:", paymentIntentId);
 
-      // For demo purposes, simulate successful payment
-      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
-        paymentIntentId,
-        membershipId: planData.id,
-        description: `Membership Purchase - ${planData.name}`
-      });
-      
-      if (confirmRes.ok) {
+        // For demo purposes, simulate successful payment
+        const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+          paymentIntentId,
+          membershipId: null,
+          description: `Membership Purchase - ${planData.name}`
+        });
+        
+        if (!confirmRes.ok) {
+          const errorData = await confirmRes.text();
+          throw new Error(`Payment confirmation failed: ${errorData}`);
+        }
+        
+        console.log("Payment confirmed, updating membership");
+        
         // Update membership after successful payment
         const membershipRes = await apiRequest("PATCH", "/api/membership", {
           planType: planData.planType,
           status: 'active'
         });
+        
+        if (!membershipRes.ok) {
+          const errorData = await membershipRes.text();
+          throw new Error(`Membership update failed: ${errorData}`);
+        }
+        
         return await membershipRes.json();
-      } else {
-        throw new Error("Payment processing failed");
+      } catch (error: any) {
+        console.error("Membership purchase error:", error);
+        throw error;
       }
     },
     onSuccess: () => {
@@ -117,6 +140,7 @@ export default function MembershipPage() {
       });
     },
     onError: (error: Error) => {
+      console.error("Purchase mutation error:", error);
       toast({
         title: "Purchase failed",
         description: error.message,

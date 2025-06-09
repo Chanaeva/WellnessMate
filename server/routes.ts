@@ -60,21 +60,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/membership", isAuthenticated, async (req, res) => {
     try {
       const { planType, status } = req.body;
-      const membership = await storage.getMembershipByUserId(req.user.id);
+      const membership = await storage.getMembershipByUserId(req.user!.id);
       
       if (!membership) {
         return res.status(404).json({ message: "Membership not found" });
       }
 
-      const updatedMembership = await storage.updateMembership(membership.id, {
-        planType,
-        status,
-        updatedAt: new Date()
+      const updatedMembership = await storage.updateMembership(membership.membershipId, {
+        planType: planType,
+        status: status
       });
 
       res.json(updatedMembership);
-    } catch (error) {
-      res.status(500).json({ message: "Server error" });
+    } catch (error: any) {
+      console.error("Membership update error:", error);
+      res.status(500).json({ message: "Server error: " + error.message });
     }
   });
 

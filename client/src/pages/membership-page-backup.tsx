@@ -157,11 +157,6 @@ export default function MembershipPage() {
   // Get current plan
   const currentPlan = membershipPlans?.find(plan => plan.planType === membership?.planType);
 
-  // Filter available plans - exclude daily passes from main membership plans and current plan
-  const availableMonthlyPlans = membershipPlans?.filter(plan => 
-    plan.planType !== 'daily' && plan.planType !== membership?.planType
-  );
-
   return (
     <div className="min-h-screen flex flex-col bg-neutral-light">
       <Header />
@@ -284,17 +279,24 @@ export default function MembershipPage() {
                 </div>
               </div>
 
-              {/* Available Plans - Only show if user has no membership or wants to change */}
-              {(!membership || availableMonthlyPlans?.length > 0) && (
-                <div className="mb-8">
-                  <h3 className="text-lg font-bold mb-4">Available Plans</h3>
-                  {isPlansLoading ? (
-                    <div className="p-6 text-center">Loading available plans...</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {availableMonthlyPlans?.map((plan) => (
-                        <Card key={plan.id} className="overflow-hidden">
-                          <CardHeader className="p-4 bg-gray-50 border-b border-gray-200">
+              {/* Available Plans */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold mb-4">Available Plans</h3>
+                {isPlansLoading ? (
+                  <div className="p-6 text-center">Loading available plans...</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {membershipPlans?.filter(plan => plan.planType !== 'daily').map((plan) => {
+                      const isCurrentPlan = membership?.planType === plan.planType;
+                      
+                      return (
+                        <Card key={plan.id} className={`overflow-hidden ${isCurrentPlan ? 'border-2 border-primary' : ''}`}>
+                          <CardHeader className={`p-4 ${isCurrentPlan ? 'bg-primary/10' : 'bg-gray-50'} border-b ${isCurrentPlan ? 'border-primary/20' : 'border-gray-200'}`}>
+                            {isCurrentPlan && (
+                              <Badge className="absolute top-2 right-2 bg-primary">
+                                Current
+                              </Badge>
+                            )}
                             <CardTitle className="font-bold">{plan.name}</CardTitle>
                             <div className="text-2xl font-bold mt-2">
                               {formatPrice(plan.monthlyPrice)}
@@ -313,24 +315,32 @@ export default function MembershipPage() {
                           </CardContent>
                           <CardFooter className="p-4 pt-0">
                             <Button 
-                              className="w-full wellness-button-primary"
-                              disabled={purchaseMembershipMutation.isPending}
-                              onClick={() => purchaseMembershipMutation.mutate(plan)}
+                              className={`w-full ${isCurrentPlan 
+                                ? 'bg-primary text-white opacity-50 cursor-not-allowed' 
+                                : 'wellness-button-primary'}`}
+                              disabled={isCurrentPlan || purchaseMembershipMutation.isPending}
+                              onClick={() => {
+                                if (!isCurrentPlan) {
+                                  purchaseMembershipMutation.mutate(plan);
+                                }
+                              }}
                             >
-                              {purchaseMembershipMutation.isPending 
-                                ? 'Processing...' 
-                                : membership 
-                                  ? 'Change to This Plan' 
-                                  : 'Purchase Package'
+                              {isCurrentPlan 
+                                ? 'Current Plan' 
+                                : purchaseMembershipMutation.isPending 
+                                  ? 'Processing...' 
+                                  : plan.monthlyPrice < (currentPlan?.monthlyPrice || 0) 
+                                    ? 'Downgrade' 
+                                    : 'Purchase Package'
                               }
                             </Button>
                           </CardFooter>
                         </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Your Punch Cards */}
               {userPunchCards && userPunchCards.length > 0 && (

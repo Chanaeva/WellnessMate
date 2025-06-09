@@ -47,15 +47,20 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const isAdminLogin = location === "/admin-login";
   const [activeTab, setActiveTab] = useState<string>("login");
 
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate("/");
+      if (isAdminLogin || user.role === 'admin') {
+        navigate("/admin");
+      } else {
+        navigate("/");
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, isAdminLogin]);
 
   // Login form
   const loginForm = useForm<LoginFormValues>({

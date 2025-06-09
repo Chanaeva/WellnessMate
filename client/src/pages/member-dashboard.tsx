@@ -248,7 +248,7 @@ export default function MemberDashboard() {
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 mb-4">
                   <Link href="/qr-code">
                     <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
                       <QrCode className="h-6 w-6 text-primary mb-2" />
@@ -267,10 +267,22 @@ export default function MemberDashboard() {
                       <span className="text-sm text-center">Membership</span>
                     </Button>
                   </Link>
-                  <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-neutral-light hover:bg-gray-100 py-6">
-                    <Settings className="h-6 w-6 text-primary mb-2" />
-                    <span className="text-sm text-center">Account Settings</span>
-                  </Button>
+                  <Link href="/staff-checkin">
+                    <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-blue-50 hover:bg-blue-100 py-6 border-blue-200">
+                      <CheckCircle className="h-6 w-6 text-blue-600 mb-2" />
+                      <span className="text-sm text-center text-blue-700 font-medium">Staff Check-in</span>
+                    </Button>
+                  </Link>
+                </div>
+                
+                {/* Admin Access Section */}
+                <div className="border-t pt-4">
+                  <Link href="/admin-login">
+                    <Button variant="outline" className="w-full flex items-center justify-center bg-gray-50 hover:bg-gray-100 py-3 border-gray-300">
+                      <Settings className="h-5 w-5 text-gray-600 mr-2" />
+                      <span className="text-sm text-gray-700">Admin Login</span>
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

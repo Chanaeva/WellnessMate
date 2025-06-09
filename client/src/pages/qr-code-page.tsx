@@ -180,11 +180,14 @@ export default function QRCodePage() {
     }
   };
 
-  // Generate QR code data
+  // Generate daily QR code data with today's date
   const qrCodeData = membership ? JSON.stringify({
+    type: "member_daily_checkin",
     membershipId: membership.membershipId,
     userId: user?.id,
-    timestamp: new Date().toISOString(),
+    date: format(new Date(), "yyyy-MM-dd"),
+    facility: "wolf_mother_wellness",
+    memberName: `${user?.firstName} ${user?.lastName}`,
   }) : '';
 
   return (
@@ -250,8 +253,10 @@ export default function QRCodePage() {
               {/* Regular View */}
               <Card className="mb-6">
                 <CardHeader className="text-center">
-                  <CardTitle className="text-2xl font-bold">Your Wolf Mother Wellness QR Code</CardTitle>
-                  <CardDescription>Use this code to check in at our thermal wellness center</CardDescription>
+                  <CardTitle className="text-2xl font-bold">Your Daily Check-in QR Code</CardTitle>
+                  <CardDescription>
+                    Valid for {format(new Date(), "MMMM dd, yyyy")} - Automatically updates daily
+                  </CardDescription>
                   {isOfflineMode && (
                     <Badge variant="secondary" className="mt-2">
                       Available Offline

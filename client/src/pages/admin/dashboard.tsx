@@ -190,7 +190,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Generate daily QR code
+  // Generate daily QR codes for all members
   const generateDailyQRCode = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
     if (qrCodeDate === today && dailyQRCode) {
@@ -198,10 +198,12 @@ export default function AdminDashboard() {
     }
 
     try {
+      // Create a general facility QR code that can be used for walk-ins or general purposes
       const qrData = JSON.stringify({
-        type: "daily_checkin",
+        type: "facility_checkin",
         date: today,
-        facility: "wolf_mother_wellness"
+        facility: "wolf_mother_wellness",
+        description: "Wolf Mother Wellness Daily Check-in"
       });
       
       const qrCodeDataURL = await QRCode.toDataURL(qrData, {
@@ -408,8 +410,8 @@ export default function AdminDashboard() {
                           </Button>
                         </div>
                         <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                          Display this QR code for members to scan for quick check-in. 
-                          Code is unique to today and automatically updates daily.
+                          This is a facility QR code. Members will use their individual daily QR codes 
+                          (generated from their member dashboard) for seamless check-in.
                         </p>
                       </>
                     ) : (

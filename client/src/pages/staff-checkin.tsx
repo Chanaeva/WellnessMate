@@ -49,35 +49,62 @@ export default function StaffCheckIn() {
       // Parse QR code data (JSON format)
       const qrData = JSON.parse(data);
       
-      // Handle daily check-in QR code
-      if (qrData.type === "daily_checkin") {
+      // Handle member daily check-in QR code
+      if (qrData.type === "member_daily_checkin") {
         const today = new Date().toISOString().split('T')[0];
         
         // Verify QR code is for today
         if (qrData.date !== today) {
           toast({
             title: "Expired QR Code",
-            description: "This QR code has expired. Please use today's QR code.",
+            description: "This QR code has expired. Please ask member to generate today's QR code.",
             variant: "destructive",
           });
           return;
         }
         
-        // For daily QR codes, prompt for membership ID
-        const membershipId = prompt("Please enter the member's Membership ID (e.g., WM-001):");
-        if (membershipId && membershipId.trim()) {
-          processCheckIn(membershipId.trim());
+        // Process check-in directly with membership ID from QR code
+        if (qrData.membershipId) {
+          processCheckIn(qrData.membershipId);
         } else {
           toast({
-            title: "Membership ID Required",
-            description: "Please enter a valid membership ID for daily check-in",
+            title: "Invalid QR Code",
+            description: "QR code missing membership information",
             variant: "destructive",
           });
         }
         return;
       }
       
-      // Handle individual member QR code
+      // Handle facility check-in QR code (admin generated)
+      if (qrData.type === "facility_checkin") {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Verify QR code is for today
+        if (qrData.date !== today) {
+          toast({
+            title: "Expired QR Code",
+            description: "This facility QR code has expired. Please use today's QR code.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // For facility QR codes, prompt for membership ID
+        const membershipId = prompt("Please enter the member's Membership ID (e.g., WM-001):");
+        if (membershipId && membershipId.trim()) {
+          processCheckIn(membershipId.trim());
+        } else {
+          toast({
+            title: "Membership ID Required",
+            description: "Please enter a valid membership ID for check-in",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+      
+      // Handle legacy individual member QR code
       if (qrData.membershipId) {
         processCheckIn(qrData.membershipId);
       } else {

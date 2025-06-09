@@ -28,7 +28,7 @@ const Footer = () => {
             <a href="#" className="text-gray-600 hover:text-primary" aria-label="Twitter">
               <Twitter className="h-5 w-5" />
             </a>
-            <a href="#" className="text-gray-600 hover:text-primary" aria-label="Email">
+            <a href="mailto:info@wolfmothertulsa.com" className="text-gray-600 hover:text-primary" aria-label="Email">
               <Mail className="h-5 w-5" />
             </a>
           </div>

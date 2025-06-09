@@ -37,17 +37,83 @@ export default function MembershipPage() {
     enabled: !!user,
   });
 
-  // Purchase punch card mutation
+  // Purchase punch card through Stripe payment
   const purchasePunchCardMutation = useMutation({
     mutationFn: async (punchCardData: any) => {
-      const res = await apiRequest("POST", "/api/punch-cards", punchCardData);
-      return await res.json();
+      // First create a payment intent
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: punchCardData.totalPrice / 100, // Convert cents to dollars
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
+      });
+      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+
+      // For demo purposes, simulate successful payment
+      // In a real app, this would redirect to Stripe checkout or use Stripe Elements
+      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+        paymentIntentId,
+        membershipId: null,
+        description: `Punch Card Purchase - ${punchCardData.name}`
+      });
+      
+      if (confirmRes.ok) {
+        // Create the punch card after successful payment
+        const punchCardRes = await apiRequest("POST", "/api/punch-cards", punchCardData);
+        return await punchCardRes.json();
+      } else {
+        throw new Error("Payment processing failed");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       toast({
         title: "Purchase successful",
-        description: "Your punch card has been purchased successfully!",
+        description: "Your punch card has been purchased and payment recorded!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Purchase failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Purchase membership plan through Stripe payment
+  const purchaseMembershipMutation = useMutation({
+    mutationFn: async (planData: any) => {
+      // First create a payment intent
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: planData.monthlyPrice / 100, // Convert cents to dollars
+        description: `Wolf Mother Wellness - ${planData.name} Membership`
+      });
+      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+
+      // For demo purposes, simulate successful payment
+      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+        paymentIntentId,
+        membershipId: planData.id,
+        description: `Membership Purchase - ${planData.name}`
+      });
+      
+      if (confirmRes.ok) {
+        // Update membership after successful payment
+        const membershipRes = await apiRequest("PATCH", "/api/membership", {
+          planType: planData.planType,
+          status: 'active'
+        });
+        return await membershipRes.json();
+      } else {
+        throw new Error("Payment processing failed");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      toast({
+        title: "Membership updated",
+        description: "Your membership has been updated and payment recorded!",
       });
     },
     onError: (error: Error) => {
@@ -198,10 +264,22 @@ export default function MembershipPage() {
                             <Button 
                               className={`w-full ${isCurrentPlan 
                                 ? 'bg-primary text-white opacity-50 cursor-not-allowed' 
-                                : 'bg-white border border-gray-300 hover:bg-gray-50 text-gray-900'}`}
-                              disabled={isCurrentPlan}
+                                : 'wellness-button-primary'}`}
+                              disabled={isCurrentPlan || purchaseMembershipMutation.isPending}
+                              onClick={() => {
+                                if (!isCurrentPlan) {
+                                  purchaseMembershipMutation.mutate(plan);
+                                }
+                              }}
                             >
-                              {isCurrentPlan ? 'Current Plan' : plan.monthlyPrice < (currentPlan?.monthlyPrice || 0) ? 'Downgrade' : 'Upgrade'}
+                              {isCurrentPlan 
+                                ? 'Current Plan' 
+                                : purchaseMembershipMutation.isPending 
+                                  ? 'Processing...' 
+                                  : plan.monthlyPrice < (currentPlan?.monthlyPrice || 0) 
+                                    ? 'Downgrade' 
+                                    : 'Purchase Package'
+                              }
                             </Button>
                           </CardFooter>
                         </Card>

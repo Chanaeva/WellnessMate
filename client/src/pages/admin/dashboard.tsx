@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Membership, CheckIn, insertUserSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +22,9 @@ import {
   ChevronLeft, 
   ChevronRight,
   QrCode,
-  CheckCircle
+  CheckCircle,
+  Download,
+  Printer
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -31,6 +33,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import Header from "@/components/layout/header";
+import QRCode from "qrcode";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -51,6 +54,8 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [dailyQRCode, setDailyQRCode] = useState<string>("");
+  const [qrCodeDate, setQrCodeDate] = useState<string>("");
   const itemsPerPage = 10;
   const { toast } = useToast();
 
@@ -182,6 +187,113 @@ export default function AdminDashboard() {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  // Generate daily QR code
+  const generateDailyQRCode = async () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    if (qrCodeDate === today && dailyQRCode) {
+      return; // Already generated for today
+    }
+
+    try {
+      const qrData = JSON.stringify({
+        type: "daily_checkin",
+        date: today,
+        facility: "wolf_mother_wellness"
+      });
+      
+      const qrCodeDataURL = await QRCode.toDataURL(qrData, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      setDailyQRCode(qrCodeDataURL);
+      setQrCodeDate(today);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate daily QR code",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Generate QR code on component mount
+  useEffect(() => {
+    generateDailyQRCode();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const downloadQRCode = () => {
+    if (!dailyQRCode) return;
+    
+    const link = document.createElement('a');
+    link.href = dailyQRCode;
+    link.download = `wolf-mother-daily-qr-${qrCodeDate}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Success",
+      description: "QR code downloaded successfully",
+    });
+  };
+
+  const printQRCode = () => {
+    if (!dailyQRCode) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Wolf Mother Wellness - Daily Check-in QR Code</title>
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                text-align: center; 
+                padding: 20px; 
+              }
+              .qr-container { 
+                margin: 20px auto; 
+                display: inline-block; 
+              }
+              h1 { color: #333; margin-bottom: 10px; }
+              h2 { color: #666; margin-bottom: 20px; }
+              .date { font-size: 18px; margin: 10px 0; }
+              .instructions { 
+                margin-top: 20px; 
+                font-size: 14px; 
+                color: #666; 
+                max-width: 400px; 
+                margin-left: auto; 
+                margin-right: auto; 
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Wolf Mother Wellness</h1>
+            <h2>Daily Check-in QR Code</h2>
+            <div class="date">Date: ${format(new Date(), "MMMM dd, yyyy")}</div>
+            <div class="qr-container">
+              <img src="${dailyQRCode}" alt="Daily Check-in QR Code" />
+            </div>
+            <div class="instructions">
+              Scan this QR code to check in to Wolf Mother Wellness.<br/>
+              This code is valid for today only.
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
     }
   };
 

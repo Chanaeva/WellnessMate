@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Camera, X } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Loader2, Camera, X, FlashlightIcon as Flashlight, RotateCcw, Focus } from 'lucide-react';
 
 interface QRScannerProps {
   onScan: (data: string) => void;

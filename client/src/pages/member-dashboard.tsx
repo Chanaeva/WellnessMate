@@ -249,7 +249,7 @@ export default function MemberDashboard() {
                   <Link href="/qr-code">
                     <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-muted hover:bg-muted/80 py-6">
                       <QrCode className="h-6 w-6 text-primary mb-2" />
-                      <span className="text-sm text-center">View My QR Code</span>
+                      <span className="text-sm text-center">View Code</span>
                     </Button>
                   </Link>
                   <Link href="/payments">

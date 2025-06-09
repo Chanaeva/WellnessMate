@@ -96,32 +96,18 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-light py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl w-full flex flex-col md:flex-row gap-8">
         {/* Left side: Auth forms */}
         <div className="md:w-1/2 lg:w-2/5">
-          <Card className="w-full">
+          <Card className="wellness-card w-full">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-center mb-4">
-                <div className="h-12 w-12 bg-primary rounded-full flex items-center justify-center">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-white"
-                  >
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                  </svg>
-                </div>
+                <img 
+                  src={logoMossGreen} 
+                  alt="Wolf Mother Wellness" 
+                  className="h-16 w-16"
+                />
               </div>
               <CardTitle className="text-2xl text-center">
                 {isAdminLogin ? "Admin Access" : "Wolf Mother Wellness"}
@@ -140,8 +126,8 @@ function AuthPage() {
                 )}
                 
                 {isAdminLogin && (
-                  <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-700">
+                  <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-xl">
+                    <p className="text-sm text-primary">
                       <strong>Admin Login:</strong> Use your admin credentials to access the dashboard and analytics.
                     </p>
                   </div>
@@ -184,7 +170,7 @@ function AuthPage() {
                       />
                       <Button 
                         type="submit" 
-                        className="w-full bg-primary hover:bg-primary/90"
+                        className="w-full wellness-button-primary"
                         disabled={loginMutation.isPending}
                       >
                         {loginMutation.isPending ? (
@@ -214,9 +200,9 @@ function AuthPage() {
                             Register here
                           </Button>
                         </p>
-                        <div className="border-t pt-3 mt-3">
+                        <div className="border-t border-border pt-3 mt-3">
                           <Link href="/admin-login">
-                            <Button variant="link" className="text-sm text-blue-600 p-0">
+                            <Button variant="link" className="text-sm text-primary p-0 font-medium">
                               Staff & Admin Login
                             </Button>
                           </Link>

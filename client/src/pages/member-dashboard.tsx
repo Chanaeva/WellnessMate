@@ -183,8 +183,8 @@ export default function MemberDashboard() {
                       <CheckCircle className="h-6 w-6 text-accent" />
                     </div>
                     <div>
-                      <h4 className="font-medium">Immune System Support</h4>
-                      <p className="text-sm text-gray-500 mt-1">Hot and cold contrast therapy can help strengthen your immune response</p>
+                      <h4 className="font-semibold text-foreground">Immune System Support</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Hot and cold contrast therapy can help strengthen your immune response</p>
                     </div>
                   </div>
                 </div>

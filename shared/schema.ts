@@ -76,7 +76,7 @@ export const punchCardStatusEnum = pgEnum('punch_card_status', ['active', 'expir
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  membershipId: text("membership_id").notNull(),
+  membershipId: text("membership_id"),
   amount: integer("amount").notNull(), // Stored in cents
   description: text("description").notNull(),
   status: paymentStatusEnum("status").notNull(),

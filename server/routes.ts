@@ -459,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In production, you would actually process the payment through Stripe
       const simulatedSuccessfulPayment = {
         userId: user.id,
-        membershipId: membershipId || null,
+        membershipId: membershipId || 'general-purchase',
         amount: paymentIntent.amount, // Already in cents
         description,
         status: 'successful' as const,

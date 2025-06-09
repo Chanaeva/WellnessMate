@@ -263,13 +263,26 @@ export class DatabaseStorage implements IStorage {
     return { data, total, page, limit };
   }
 
-  async getTodayCheckIns(): Promise<CheckIn[]> {
+  async getTodayCheckIns(): Promise<any[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    return await db.select().from(checkIns)
-      .where(gte(checkIns.timestamp, today))
-      .orderBy(desc(checkIns.timestamp));
+    return await db.select({
+      id: checkIns.id,
+      userId: checkIns.userId,
+      membershipId: checkIns.membershipId,
+      timestamp: checkIns.timestamp,
+      location: checkIns.location,
+      method: sql<string>`CASE WHEN ${checkIns.location} LIKE '%Manual%' OR ${checkIns.location} LIKE '%Front Desk%' THEN 'manual' ELSE 'qr' END`,
+      user: {
+        username: users.username,
+        email: users.email
+      }
+    })
+    .from(checkIns)
+    .leftJoin(users, eq(checkIns.userId, users.id))
+    .where(gte(checkIns.timestamp, today))
+    .orderBy(desc(checkIns.timestamp));
   }
 
   async getPaymentsByUserId(userId: number): Promise<Payment[]> {
@@ -541,8 +554,10 @@ export class DatabaseStorage implements IStorage {
 
     // Group by date for chart data
     const visitsByDate = checkInResults.reduce((acc: any, checkIn) => {
-      const date = new Date(checkIn.timestamp!).toDateString();
-      acc[date] = (acc[date] || 0) + 1;
+      if (checkIn.timestamp) {
+        const date = new Date(checkIn.timestamp).toDateString();
+        acc[date] = (acc[date] || 0) + 1;
+      }
       return acc;
     }, {});
 

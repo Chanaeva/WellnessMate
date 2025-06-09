@@ -525,10 +525,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Member not found" });
       }
 
-      // Create check-in record
+      // Create check-in record  
       const checkIn = await storage.createCheckIn({
         userId: user.id,
-        membershipId: membershipId
+        membershipId: membershipId,
+        location: 'Front Desk - Manual'
       });
 
       res.status(201).json({ 

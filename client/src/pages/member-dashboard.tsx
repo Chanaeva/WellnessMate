@@ -71,43 +71,41 @@ export default function MemberDashboard() {
   }).length || 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-light">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
-      <main className="flex-grow container mx-auto px-4 py-8">
+      <main className="flex-grow wellness-container py-8">
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left Column (2/3) */}
           <div className="md:w-2/3 space-y-6">
             {/* Welcome Banner */}
-            <Card className="overflow-hidden">
-              <div 
-                className="h-40 bg-cover bg-center" 
-                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1584622781564-1d987f7333c1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&h=320&q=80')" }}
-              >
-                <div className="h-full w-full bg-gradient-to-r from-primary/70 to-transparent p-6 flex items-end">
+            <Card className="wellness-card overflow-hidden">
+              <div className="h-40 thermal-gradient relative">
+                <div className="absolute inset-0 bg-black/20"></div>
+                <div className="relative h-full p-6 flex items-end">
                   <div>
-                    <h2 className="text-2xl font-bold text-white">
+                    <h1 className="text-3xl font-display font-bold text-white">
                       Welcome back, {user?.firstName || "Member"}!
-                    </h2>
-                    <p className="text-white/90">
+                    </h1>
+                    <p className="text-white/90 font-medium">
                       Your membership is {membershipStatus === "active" ? "active until" : "expired on"} {formattedEndDate}
                     </p>
                   </div>
                 </div>
               </div>
-              <CardContent className="p-4 flex justify-between items-center">
+              <CardContent className="p-6 flex justify-between items-center bg-card">
                 <div>
-                  <div className="text-sm text-gray-500">Recent Check-ins</div>
-                  <div className="font-medium">{checkInsThisMonth} this month</div>
+                  <div className="text-sm text-muted-foreground">Recent Check-ins</div>
+                  <div className="text-xl font-semibold text-foreground">{checkInsThisMonth} this month</div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <Link href="/qr-code">
-                    <Button className="bg-primary hover:bg-primary/90 flex items-center">
+                    <Button className="wellness-button-primary flex items-center">
                       <QrCode className="mr-2 h-4 w-4" /> Check In Now
                     </Button>
                   </Link>
                   <Link href="/staff-checkin">
-                    <Button variant="outline" className="flex items-center">
+                    <Button variant="outline" className="border-border hover:bg-muted">
                       Staff Check-in
                     </Button>
                   </Link>
@@ -118,33 +116,37 @@ export default function MemberDashboard() {
 
 
             {/* Facilities */}
-            <Card>
+            <Card className="wellness-card">
               <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4">Our Thermal Facilities</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <h2 className="text-2xl font-display font-bold mb-6 text-foreground">Our Thermal Facilities</h2>
+                <div className="wellness-grid">
                   {/* Facility Item 1 */}
-                  <div className="rounded-lg overflow-hidden shadow-sm">
-                    <img 
-                      src="https://images.unsplash.com/photo-1584622781564-1d987f7333c1?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&h=300&q=80" 
-                      alt="Sauna Facility" 
-                      className="w-full h-40 object-cover"
-                    />
+                  <div className="wellness-card overflow-hidden">
+                    <div className="h-32 thermal-gradient relative">
+                      <div className="absolute inset-0 bg-black/10"></div>
+                      <div className="relative h-full flex items-center justify-center">
+                        <Heart className="h-8 w-8 text-white" />
+                      </div>
+                    </div>
                     <div className="p-4">
-                      <h4 className="font-medium">Finnish Saunas</h4>
-                      <p className="text-sm text-gray-500 mt-1">Open 24/7 • Traditional dry heat therapy</p>
+                      <h4 className="font-semibold text-foreground">Finnish Saunas</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Open 24/7 • Traditional dry heat therapy</p>
+                      <Badge className="thermal-badge-primary mt-2">Available</Badge>
                     </div>
                   </div>
                   
                   {/* Facility Item 2 */}
-                  <div className="rounded-lg overflow-hidden shadow-sm">
-                    <img 
-                      src="https://images.unsplash.com/photo-1613725193525-2fd537614b3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&h=300&q=80" 
-                      alt="Cold Plunge Pool" 
-                      className="w-full h-40 object-cover"
-                    />
+                  <div className="wellness-card overflow-hidden">
+                    <div className="h-32 cold-gradient relative">
+                      <div className="absolute inset-0 bg-black/10"></div>
+                      <div className="relative h-full flex items-center justify-center">
+                        <Sparkles className="h-8 w-8 text-white" />
+                      </div>
+                    </div>
                     <div className="p-4">
-                      <h4 className="font-medium">Cold Plunge Pools</h4>
-                      <p className="text-sm text-gray-500 mt-1">Invigorating cold therapy • Health benefits</p>
+                      <h4 className="font-semibold text-foreground">Cold Plunge Pools</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Invigorating cold therapy • Health benefits</p>
+                      <Badge className="thermal-badge-info mt-2">Available</Badge>
                     </div>
                   </div>
                 </div>
@@ -152,33 +154,33 @@ export default function MemberDashboard() {
             </Card>
             
             {/* Thermal Wellness Benefits */}
-            <Card>
+            <Card className="wellness-card">
               <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4">Thermal Wellness Benefits</h3>
+                <h2 className="text-2xl font-display font-bold mb-6 text-foreground">Thermal Wellness Benefits</h2>
                 <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="bg-primary/10 p-2 rounded-lg">
-                      <Heart className="h-5 w-5 text-primary" />
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-primary/10 p-3 rounded-xl">
+                      <Heart className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-medium">Improved Circulation</h4>
-                      <p className="text-sm text-gray-500 mt-1">Regular sauna sessions can improve cardiovascular health and blood flow</p>
+                      <h4 className="font-semibold text-foreground">Improved Circulation</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Regular sauna sessions can improve cardiovascular health and blood flow</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start space-x-3">
-                    <div className="bg-secondary/10 p-2 rounded-lg">
-                      <Sparkles className="h-5 w-5 text-secondary" />
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-secondary/10 p-3 rounded-xl">
+                      <Sparkles className="h-6 w-6 text-secondary" />
                     </div>
                     <div>
-                      <h4 className="font-medium">Stress Reduction</h4>
-                      <p className="text-sm text-gray-500 mt-1">Thermal therapy helps reduce cortisol levels and promotes relaxation</p>
+                      <h4 className="font-semibold text-foreground">Stress Reduction</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Thermal therapy helps reduce cortisol levels and promotes relaxation</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-start space-x-3">
-                    <div className="bg-purple-100 p-2 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-purple-700" />
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-accent/10 p-3 rounded-xl">
+                      <CheckCircle className="h-6 w-6 text-accent" />
                     </div>
                     <div>
                       <h4 className="font-medium">Immune System Support</h4>

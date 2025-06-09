@@ -5,50 +5,59 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Wolf Mother earth-toned color palette */
-  --background: 36 33% 97%;     /* Light cream/beige background */
-  --foreground: 24 15% 15%;     /* Dark brown text */
-  --muted: 35 25% 92%;          /* Muted beige */
-  --muted-foreground: 30 8% 35%;/* Muted brown text */
-  --popover: 36 33% 97%;
-  --popover-foreground: 24 15% 15%;
-  --card: 0 0% 100%;
-  --card-foreground: 24 15% 15%;
-  --border: 30 15% 90%;
-  --input: 30 15% 90%;
-  --primary: 24 56% 35%;        /* Earthy brown */
-  --primary-foreground: 36 33% 97%;
-  --secondary: 196 50% 40%;     /* Cool blue for cold plunge */
+  /* Wolf Mother Wellness - Thermal Spa Color Palette */
+  --background: 44 20% 97%;      /* Warm off-white with subtle warmth */
+  --foreground: 210 15% 15%;     /* Deep charcoal for excellent readability */
+  --muted: 44 15% 94%;           /* Soft warm neutral for backgrounds */
+  --muted-foreground: 210 10% 45%; /* Medium gray for secondary text */
+  --popover: 0 0% 100%;          /* Pure white for popovers */
+  --popover-foreground: 210 15% 15%;
+  --card: 0 0% 100%;             /* Pure white cards for clarity */
+  --card-foreground: 210 15% 15%;
+  --border: 44 15% 88%;          /* Subtle warm border */
+  --input: 44 15% 96%;           /* Light warm input backgrounds */
+  --primary: 25 85% 25%;         /* Rich moss green - thermal wellness */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 85% 35%;      /* Deep thermal blue - cold therapy */
   --secondary-foreground: 0 0% 100%;
-  --accent: 15 30% 60%;         /* Warm terracotta accent */
+  --accent: 35 75% 55%;          /* Warm amber - heat therapy */
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 62% 45%;     /* Deep red */
+  --destructive: 0 75% 50%;      /* Clear red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --ring: 24 56% 35%;
-  --radius: 0.5rem;
+  --success: 145 65% 35%;        /* Forest green for success states */
+  --success-foreground: 0 0% 100%;
+  --warning: 45 90% 50%;         /* Warm amber for warnings */
+  --warning-foreground: 0 0% 100%;
+  --ring: 25 85% 25%;
+  --radius: 0.75rem;             /* Slightly more rounded for modern feel */
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --primary: 15 80% 50%;
+  /* Wolf Mother Wellness - Dark Thermal Spa Mode */
+  --background: 210 15% 8%;       /* Deep charcoal background */
+  --foreground: 44 15% 92%;       /* Warm off-white text */
+  --muted: 210 12% 12%;           /* Dark muted background */
+  --muted-foreground: 210 8% 65%; /* Medium gray for secondary text */
+  --popover: 210 15% 10%;         /* Slightly lighter dark for popovers */
+  --popover-foreground: 44 15% 92%;
+  --card: 210 15% 10%;            /* Dark cards with subtle warmth */
+  --card-foreground: 44 15% 92%;
+  --border: 210 12% 18%;          /* Subtle dark borders */
+  --input: 210 12% 15%;           /* Dark input backgrounds */
+  --primary: 25 75% 35%;          /* Slightly brighter moss green for dark */
   --primary-foreground: 0 0% 100%;
-  --secondary: 220 70% 50%;
-  --secondary-foreground: 210 40% 98%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --ring: 240 4.9% 83.9%;
-  --radius: 0.5rem;
+  --secondary: 200 80% 45%;       /* Brighter thermal blue for dark */
+  --secondary-foreground: 0 0% 100%;
+  --accent: 35 70% 60%;           /* Brighter warm amber for dark */
+  --accent-foreground: 210 15% 8%;
+  --destructive: 0 70% 55%;       /* Brighter red for dark mode */
+  --destructive-foreground: 0 0% 100%;
+  --success: 145 60% 45%;         /* Brighter forest green for dark */
+  --success-foreground: 0 0% 100%;
+  --warning: 45 85% 60%;          /* Brighter amber for dark warnings */
+  --warning-foreground: 210 15% 8%;
+  --ring: 25 75% 35%;
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -58,5 +67,73 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+  }
+
+  .font-display {
+    font-family: 'Cormorant Garamond', serif;
+  }
+}
+
+@layer components {
+  /* Thermal Wellness Theme Components */
+  .thermal-gradient {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
+  }
+  
+  .cold-gradient {
+    background: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(200 70% 45%) 100%);
+  }
+  
+  .wellness-card {
+    @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-200;
+  }
+  
+  .thermal-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .thermal-badge-success {
+    @apply thermal-badge bg-green-50 text-green-700 border border-green-200;
+  }
+  
+  .thermal-badge-warning {
+    @apply thermal-badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  
+  .thermal-badge-info {
+    @apply thermal-badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  
+  .thermal-badge-primary {
+    @apply thermal-badge bg-green-50 text-green-800 border border-green-200;
+  }
+  
+  .wellness-button-primary {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-6 py-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
+  }
+  
+  .wellness-button-secondary {
+    @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium px-6 py-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
+  }
+  
+  .wellness-input {
+    @apply bg-input border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200;
+  }
+  
+  .wellness-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .thermal-section {
+    @apply py-12 px-4;
+  }
+  
+  .wellness-grid {
+    @apply grid gap-6 md:grid-cols-2 lg:grid-cols-3;
   }
 }

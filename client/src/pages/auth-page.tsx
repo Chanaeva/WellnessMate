@@ -123,17 +123,29 @@ function AuthPage() {
                   </svg>
                 </div>
               </div>
-              <CardTitle className="text-2xl text-center">Wolf Mother Wellness</CardTitle>
+              <CardTitle className="text-2xl text-center">
+                {isAdminLogin ? "Admin Access" : "Wolf Mother Wellness"}
+              </CardTitle>
               <CardDescription className="text-center">
-                Manage your thermal wellness journey
+                {isAdminLogin ? "Sign in to access the admin dashboard" : "Manage your thermal wellness journey"}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="register">Register</TabsTrigger>
-                </TabsList>
+                {!isAdminLogin && (
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="login">Login</TabsTrigger>
+                    <TabsTrigger value="register">Register</TabsTrigger>
+                  </TabsList>
+                )}
+                
+                {isAdminLogin && (
+                  <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      <strong>Admin Login:</strong> Use your admin credentials to access the dashboard and analytics.
+                    </p>
+                  </div>
+                )}
                 
                 <TabsContent value="login">
                   <Form {...loginForm}>

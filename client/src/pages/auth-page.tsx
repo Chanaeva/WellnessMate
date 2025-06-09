@@ -206,12 +206,32 @@ function AuthPage() {
                         </Button>
                       </Link>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Don't have an account?{" "}
-                      <Button variant="link" onClick={() => setActiveTab("register")} className="p-0">
-                        Register here
-                      </Button>
-                    </p>
+                    {!isAdminLogin && (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Don't have an account?{" "}
+                          <Button variant="link" onClick={() => setActiveTab("register")} className="p-0">
+                            Register here
+                          </Button>
+                        </p>
+                        <div className="border-t pt-3 mt-3">
+                          <Link href="/admin-login">
+                            <Button variant="link" className="text-sm text-blue-600 p-0">
+                              Staff & Admin Login
+                            </Button>
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                    {isAdminLogin && (
+                      <div className="border-t pt-3 mt-3">
+                        <Link href="/auth">
+                          <Button variant="link" className="text-sm text-muted-foreground p-0">
+                            ← Back to Member Login
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
                 

@@ -15,6 +15,7 @@ import MembershipPage from "@/pages/membership-page";
 import PaymentsPage from "@/pages/payments-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import StaffCheckIn from "@/pages/staff-checkin";
+import TestPayment from "@/pages/test-payment";
 
 function Router() {
   return (
@@ -29,6 +30,9 @@ function Router() {
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
       <ProtectedRoute path="/membership" component={MembershipPage} />
       <ProtectedRoute path="/payments" component={PaymentsPage} />
+      
+      {/* Test payment - accessible to all authenticated users */}
+      <ProtectedRoute path="/test-payment" component={TestPayment} />
       
       {/* Staff check-in - accessible to all authenticated users */}
       <ProtectedRoute path="/staff-checkin" component={StaffCheckIn} />

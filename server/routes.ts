@@ -402,35 +402,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create payment intent for membership or day pass
-  app.post("/api/create-payment-intent", isAuthenticated, async (req, res) => {
+  app.post("/api/create-payment-intent", async (req, res) => {
     try {
-      const user = req.user!;
-      const { amount, description, paymentMethodId } = req.body;
-      
-      // Ensure user has Stripe customer
-      let customerId = user.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName} ${user.lastName}`,
-          metadata: { userId: user.id.toString() }
-        });
-        customerId = customer.id;
-        await storage.updateUserStripeCustomerId(user.id, customerId);
-      }
+      const { amount, description } = req.body;
       
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency: 'usd',
-        customer: customerId,
-        payment_method: paymentMethodId,
-        confirmation_method: 'manual',
-        confirm: true,
-        description,
-        metadata: {
-          userId: user.id.toString(),
-          description
-        }
+        description: description || 'Wolf Mother Wellness Payment',
+        automatic_payment_methods: {
+          enabled: true,
+        },
       });
       
       res.json({ 

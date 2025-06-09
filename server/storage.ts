@@ -87,6 +87,12 @@ export interface IStorage {
   getStravaIntegration(userId: number): Promise<StravaIntegration | undefined>;
   createOrUpdateStravaIntegration(integration: InsertStravaIntegration): Promise<StravaIntegration>;
   disconnectStravaIntegration(userId: number): Promise<void>;
+
+  // Visit logging and analytics methods
+  getVisitAnalytics(period: string): Promise<any>;
+  getPeakHoursAnalytics(): Promise<any>;
+  getDashboardSummary(): Promise<any>;
+  getUserByMembershipId(membershipId: string): Promise<User | undefined>;
   
   // Session store
   sessionStore: any;
@@ -508,6 +514,146 @@ export class DatabaseStorage implements IStorage {
       { name: "10-Day Pass", totalPunches: 10, totalPrice: 24000, pricePerPunch: 2400 }, // $240 total, $24 per punch (20% savings)
       { name: "20-Day Pass", totalPunches: 20, totalPrice: 42000, pricePerPunch: 2100 }, // $420 total, $21 per punch (30% savings)
     ];
+  }
+
+  async getVisitAnalytics(period: string): Promise<any> {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (period) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const checkInResults = await db
+      .select()
+      .from(checkIns)
+      .where(gte(checkIns.timestamp, startDate));
+
+    // Group by date for chart data
+    const visitsByDate = checkInResults.reduce((acc: any, checkIn) => {
+      const date = new Date(checkIn.timestamp).toDateString();
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      totalVisits: checkInResults.length,
+      averageDaily: Math.round(checkInResults.length / Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)))),
+      visitsByDate,
+      period
+    };
+  }
+
+  async getPeakHoursAnalytics(): Promise<any> {
+    const now = new Date();
+    const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    const weeklyCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(gte(checkIns.timestamp, startOfWeek));
+
+    // Group by hour of day
+    const hourlyVisits = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      visits: 0,
+      label: hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`
+    }));
+
+    weeklyCheckIns.forEach(checkIn => {
+      const hour = new Date(checkIn.timestamp).getHours();
+      hourlyVisits[hour].visits++;
+    });
+
+    const peakHour = hourlyVisits.reduce((max, current) => 
+      current.visits > max.visits ? current : max
+    );
+
+    return {
+      hourlyData: hourlyVisits,
+      peakHour: peakHour.label,
+      peakVisits: peakHour.visits
+    };
+  }
+
+  async getDashboardSummary(): Promise<any> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Today's check-ins
+    const todayCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(gte(checkIns.timestamp, today));
+
+    // This month's check-ins
+    const thisMonthCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(gte(checkIns.timestamp, thisMonth));
+
+    // Last month's check-ins for comparison
+    const lastMonthCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(and(
+        gte(checkIns.timestamp, lastMonth),
+        lte(checkIns.timestamp, lastMonthEnd)
+      ));
+
+    // Active memberships
+    const activeMembers = await db
+      .select()
+      .from(memberships)
+      .where(eq(memberships.status, 'active'));
+
+    // New members this month
+    const newMembersThisMonth = await db
+      .select()
+      .from(users)
+      .where(gte(users.createdAt, thisMonth));
+
+    return {
+      todayVisits: todayCheckIns.length,
+      monthlyVisits: thisMonthCheckIns.length,
+      activeMembers: activeMembers.length,
+      newMembers: newMembersThisMonth.length,
+      growth: {
+        visits: lastMonthCheckIns.length > 0 ? 
+          Math.round(((thisMonthCheckIns.length - lastMonthCheckIns.length) / lastMonthCheckIns.length) * 100) : 0
+      }
+    };
+  }
+
+  async getUserByMembershipId(membershipId: string): Promise<User | undefined> {
+    const [membership] = await db
+      .select()
+      .from(memberships)
+      .where(eq(memberships.membershipId, membershipId))
+      .limit(1);
+
+    if (!membership) return undefined;
+
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, membership.userId))
+      .limit(1);
+
+    return user;
   }
 }
 

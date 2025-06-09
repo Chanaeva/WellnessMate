@@ -1,5 +1,8 @@
-import { User, Membership } from "@shared/schema";
-import { Card, CardContent } from "@/components/ui/card";
+import { User, Membership, MembershipPlan } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, Crown, Calendar, CreditCard } from "lucide-react";
+import { format } from "date-fns";
 
 interface MemberCardProps {
   user: User | null;
@@ -7,6 +10,7 @@ interface MemberCardProps {
   membershipEndDate: string;
   planName: string;
   memberSince: string;
+  currentPlan?: MembershipPlan;
 }
 
 const MemberCard = ({

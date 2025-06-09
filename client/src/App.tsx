@@ -17,6 +17,7 @@ import AdminDashboard from "@/pages/admin/dashboard";
 import StaffCheckIn from "@/pages/staff-checkin";
 import TestPayment from "@/pages/test-payment";
 
+
 function Router() {
   return (
     <Switch>
@@ -33,7 +34,7 @@ function Router() {
       
       {/* Test payment - accessible to all authenticated users */}
       <ProtectedRoute path="/test-payment" component={TestPayment} />
-      
+
       {/* Staff check-in - accessible to all authenticated users */}
       <ProtectedRoute path="/staff-checkin" component={StaffCheckIn} />
       

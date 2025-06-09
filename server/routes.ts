@@ -2,7 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
+import { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
 import Stripe from "stripe";
+
+const scryptAsync = promisify(scrypt);
 import { 
   insertMembershipSchema, 
   insertCheckInSchema, 
@@ -507,6 +511,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(peakHours);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new member (admin only)
+  app.post("/api/admin/create-member", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const { firstName, lastName, email, username, password, planType } = req.body;
+      
+      // Hash password using crypto functions
+      const crypto = await import('crypto');
+      const salt = crypto.randomBytes(16).toString("hex");
+      const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+      const hashedPassword = `${buf.toString("hex")}.${salt}`;
+
+      // Create user
+      const newUser = await storage.createUser({
+        firstName,
+        lastName,
+        email,
+        username,
+        password: hashedPassword,
+        role: 'member'
+      });
+
+      // Generate unique membership ID
+      const membershipId = `WM-${String(newUser.id).padStart(3, '0')}`;
+      
+      // Create membership
+      const membership = await storage.createMembership({
+        userId: newUser.id,
+        membershipId,
+        planType,
+        status: 'active',
+      });
+
+      res.json({ 
+        user: { ...newUser, password: undefined }, 
+        membership 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to create member: " + error.message });
     }
   });
 

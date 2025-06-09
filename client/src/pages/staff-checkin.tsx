@@ -46,8 +46,38 @@ export default function StaffCheckIn() {
 
   const handleQRScan = (data: string) => {
     try {
-      // Parse QR code data (JSON format with membershipId)
+      // Parse QR code data (JSON format)
       const qrData = JSON.parse(data);
+      
+      // Handle daily check-in QR code
+      if (qrData.type === "daily_checkin") {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Verify QR code is for today
+        if (qrData.date !== today) {
+          toast({
+            title: "Expired QR Code",
+            description: "This QR code has expired. Please use today's QR code.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // For daily QR codes, prompt for membership ID
+        const membershipId = prompt("Please enter the member's Membership ID (e.g., WM-001):");
+        if (membershipId && membershipId.trim()) {
+          processCheckIn(membershipId.trim());
+        } else {
+          toast({
+            title: "Membership ID Required",
+            description: "Please enter a valid membership ID for daily check-in",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+      
+      // Handle individual member QR code
       if (qrData.membershipId) {
         processCheckIn(qrData.membershipId);
       } else {

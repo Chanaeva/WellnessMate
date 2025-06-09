@@ -375,25 +375,75 @@ export default function AdminDashboard() {
                 </Card>
               </div>
 
-              {/* Manual Check-in */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Manual Check-in</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Enter Membership ID (e.g., WM-001)"
-                      value={membershipId}
-                      onChange={(e) => setMembershipId(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleManualCheckIn}>
-                      Check In
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Daily QR Code */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <QrCode className="h-5 w-5 mr-2" />
+                      Daily Check-in QR Code
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center space-y-4">
+                    {dailyQRCode ? (
+                      <>
+                        <div className="bg-white p-4 rounded-lg border-2 border-dashed border-gray-300 inline-block">
+                          <img 
+                            src={dailyQRCode} 
+                            alt="Daily Check-in QR Code" 
+                            className="w-48 h-48 mx-auto"
+                          />
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Valid for: {format(new Date(), "MMMM dd, yyyy")}
+                        </div>
+                        <div className="flex justify-center space-x-2">
+                          <Button onClick={downloadQRCode} variant="outline" size="sm">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                          <Button onClick={printQRCode} variant="outline" size="sm">
+                            <Printer className="h-4 w-4 mr-2" />
+                            Print
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                          Display this QR code for members to scan for quick check-in. 
+                          Code is unique to today and automatically updates daily.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="py-8">
+                        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                        <p className="text-gray-500">Generating daily QR code...</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Manual Check-in */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Manual Check-in</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex space-x-2">
+                      <Input
+                        placeholder="Enter Membership ID (e.g., WM-001)"
+                        value={membershipId}
+                        onChange={(e) => setMembershipId(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button onClick={handleManualCheckIn}>
+                        Check In
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Manually check in a member by entering their membership ID.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* Members Tab */}

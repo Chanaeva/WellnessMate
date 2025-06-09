@@ -5,58 +5,58 @@
 @tailwind utilities;
 
 :root {
-  /* Wolf Mother Wellness - Thermal Spa Color Palette */
-  --background: 44 20% 97%;      /* Warm off-white with subtle warmth */
-  --foreground: 210 15% 15%;     /* Deep charcoal for excellent readability */
-  --muted: 44 15% 94%;           /* Soft warm neutral for backgrounds */
-  --muted-foreground: 210 10% 45%; /* Medium gray for secondary text */
+  /* Wolf Mother Wellness - Green Theme Color Palette */
+  --background: 210 20% 98%;     /* Very light gray background */
+  --foreground: 150 25% 25%;     /* Dark forest green for text */
+  --muted: 210 15% 92%;          /* Light gray muted backgrounds */
+  --muted-foreground: 150 15% 40%; /* Medium forest green for secondary text */
   --popover: 0 0% 100%;          /* Pure white for popovers */
-  --popover-foreground: 210 15% 15%;
+  --popover-foreground: 150 25% 25%;
   --card: 0 0% 100%;             /* Pure white cards for clarity */
-  --card-foreground: 210 15% 15%;
-  --border: 44 15% 88%;          /* Subtle warm border */
-  --input: 44 15% 96%;           /* Light warm input backgrounds */
-  --primary: 25 85% 25%;         /* Rich moss green - thermal wellness */
+  --card-foreground: 150 25% 25%;
+  --border: 210 15% 85%;         /* Light gray borders */
+  --input: 210 15% 95%;          /* Very light input backgrounds */
+  --primary: 150 30% 35%;        /* Deep forest green - matching DARK 1 */
   --primary-foreground: 0 0% 100%;
-  --secondary: 200 85% 35%;      /* Deep thermal blue - cold therapy */
+  --secondary: 150 20% 45%;      /* Medium forest green */
   --secondary-foreground: 0 0% 100%;
-  --accent: 35 75% 55%;          /* Warm amber - heat therapy */
+  --accent: 150 25% 55%;         /* Lighter forest green accent */
   --accent-foreground: 0 0% 100%;
   --destructive: 0 75% 50%;      /* Clear red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --success: 145 65% 35%;        /* Forest green for success states */
+  --success: 150 50% 30%;        /* Success green */
   --success-foreground: 0 0% 100%;
   --warning: 45 90% 50%;         /* Warm amber for warnings */
   --warning-foreground: 0 0% 100%;
-  --ring: 25 85% 25%;
-  --radius: 0.75rem;             /* Slightly more rounded for modern feel */
+  --ring: 150 30% 35%;
+  --radius: 0.75rem;
 }
 
 .dark {
-  /* Wolf Mother Wellness - Dark Thermal Spa Mode */
-  --background: 210 15% 8%;       /* Deep charcoal background */
-  --foreground: 44 15% 92%;       /* Warm off-white text */
-  --muted: 210 12% 12%;           /* Dark muted background */
-  --muted-foreground: 210 8% 65%; /* Medium gray for secondary text */
-  --popover: 210 15% 10%;         /* Slightly lighter dark for popovers */
-  --popover-foreground: 44 15% 92%;
-  --card: 210 15% 10%;            /* Dark cards with subtle warmth */
-  --card-foreground: 44 15% 92%;
-  --border: 210 12% 18%;          /* Subtle dark borders */
-  --input: 210 12% 15%;           /* Dark input backgrounds */
-  --primary: 25 75% 35%;          /* Slightly brighter moss green for dark */
+  /* Wolf Mother Wellness - Dark Green Theme */
+  --background: 150 20% 8%;       /* Very dark forest green background */
+  --foreground: 150 15% 85%;      /* Light greenish-white text */
+  --muted: 150 15% 12%;           /* Dark muted green background */
+  --muted-foreground: 150 10% 65%; /* Medium light green for secondary text */
+  --popover: 150 20% 10%;         /* Slightly lighter dark green for popovers */
+  --popover-foreground: 150 15% 85%;
+  --card: 150 20% 10%;            /* Dark green cards */
+  --card-foreground: 150 15% 85%;
+  --border: 150 15% 18%;          /* Subtle dark green borders */
+  --input: 150 15% 15%;           /* Dark green input backgrounds */
+  --primary: 150 40% 45%;         /* Brighter forest green for dark mode */
   --primary-foreground: 0 0% 100%;
-  --secondary: 200 80% 45%;       /* Brighter thermal blue for dark */
+  --secondary: 150 30% 55%;       /* Medium bright green */
   --secondary-foreground: 0 0% 100%;
-  --accent: 35 70% 60%;           /* Brighter warm amber for dark */
-  --accent-foreground: 210 15% 8%;
-  --destructive: 0 70% 55%;       /* Brighter red for dark mode */
+  --accent: 150 35% 65%;          /* Light forest green accent */
+  --accent-foreground: 150 20% 8%;
+  --destructive: 0 70% 55%;       /* Bright red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --success: 145 60% 45%;         /* Brighter forest green for dark */
+  --success: 150 60% 50%;         /* Bright success green */
   --success-foreground: 0 0% 100%;
-  --warning: 45 85% 60%;          /* Brighter amber for dark warnings */
-  --warning-foreground: 210 15% 8%;
-  --ring: 25 75% 35%;
+  --warning: 45 85% 60%;          /* Bright amber for warnings */
+  --warning-foreground: 150 20% 8%;
+  --ring: 150 40% 45%;
   --radius: 0.75rem;
 }
 

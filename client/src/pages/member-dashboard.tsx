@@ -267,7 +267,7 @@ export default function MemberDashboard() {
                 </div>
                 
                 {/* External Links Section */}
-                <div className="border-t border-border pt-4 space-y-3">
+                <div className="border-t border-border pt-4">
                   <a 
                     href="https://www.wolfmothertulsa.com/" 
                     target="_blank" 
@@ -281,14 +281,6 @@ export default function MemberDashboard() {
                       <span className="text-sm text-primary font-medium">Visit Our Website</span>
                     </Button>
                   </a>
-                  
-                  {/* Admin Access */}
-                  <Link href="/admin-login">
-                    <Button variant="outline" className="w-full flex items-center justify-center bg-muted hover:bg-muted/80 py-3">
-                      <Settings className="h-5 w-5 text-muted-foreground mr-2" />
-                      <span className="text-sm text-muted-foreground">Admin Login</span>
-                    </Button>
-                  </Link>
                 </div>
               </CardContent>
             </Card>

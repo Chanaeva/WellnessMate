@@ -14,7 +14,7 @@ const Footer = () => {
                 WW
               </div>
               <span className="text-sm text-gray-600">
-                © {currentYear} WolfMother Wellness - Thermal Wellness Center. All rights reserved.
+                © {currentYear} Wolf Mother Wellness - Thermal Wellness Center. All rights reserved.
               </span>
             </div>
           </div>

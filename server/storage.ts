@@ -571,8 +571,10 @@ export class DatabaseStorage implements IStorage {
     }));
 
     weeklyCheckIns.forEach(checkIn => {
-      const hour = new Date(checkIn.timestamp).getHours();
-      hourlyVisits[hour].visits++;
+      if (checkIn.timestamp) {
+        const hour = new Date(checkIn.timestamp).getHours();
+        hourlyVisits[hour].visits++;
+      }
     });
 
     const peakHour = hourlyVisits.reduce((max, current) => 

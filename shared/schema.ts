@@ -47,6 +47,9 @@ export const memberships = pgTable("memberships", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Check-in method enum
+export const checkInMethodEnum = pgEnum('check_in_method', ['qr', 'manual']);
+
 // Check-in records table definition
 export const checkIns = pgTable("check_ins", {
   id: serial("id").primaryKey(),
@@ -54,6 +57,7 @@ export const checkIns = pgTable("check_ins", {
   membershipId: text("membership_id").notNull(),
   timestamp: timestamp("timestamp").defaultNow(),
   location: text("location").notNull().default('Main Entrance'),
+  method: checkInMethodEnum("method").notNull().default('qr'),
 });
 
 // Payment status enum

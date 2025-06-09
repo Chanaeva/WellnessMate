@@ -528,8 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create check-in record
       const checkIn = await storage.createCheckIn({
         userId: user.id,
-        timestamp: new Date(),
-        method: 'manual'
+        membershipId: membershipId
       });
 
       res.status(201).json({ 
@@ -537,6 +536,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checkIn,
         member: { username: user.username, email: user.email }
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin check-ins route with pagination
+  app.get("/api/admin/check-ins", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      const result = await storage.getAllCheckIns(page, limit);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Today's check-ins
+  app.get("/api/check-ins/today", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const todayCheckIns = await storage.getTodayCheckIns();
+      res.json(todayCheckIns);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

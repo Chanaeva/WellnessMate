@@ -100,11 +100,18 @@ export default function MemberDashboard() {
                   <div className="text-sm text-gray-500">Recent Check-ins</div>
                   <div className="font-medium">{checkInsThisMonth} this month</div>
                 </div>
-                <Link href="/qr-code">
-                  <Button className="bg-primary hover:bg-primary/90 flex items-center">
-                    <QrCode className="mr-2 h-4 w-4" /> Check In Now
-                  </Button>
-                </Link>
+                <div className="flex gap-2">
+                  <Link href="/qr-code">
+                    <Button className="bg-primary hover:bg-primary/90 flex items-center">
+                      <QrCode className="mr-2 h-4 w-4" /> Check In Now
+                    </Button>
+                  </Link>
+                  <Link href="/staff-checkin">
+                    <Button variant="outline" className="flex items-center">
+                      Staff Check-in
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
 

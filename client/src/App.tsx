@@ -16,6 +16,8 @@ import PaymentsPage from "@/pages/payments-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminCheckIns from "@/pages/admin/check-ins";
+import StaffCheckIn from "@/pages/staff-checkin";
+import { AdminRoute } from "./lib/admin-route";
 
 function Router() {
   return (
@@ -29,6 +31,9 @@ function Router() {
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
       <ProtectedRoute path="/membership" component={MembershipPage} />
       <ProtectedRoute path="/payments" component={PaymentsPage} />
+      
+      {/* Staff check-in - accessible to all authenticated users */}
+      <ProtectedRoute path="/staff-checkin" component={StaffCheckIn} />
       
       {/* Admin routes */}
       <ProtectedRoute path="/admin" component={AdminDashboard} />

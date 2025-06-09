@@ -471,8 +471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin analytics routes
   app.get("/api/admin/dashboard-summary", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'admin') {
-      return res.sendStatus(403);
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
     }
     
     try {

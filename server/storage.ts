@@ -14,7 +14,7 @@ import {
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, and, lt, gte, lte } from "drizzle-orm";
+import { eq, desc, and, lt, gte, lte, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 

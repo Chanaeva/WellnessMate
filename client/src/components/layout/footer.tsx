@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Facebook, Twitter, Instagram, Mail } from "lucide-react";
+import { Instagram, Mail } from "lucide-react";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -21,12 +21,6 @@ const Footer = () => {
           <div className="flex space-x-4">
             <a href="https://www.instagram.com/wolfmothertulsa" target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-primary" aria-label="Instagram">
               <Instagram className="h-5 w-5" />
-            </a>
-            <a href="#" className="text-gray-600 hover:text-primary" aria-label="Facebook">
-              <Facebook className="h-5 w-5" />
-            </a>
-            <a href="#" className="text-gray-600 hover:text-primary" aria-label="Twitter">
-              <Twitter className="h-5 w-5" />
             </a>
             <a href="mailto:info@wolfmothertulsa.com" className="text-gray-600 hover:text-primary" aria-label="Email">
               <Mail className="h-5 w-5" />

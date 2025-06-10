@@ -503,7 +503,7 @@ export default function MemberDashboard() {
                   <Link href="/payments">
                     <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-muted hover:bg-muted/80 py-6">
                       <CreditCard className="h-6 w-6 text-primary mb-2" />
-                      <span className="text-sm text-center">Payment History</span>
+                      <span className="text-sm text-center">Payments</span>
                     </Button>
                   </Link>
                   <Link href="/membership">

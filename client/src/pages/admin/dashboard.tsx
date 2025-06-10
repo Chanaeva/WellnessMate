@@ -35,7 +35,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import Header from "@/components/layout/header";
 import QRCode from "qrcode";
-import PricingManagement from "./pricing";
+import PackagesManagement from "./packages";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -323,7 +323,7 @@ export default function AdminDashboard() {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="members">Members</TabsTrigger>
               <TabsTrigger value="checkins">Check-ins</TabsTrigger>
-              <TabsTrigger value="pricing">Pricing</TabsTrigger>
+              <TabsTrigger value="packages">Packages</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
@@ -762,9 +762,9 @@ export default function AdminDashboard() {
               </Card>
             </TabsContent>
 
-            {/* Pricing Management Tab */}
-            <TabsContent value="pricing" className="space-y-6">
-              <PricingManagement />
+            {/* Package Management Tab */}
+            <TabsContent value="packages" className="space-y-6">
+              <PackagesManagement />
             </TabsContent>
 
             {/* Analytics Tab */}

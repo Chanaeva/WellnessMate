@@ -62,6 +62,7 @@ export interface IStorage {
   // Membership plan methods
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
   createOrUpdateMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
+  deleteMembershipPlan(id: number): Promise<void>;
 
   // Punch card template methods
   getAllPunchCardTemplates(): Promise<PunchCardTemplate[]>;

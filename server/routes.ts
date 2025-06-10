@@ -258,6 +258,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update a membership plan
+  app.put("/api/admin/membership-plans/:id", isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const validatedData = insertMembershipPlanSchema.parse(req.body);
+      const plan = await storage.createOrUpdateMembershipPlan({ ...validatedData, id });
+      res.json(plan);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Delete a membership plan
+  app.delete("/api/admin/membership-plans/:id", isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteMembershipPlan(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Admin punch card template management
   app.get("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
     try {

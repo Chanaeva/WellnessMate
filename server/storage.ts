@@ -753,6 +753,61 @@ export class DatabaseStorage implements IStorage {
 
     return user;
   }
+
+  // Notification methods implementation
+  async getAllNotifications(): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getActiveNotifications(): Promise<Notification[]> {
+    const now = new Date();
+    return await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.isActive, true),
+          lte(notifications.startDate, now),
+          sql`(${notifications.endDate} IS NULL OR ${notifications.endDate} >= ${now})`
+        )
+      )
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getNotificationById(id: number): Promise<Notification | undefined> {
+    const [notification] = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.id, id))
+      .limit(1);
+    return notification;
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const [notification] = await db
+      .insert(notifications)
+      .values(insertNotification)
+      .returning();
+    return notification;
+  }
+
+  async updateNotification(id: number, data: Partial<Notification>): Promise<Notification> {
+    const [notification] = await db
+      .update(notifications)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(notifications.id, id))
+      .returning();
+    return notification;
+  }
+
+  async deleteNotification(id: number): Promise<void> {
+    await db
+      .delete(notifications)
+      .where(eq(notifications.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();

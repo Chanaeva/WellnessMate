@@ -15,6 +15,7 @@ import MembershipPage from "@/pages/membership-page";
 import PaymentsPage from "@/pages/payments-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
+import AdminNotifications from "@/pages/admin/notifications";
 import StaffCheckIn from "@/pages/staff-checkin";
 import TestPayment from "@/pages/test-payment";
 
@@ -42,6 +43,7 @@ function Router() {
       {/* Admin routes */}
       <ProtectedRoute path="/admin" component={AdminDashboard} />
       <ProtectedRoute path="/admin/members" component={AdminMembers} />
+      <ProtectedRoute path="/admin/notifications" component={AdminNotifications} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

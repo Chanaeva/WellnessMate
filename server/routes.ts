@@ -13,7 +13,8 @@ import {
   insertPaymentSchema, 
   insertMembershipPlanSchema,
   insertPunchCardTemplateSchema,
-  insertPunchCardSchema
+  insertPunchCardSchema,
+  insertNotificationSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -830,6 +831,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const todayCheckIns = await storage.getTodayCheckIns();
       res.json(todayCheckIns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ===== NOTIFICATION ROUTES =====
+  
+  // Get all notifications (Admin only)
+  app.get("/api/admin/notifications", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const notifications = await storage.getAllNotifications();
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active notifications (for member dashboard)
+  app.get("/api/notifications/active", async (req, res) => {
+    try {
+      const notifications = await storage.getActiveNotifications();
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get single notification (Admin only)
+  app.get("/api/admin/notifications/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const id = parseInt(req.params.id);
+      const notification = await storage.getNotificationById(id);
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      res.json(notification);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create notification (Admin only)
+  app.post("/api/admin/notifications", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const validatedData = insertNotificationSchema.parse(req.body);
+      const notification = await storage.createNotification(validatedData);
+      res.status(201).json(notification);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Update notification (Admin only)
+  app.put("/api/admin/notifications/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const id = parseInt(req.params.id);
+      const notification = await storage.updateNotification(id, req.body);
+      res.json(notification);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete notification (Admin only)
+  app.delete("/api/admin/notifications/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteNotification(id);
+      res.json({ message: "Notification deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

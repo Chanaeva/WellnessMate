@@ -506,11 +506,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (existingMembership) {
             // Update existing membership
-            await storage.updateMembership(existingMembership.id, {
+            await storage.updateMembership(existingMembership.id.toString(), {
               planType: membershipPlanType,
               status: 'active',
-              startDate: new Date(),
-              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              startDate: new Date().toISOString(),
+              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
               autoRenew: true
             });
           } else {
@@ -522,8 +522,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               membershipId: newMembershipId,
               planType: membershipPlanType,
               status: 'active',
-              startDate: new Date(),
-              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              startDate: new Date().toISOString(),
+              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
               autoRenew: true
             });
           }

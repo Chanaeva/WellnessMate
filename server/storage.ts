@@ -12,6 +12,7 @@ import {
   therapySessions, type TherapySession, type InsertTherapySession,
   healthMetrics, type HealthMetrics, type InsertHealthMetrics,
   stravaIntegrations, type StravaIntegration, type InsertStravaIntegration,
+  notifications, type Notification, type InsertNotification,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -102,6 +103,14 @@ export interface IStorage {
   getPeakHoursAnalytics(): Promise<any>;
   getDashboardSummary(): Promise<any>;
   getUserByMembershipId(membershipId: string): Promise<User | undefined>;
+
+  // Notification methods
+  getAllNotifications(): Promise<Notification[]>;
+  getActiveNotifications(): Promise<Notification[]>;
+  getNotificationById(id: number): Promise<Notification | undefined>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  updateNotification(id: number, data: Partial<Notification>): Promise<Notification>;
+  deleteNotification(id: number): Promise<void>;
   
   // Session store
   sessionStore: any;

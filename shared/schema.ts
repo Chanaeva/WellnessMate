@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, pgEnum, jsonb, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, integer, boolean, timestamp, date, pgEnum, jsonb, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -323,3 +323,23 @@ export const passwordResetSchema = z.object({
 
 export type PasswordResetRequestData = z.infer<typeof passwordResetRequestSchema>;
 export type PasswordResetData = z.infer<typeof passwordResetSchema>;
+
+// Notifications table
+export const notificationTypeEnum = pgEnum('notification_type', ['announcement', 'maintenance', 'promotion', 'alert']);
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: notificationTypeEnum("type").notNull().default('announcement'),
+  isActive: boolean("is_active").notNull().default(true),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications);
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

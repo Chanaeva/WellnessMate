@@ -11,6 +11,13 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        // Wolf Mother Brand Colors
+        'rosy-smoke': '#D6A8A1',
+        'deep-moss': '#5C6656', 
+        'earthen-linen': '#C9BBAA',
+        'ivory-veil': '#EFEDE9',
+        'charred-ash': '#1F1F1F',
+        
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

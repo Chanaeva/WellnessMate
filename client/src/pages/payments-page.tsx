@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
-import { Payment, Membership, PaymentMethod } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Payment, Membership, PaymentMethod, MembershipPlan, PunchCard } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, CreditCard, Shield, Lock, Plus, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { Download, CreditCard, Shield, Lock, Plus, Loader2, Crown, Star, Zap, Check, Ticket, ShoppingCart } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
@@ -20,6 +23,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
 
 export default function PaymentsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [timeFilter, setTimeFilter] = useState("3months");
   const [currentPage, setCurrentPage] = useState(1);
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
@@ -41,6 +45,115 @@ export default function PaymentsPage() {
   const { data: paymentMethods, isLoading: isPaymentMethodsLoading } = useQuery<PaymentMethod[]>({
     queryKey: ["/api/payment-methods"],
     enabled: !!user,
+  });
+
+  // Fetch membership plans
+  const { data: membershipPlans, isLoading: isPlansLoading } = useQuery<MembershipPlan[]>({
+    queryKey: ["/api/membership-plans"],
+  });
+
+  // Fetch punch card options
+  const { data: punchCardOptions, isLoading: isPunchCardOptionsLoading } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
+    queryKey: ["/api/punch-cards/options"],
+  });
+
+  // Fetch user's punch cards
+  const { data: userPunchCards, isLoading: isUserPunchCardsLoading } = useQuery<PunchCard[]>({
+    queryKey: ["/api/punch-cards"],
+    enabled: !!user,
+  });
+
+  // Purchase membership mutation
+  const purchaseMembershipMutation = useMutation({
+    mutationFn: async (plan: MembershipPlan) => {
+      console.log('Starting membership purchase for:', plan);
+      
+      // Create payment intent
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: plan.monthlyPrice / 100, // Convert cents to dollars
+        description: `Wolf Mother Wellness - ${plan.name}`
+      });
+      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+      console.log('Payment intent created:', paymentIntentId);
+
+      // Confirm payment and create membership
+      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+        paymentIntentId,
+        membershipId: null,
+        description: `Wolf Mother Wellness - ${plan.name}`
+      });
+      
+      if (!confirmRes.ok) {
+        throw new Error('Payment confirmation failed');
+      }
+
+      return await confirmRes.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Membership Purchased!",
+        description: "Your membership has been activated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+    },
+    onError: (error: any) => {
+      console.error('Membership purchase error:', error);
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to purchase membership",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Purchase punch card mutation
+  const purchasePunchCardMutation = useMutation({
+    mutationFn: async (punchCardData: any) => {
+      // Create payment intent
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: punchCardData.totalPrice / 100,
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
+      });
+      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+
+      // Confirm payment and create punch card
+      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+        paymentIntentId,
+        membershipId: null,
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
+      });
+      
+      if (!confirmRes.ok) {
+        throw new Error('Payment confirmation failed');
+      }
+
+      // Create punch card
+      const punchCardRes = await apiRequest("POST", "/api/punch-cards", {
+        name: punchCardData.name,
+        totalPunches: punchCardData.totalPunches,
+        remainingPunches: punchCardData.totalPunches,
+        pricePerPunch: punchCardData.pricePerPunch,
+        totalPrice: punchCardData.totalPrice,
+      });
+
+      return await punchCardRes.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Punch Card Purchased!",
+        description: "Your punch card has been added to your account.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to purchase punch card",
+        variant: "destructive",
+      });
+    },
   });
 
   // Helper function to convert cents to dollars

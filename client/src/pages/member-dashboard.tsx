@@ -163,6 +163,27 @@ export default function MemberDashboard() {
     },
   });
 
+  // Helper functions for notification styling
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'announcement': return 'border-blue-500 bg-blue-50';
+      case 'maintenance': return 'border-orange-500 bg-orange-50';
+      case 'promotion': return 'border-green-500 bg-green-50';
+      case 'alert': return 'border-red-500 bg-red-50';
+      default: return 'border-gray-300 bg-gray-50';
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'announcement': return '📢';
+      case 'maintenance': return '🔧';
+      case 'promotion': return '⭐';
+      case 'alert': return '⚠️';
+      default: return '📌';
+    }
+  };
+
   // Calculate membership status and information
   const membershipStatus = membership?.status || "inactive";
   const membershipEndDate = membership ? new Date(membership.endDate) : new Date();
@@ -548,21 +569,29 @@ export default function MemberDashboard() {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  <div className="border-l-4 border-[#FF7F50] bg-[#FF7F50]/5 p-3 rounded-r-lg">
-                    <h4 className="font-medium text-sm">New Thermal Sessions</h4>
-                    <p className="text-sm text-gray-600 mt-1">New guided sauna sessions added to the schedule. Reserve now!</p>
-                    <p className="text-xs text-gray-500 mt-1">2 hours ago</p>
-                  </div>
-                  <div className="border-l-4 border-green-500 bg-green-500/5 p-3 rounded-r-lg">
-                    <h4 className="font-medium text-sm">Payment Successful</h4>
-                    <p className="text-sm text-gray-600 mt-1">Your thermal wellness membership payment was processed successfully.</p>
-                    <p className="text-xs text-gray-500 mt-1">Yesterday</p>
-                  </div>
-                  <div className="border-l-4 border-gray-300 bg-gray-50 p-3 rounded-r-lg">
-                    <h4 className="font-medium text-sm">Maintenance Notice</h4>
-                    <p className="text-sm text-gray-600 mt-1">The Finnish sauna will be closed for maintenance on Saturday.</p>
-                    <p className="text-xs text-gray-500 mt-1">2 days ago</p>
-                  </div>
+                  {activeNotifications && activeNotifications.length > 0 ? (
+                    activeNotifications.slice(0, 3).map((notification) => (
+                      <div 
+                        key={notification.id} 
+                        className={`border-l-4 p-3 rounded-r-lg ${getNotificationColor(notification.type)}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-sm">{getNotificationIcon(notification.type)}</span>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm text-foreground">{notification.title}</h4>
+                            <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(notification.startDate), "MMM d, yyyy 'at' h:mm a")}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <p className="text-sm">No notifications at this time</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

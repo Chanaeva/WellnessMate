@@ -29,17 +29,17 @@ const Footer = () => {
         </div>
         <div className="mt-4 text-center">
           <div className="flex flex-wrap justify-center space-x-4 text-xs text-gray-500">
-            <Link href="#">
-              <a className="hover:text-primary">Terms of Service</a>
+            <Link href="#" className="hover:text-primary">
+              Terms of Service
             </Link>
-            <Link href="#">
-              <a className="hover:text-primary">Privacy Policy</a>
+            <Link href="#" className="hover:text-primary">
+              Privacy Policy
             </Link>
-            <Link href="#">
-              <a className="hover:text-primary">Contact Us</a>
+            <Link href="#" className="hover:text-primary">
+              Contact Us
             </Link>
-            <Link href="#">
-              <a className="hover:text-primary">FAQ</a>
+            <Link href="#" className="hover:text-primary">
+              FAQ
             </Link>
           </div>
         </div>

@@ -27,6 +27,7 @@ export default function PaymentsPage() {
   const [timeFilter, setTimeFilter] = useState("3months");
   const [currentPage, setCurrentPage] = useState(1);
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
+  const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
   const itemsPerPage = 5;
 
   // Fetch membership data
@@ -244,14 +245,20 @@ export default function PaymentsPage() {
                       <Button 
                         variant="link" 
                         className="text-primary p-0 h-auto mr-3"
-                        onClick={() => setShowAddPaymentMethod(true)}
+                        onClick={() => {
+                          setIsUpdatingPaymentMethod(true);
+                          setShowAddPaymentMethod(true);
+                        }}
                       >
                         Update
                       </Button>
                       <Button 
                         variant="link" 
                         className="text-primary p-0 h-auto"
-                        onClick={() => setShowAddPaymentMethod(true)}
+                        onClick={() => {
+                          setIsUpdatingPaymentMethod(false);
+                          setShowAddPaymentMethod(true);
+                        }}
                       >
                         Add New
                       </Button>
@@ -398,7 +405,10 @@ export default function PaymentsPage() {
                   </CardDescription>
                 </div>
                 <Button
-                  onClick={() => setShowAddPaymentMethod(true)}
+                  onClick={() => {
+                    setIsUpdatingPaymentMethod(false);
+                    setShowAddPaymentMethod(true);
+                  }}
                   className="bg-primary hover:bg-primary/90"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -425,8 +435,15 @@ export default function PaymentsPage() {
               {showAddPaymentMethod ? (
                 <Elements stripe={stripePromise}>
                   <AddPaymentMethod
-                    onSuccess={() => setShowAddPaymentMethod(false)}
-                    onCancel={() => setShowAddPaymentMethod(false)}
+                    isUpdating={isUpdatingPaymentMethod}
+                    onSuccess={() => {
+                      setShowAddPaymentMethod(false);
+                      setIsUpdatingPaymentMethod(false);
+                    }}
+                    onCancel={() => {
+                      setShowAddPaymentMethod(false);
+                      setIsUpdatingPaymentMethod(false);
+                    }}
                   />
                 </Elements>
               ) : (

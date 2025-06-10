@@ -20,11 +20,12 @@ const cardElementOptions = {
 };
 
 interface AddPaymentMethodProps {
+  isUpdating?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function AddPaymentMethod({ onSuccess, onCancel }: AddPaymentMethodProps) {
+export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: AddPaymentMethodProps) {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -109,10 +110,10 @@ export function AddPaymentMethod({ onSuccess, onCancel }: AddPaymentMethodProps)
       <CardHeader className="text-center">
         <CardTitle className="text-xl text-white flex items-center justify-center gap-2">
           <CreditCard className="h-5 w-5" />
-          Add New Payment Method
+          {isUpdating ? "Update Payment Method" : "Add New Payment Method"}
         </CardTitle>
         <CardDescription className="text-slate-400">
-          Add a credit or debit card for secure payments
+          {isUpdating ? "Replace your current payment method" : "Add a credit or debit card for secure payments"}
         </CardDescription>
       </CardHeader>
       <CardContent>

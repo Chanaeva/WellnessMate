@@ -1,72 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300;400;500;600;700;800&display=swap');
-
-/* Wolf Mother Custom Font - La Charisme-Regular */
-@font-face {
-  font-family: 'La Charisme-Regular';
-  src: url('../assets/fonts/la-charisme-regular.woff2') format('woff2'),
-       url('../assets/fonts/la-charisme-regular.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Wolf Mother Wellness - Brand Color Palette */
-  --background: 39 23% 95%;      /* Ivory Veil #EFEDE9 - Main background */
-  --foreground: 0 0% 12%;        /* Charred Ash #1F1F1F - Headlines, deep text */
-  --muted: 29 23% 79%;           /* Earthen Linen #C9BBAA - Warm backgrounds */
-  --muted-foreground: 78 6% 38%; /* Deep Moss #5C6656 - Body text, borders */
-  --popover: 39 23% 95%;         /* Ivory Veil for popovers */
-  --popover-foreground: 0 0% 12%;
-  --card: 39 23% 95%;            /* Ivory Veil for cards */
-  --card-foreground: 0 0% 12%;
-  --border: 78 6% 38%;           /* Deep Moss for borders */
-  --input: 29 23% 79%;           /* Earthen Linen for inputs */
-  --primary: 7 22% 73%;          /* Rosy Smoke #D6A8A1 - Accent highlights */
+  /* Wolf Mother Wellness - Green Theme Color Palette */
+  --background: 210 20% 98%;     /* Very light gray background */
+  --foreground: 150 25% 25%;     /* Dark forest green for text */
+  --muted: 210 15% 92%;          /* Light gray muted backgrounds */
+  --muted-foreground: 150 15% 40%; /* Medium forest green for secondary text */
+  --popover: 0 0% 100%;          /* Pure white for popovers */
+  --popover-foreground: 150 25% 25%;
+  --card: 0 0% 100%;             /* Pure white cards for clarity */
+  --card-foreground: 150 25% 25%;
+  --border: 210 15% 85%;         /* Light gray borders */
+  --input: 210 15% 95%;          /* Very light input backgrounds */
+  --primary: 150 30% 35%;        /* Deep forest green - matching DARK 1 */
   --primary-foreground: 0 0% 100%;
-  --secondary: 78 6% 38%;        /* Deep Moss - Secondary elements */
+  --secondary: 150 20% 45%;      /* Medium forest green */
   --secondary-foreground: 0 0% 100%;
-  --accent: 7 22% 73%;           /* Rosy Smoke - Accent color */
-  --accent-foreground: 0 0% 12%;
-  --destructive: 0 75% 50%;      /* Red for alerts */
+  --accent: 150 25% 55%;         /* Lighter forest green accent */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 75% 50%;      /* Clear red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --success: 78 30% 35%;         /* Deep green for success */
+  --success: 150 50% 30%;        /* Success green */
   --success-foreground: 0 0% 100%;
-  --warning: 45 90% 50%;         /* Amber for warnings */
+  --warning: 45 90% 50%;         /* Warm amber for warnings */
   --warning-foreground: 0 0% 100%;
-  --ring: 7 22% 73%;             /* Rosy Smoke for focus rings */
+  --ring: 150 30% 35%;
   --radius: 0.75rem;
 }
 
 .dark {
-  /* Wolf Mother Wellness - Dark Theme */
-  --background: 0 0% 12%;          /* Charred Ash #1F1F1F - Dark background */
-  --foreground: 39 23% 95%;        /* Ivory Veil - Light text */
-  --muted: 78 6% 25%;              /* Darker Deep Moss - Muted backgrounds */
-  --muted-foreground: 29 23% 79%;  /* Earthen Linen - Muted text */
-  --popover: 0 0% 12%;             /* Charred Ash for popovers */
-  --popover-foreground: 39 23% 95%;
-  --card: 78 6% 15%;               /* Very dark Deep Moss for cards */
-  --card-foreground: 39 23% 95%;
-  --border: 78 6% 30%;             /* Deep Moss borders */
-  --input: 78 6% 20%;              /* Dark inputs */
-  --primary: 7 22% 73%;            /* Rosy Smoke - Accent highlights */
-  --primary-foreground: 0 0% 12%;
-  --secondary: 78 6% 50%;          /* Lighter Deep Moss */
+  /* Wolf Mother Wellness - Dark Green Theme */
+  --background: 150 20% 8%;       /* Very dark forest green background */
+  --foreground: 150 15% 85%;      /* Light greenish-white text */
+  --muted: 150 15% 12%;           /* Dark muted green background */
+  --muted-foreground: 150 10% 65%; /* Medium light green for secondary text */
+  --popover: 150 20% 10%;         /* Slightly lighter dark green for popovers */
+  --popover-foreground: 150 15% 85%;
+  --card: 150 20% 10%;            /* Dark green cards */
+  --card-foreground: 150 15% 85%;
+  --border: 150 15% 18%;          /* Subtle dark green borders */
+  --input: 150 15% 15%;           /* Dark green input backgrounds */
+  --primary: 150 40% 45%;         /* Brighter forest green for dark mode */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 150 30% 55%;       /* Medium bright green */
   --secondary-foreground: 0 0% 100%;
-  --accent: 7 22% 73%;             /* Rosy Smoke accent */
-  --accent-foreground: 0 0% 12%;
-  --destructive: 0 70% 55%;        /* Bright red for alerts */
+  --accent: 150 35% 65%;          /* Light forest green accent */
+  --accent-foreground: 150 20% 8%;
+  --destructive: 0 70% 55%;       /* Bright red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --success: 78 40% 45%;           /* Success green */
+  --success: 150 60% 50%;         /* Bright success green */
   --success-foreground: 0 0% 100%;
-  --warning: 45 85% 60%;           /* Bright amber */
-  --warning-foreground: 0 0% 12%;
-  --ring: 7 22% 73%;               /* Rosy Smoke focus rings */
+  --warning: 45 85% 60%;          /* Bright amber for warnings */
+  --warning-foreground: 150 20% 8%;
+  --ring: 150 40% 45%;
   --radius: 0.75rem;
 }
 
@@ -76,123 +66,59 @@
   }
 
   body {
-    @apply antialiased bg-background text-foreground;
-    font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    @apply font-sans antialiased bg-background text-foreground;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'La Charisme-Regular', 'Sofia Sans', serif;
-    font-weight: 400;
-    color: hsl(var(--foreground));
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
   }
 
   .font-display {
-    font-family: 'La Charisme-Regular', 'Sofia Sans', serif;
-  }
-
-  .font-body {
-    font-family: 'Sofia Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Cormorant Garamond', serif;
   }
 }
 
 @layer components {
-  /* Wolf Mother Wellness Design Language Components */
+  /* Thermal Wellness Theme Components */
   .thermal-gradient {
-    background: linear-gradient(135deg, #D6A8A1 0%, #5C6656 100%);
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
   }
   
-  .rosy-gradient {
-    background: linear-gradient(135deg, #D6A8A1 0%, #C9BBAA 100%);
-  }
-  
-  .moss-gradient {
-    background: linear-gradient(135deg, #5C6656 0%, #1F1F1F 100%);
+  .cold-gradient {
+    background: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(200 70% 45%) 100%);
   }
   
   .wellness-card {
     @apply bg-card border border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-200;
-    background-color: #EFEDE9;
-    border-color: #5C6656;
+  }
+  
+  .thermal-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .thermal-badge-success {
+    @apply thermal-badge bg-green-50 text-green-700 border border-green-200;
+  }
+  
+  .thermal-badge-warning {
+    @apply thermal-badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  
+  .thermal-badge-info {
+    @apply thermal-badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  
+  .thermal-badge-primary {
+    @apply thermal-badge bg-green-50 text-green-800 border border-green-200;
   }
   
   .wellness-button-primary {
-    @apply px-6 py-3 rounded-lg font-medium transition-all duration-200;
-    background-color: #5C6656;
-    color: #D6A8A1;
-  }
-  
-  .wellness-button-primary:hover {
-    background-color: #4a5549;
-    color: #D6A8A1;
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-6 py-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
   }
   
   .wellness-button-secondary {
-    @apply px-6 py-3 rounded-lg font-medium transition-all duration-200;
-    background-color: #5C6656;
-    color: #D6A8A1;
-  }
-  
-  .wellness-button-secondary:hover {
-    background-color: #4a5549;
-    color: #D6A8A1;
-  }
-  
-  .wellness-badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border;
-  }
-  
-  .wellness-badge-success {
-    @apply wellness-badge;
-    background-color: #D6A8A1;
-    color: white;
-    border-color: #C9BBAA;
-  }
-  
-  .wellness-badge-info {
-    @apply wellness-badge;
-    background-color: #C9BBAA;
-    color: #5C6656;
-    border-color: #5C6656;
-  }
-  
-  .wellness-text-rosy {
-    color: #D6A8A1;
-  }
-  
-  .wellness-text-moss {
-    color: #5C6656;
-  }
-  
-  .wellness-text-linen {
-    color: #C9BBAA;
-  }
-  
-  .wellness-text-ivory {
-    color: #EFEDE9;
-  }
-  
-  .wellness-text-ash {
-    color: #1F1F1F;
-  }
-  
-  .wellness-bg-rosy {
-    background-color: #D6A8A1;
-  }
-  
-  .wellness-bg-moss {
-    background-color: #5C6656;
-  }
-  
-  .wellness-bg-linen {
-    background-color: #C9BBAA;
-  }
-  
-  .wellness-bg-ivory {
-    background-color: #EFEDE9;
-  }
-  
-  .wellness-bg-ash {
-    background-color: #1F1F1F;
+    @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium px-6 py-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md;
   }
   
   .wellness-input {

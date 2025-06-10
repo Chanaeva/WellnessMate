@@ -234,6 +234,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get membership plans for admin
+  app.get("/api/admin/membership-plans", isAdmin, async (req, res) => {
+    try {
+      const plans = await storage.getAllMembershipPlans();
+      res.json(plans);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Create or update a membership plan
   app.post("/api/admin/membership-plans", isAdmin, async (req, res) => {
     try {

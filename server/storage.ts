@@ -505,7 +505,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPunchCardsByUserId(userId: number): Promise<PunchCard[]> {
-    return await db.select().from(punchCards).where(eq(punchCards.userId, userId)).orderBy(desc(punchCards.purchasedAt));
+    return await db.select().from(punchCards).where(eq(punchCards.userId, userId)).orderBy(punchCards.purchasedAt);
   }
 
   async getPunchCardById(id: number): Promise<PunchCard | undefined> {

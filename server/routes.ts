@@ -310,9 +310,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's punch cards
   app.get("/api/punch-cards", isAuthenticated, async (req, res) => {
     try {
-      const punchCards = await storage.getPunchCardsByUserId(req.user.id);
+      const punchCards = await storage.getPunchCardsByUserId(req.user!.id);
       res.json(punchCards);
     } catch (error) {
+      console.error("Error fetching punch cards:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

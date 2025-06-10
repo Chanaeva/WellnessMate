@@ -522,11 +522,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]> {
-    return [
-      { name: "5-Day Pass", totalPunches: 5, totalPrice: 13500, pricePerPunch: 2700 }, // $135 total, $27 per punch (10% savings)
-      { name: "10-Day Pass", totalPunches: 10, totalPrice: 24000, pricePerPunch: 2400 }, // $240 total, $24 per punch (20% savings)
-      { name: "20-Day Pass", totalPunches: 20, totalPrice: 42000, pricePerPunch: 2100 }, // $420 total, $21 per punch (30% savings)
-    ];
+    const templates = await db.select().from(punchCardTemplates)
+      .where(eq(punchCardTemplates.isActive, true))
+      .orderBy(punchCardTemplates.sortOrder, punchCardTemplates.totalPunches);
+    
+    return templates.map(template => ({
+      name: template.name,
+      totalPunches: template.totalPunches,
+      totalPrice: template.totalPrice,
+      pricePerPunch: template.pricePerPunch
+    }));
   }
 
   async getVisitAnalytics(period: string): Promise<any> {

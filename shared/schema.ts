@@ -109,10 +109,25 @@ export const membershipPlans = pgTable("membership_plans", {
   features: text("features").array().notNull(),
 });
 
+// Punch card templates for admin management
+export const punchCardTemplates = pgTable("punch_card_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  totalPunches: integer("total_punches").notNull(),
+  pricePerPunch: integer("price_per_punch").notNull(), // in cents
+  totalPrice: integer("total_price").notNull(), // in cents
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
 // Punch cards table for day pass packages
 export const punchCards = pgTable("punch_cards", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
+  templateId: integer("template_id").references(() => punchCardTemplates.id),
   name: text("name").notNull(), // e.g., "5-Day Pass Package"
   totalPunches: integer("total_punches").notNull(), // Number of day passes included
   remainingPunches: integer("remaining_punches").notNull(),
@@ -148,6 +163,12 @@ export const insertMembershipPlanSchema = createInsertSchema(membershipPlans).om
   id: true,
 });
 
+export const insertPunchCardTemplateSchema = createInsertSchema(punchCardTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPunchCardSchema = createInsertSchema(punchCards).omit({
   id: true,
   purchasedAt: true,
@@ -173,6 +194,9 @@ export type Payment = typeof payments.$inferSelect;
 
 export type InsertMembershipPlan = z.infer<typeof insertMembershipPlanSchema>;
 export type MembershipPlan = typeof membershipPlans.$inferSelect;
+
+export type InsertPunchCardTemplate = z.infer<typeof insertPunchCardTemplateSchema>;
+export type PunchCardTemplate = typeof punchCardTemplates.$inferSelect;
 
 export type InsertPunchCard = z.infer<typeof insertPunchCardSchema>;
 export type PunchCard = typeof punchCards.$inferSelect;

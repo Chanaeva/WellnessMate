@@ -468,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/confirm-payment", isAuthenticated, async (req, res) => {
     try {
       const user = req.user!;
-      const { paymentIntentId, membershipId, description } = req.body;
+      const { paymentIntentId, membershipId, description, planType } = req.body;
       
       // Retrieve payment intent from Stripe
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -488,6 +488,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Record payment in database
       const payment = await storage.createPayment(simulatedSuccessfulPayment);
+      
+      // If this is a membership purchase, create or update the membership
+      if (description && description.includes('Membership') || description.includes('membership')) {
+        try {
+          // Extract plan type from description or use provided planType
+          let membershipPlanType = planType;
+          if (!membershipPlanType) {
+            if (description.toLowerCase().includes('basic')) membershipPlanType = 'basic';
+            else if (description.toLowerCase().includes('premium')) membershipPlanType = 'premium';
+            else if (description.toLowerCase().includes('vip')) membershipPlanType = 'vip';
+            else membershipPlanType = 'basic'; // default
+          }
+          
+          // Check if user already has a membership
+          const existingMembership = await storage.getMembershipByUserId(user.id);
+          
+          if (existingMembership) {
+            // Update existing membership
+            await storage.updateMembership(existingMembership.id, {
+              planType: membershipPlanType,
+              status: 'active',
+              startDate: new Date(),
+              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              autoRenew: true
+            });
+          } else {
+            // Create new membership
+            const newMembershipId = `WM-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}-${String(user.id).padStart(4, '0')}`;
+            
+            await storage.createMembership({
+              userId: user.id,
+              membershipId: newMembershipId,
+              planType: membershipPlanType,
+              status: 'active',
+              startDate: new Date(),
+              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              autoRenew: true
+            });
+          }
+        } catch (membershipError) {
+          console.error('Failed to create/update membership:', membershipError);
+          // Don't fail the payment if membership creation fails, but log the error
+        }
+      }
       
       res.json({ payment, message: "Payment successful" });
     } catch (error: any) {

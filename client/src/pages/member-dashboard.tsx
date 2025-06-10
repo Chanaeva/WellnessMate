@@ -82,7 +82,8 @@ export default function MemberDashboard() {
       const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
         paymentIntentId,
         membershipId: null,
-        description: `Wolf Mother Wellness - ${plan.name}`
+        description: `Wolf Mother Wellness - ${plan.name}`,
+        planType: plan.planType
       });
       
       if (!confirmRes.ok) {

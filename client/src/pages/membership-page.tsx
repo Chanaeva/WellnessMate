@@ -158,7 +158,7 @@ export default function MembershipPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pb-12">
-                <Link href="/payments">
+                <Link href="/">
                   <Button size="lg" className="wellness-button-primary">
                     <ShoppingCart className="h-5 w-5 mr-2" />
                     Browse Membership Plans

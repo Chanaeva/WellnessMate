@@ -1,10 +1,12 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Membership, CheckIn, MembershipPlan, PunchCard } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,12 +26,19 @@ import {
   Volleyball,
   Heart,
   Sparkles,
-  Ticket
+  Ticket,
+  ShoppingCart,
+  Crown,
+  Star,
+  Zap,
+  Check,
+  Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 
 export default function MemberDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Fetch membership data
   const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
@@ -52,6 +61,100 @@ export default function MemberDashboard() {
   const { data: userPunchCards } = useQuery<PunchCard[]>({
     queryKey: ["/api/punch-cards"],
     enabled: !!user,
+  });
+
+  // Fetch punch card options
+  const { data: punchCardOptions } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
+    queryKey: ["/api/punch-cards/options"],
+  });
+
+  // Purchase membership mutation
+  const purchaseMembershipMutation = useMutation({
+    mutationFn: async (plan: MembershipPlan) => {
+      // Create payment intent
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: plan.monthlyPrice / 100,
+        description: `Wolf Mother Wellness - ${plan.name}`
+      });
+      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+
+      // Confirm payment and create membership
+      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+        paymentIntentId,
+        membershipId: null,
+        description: `Wolf Mother Wellness - ${plan.name}`
+      });
+      
+      if (!confirmRes.ok) {
+        throw new Error('Payment confirmation failed');
+      }
+
+      return await confirmRes.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Membership Purchased!",
+        description: "Your membership has been activated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to purchase membership",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Purchase punch card mutation
+  const purchasePunchCardMutation = useMutation({
+    mutationFn: async (punchCardData: any) => {
+      // Create payment intent
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: punchCardData.totalPrice / 100,
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
+      });
+      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
+
+      // Confirm payment and create punch card
+      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
+        paymentIntentId,
+        membershipId: null,
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
+      });
+      
+      if (!confirmRes.ok) {
+        throw new Error('Payment confirmation failed');
+      }
+
+      // Create punch card
+      const punchCardRes = await apiRequest("POST", "/api/punch-cards", {
+        name: punchCardData.name,
+        totalPunches: punchCardData.totalPunches,
+        remainingPunches: punchCardData.totalPunches,
+        pricePerPunch: punchCardData.pricePerPunch,
+        totalPrice: punchCardData.totalPrice,
+      });
+
+      return await punchCardRes.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Punch Card Purchased!",
+        description: "Your punch card has been added to your account.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to purchase punch card",
+        variant: "destructive",
+      });
+    },
   });
 
   // Calculate membership status and information
@@ -108,7 +211,150 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
+            {/* Quick Purchase Cards */}
+            {(!membership || membership.status !== 'active') && (
+              <Card className="wellness-card">
+                <CardHeader>
+                  <CardTitle className="text-xl font-display text-foreground flex items-center">
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Quick Purchase
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Membership Plans */}
+                  <div>
+                    <h3 className="font-semibold text-lg mb-4">Membership Plans</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {membershipPlans?.filter(plan => plan.planType !== 'daily').slice(0, 2).map((plan) => {
+                        const getPlanIcon = (planType: string) => {
+                          switch (planType) {
+                            case 'basic': return <CreditCard className="h-5 w-5" />;
+                            case 'premium': return <Star className="h-5 w-5" />;
+                            case 'vip': return <Crown className="h-5 w-5" />;
+                            default: return <CreditCard className="h-5 w-5" />;
+                          }
+                        };
 
+                        const getPlanColor = (planType: string) => {
+                          switch (planType) {
+                            case 'basic': return 'from-blue-500 to-blue-600';
+                            case 'premium': return 'from-purple-500 to-purple-600';
+                            case 'vip': return 'from-amber-500 to-amber-600';
+                            default: return 'from-gray-500 to-gray-600';
+                          }
+                        };
+
+                        return (
+                          <Card key={plan.id} className="overflow-hidden border-2 border-primary/20">
+                            <div className={`h-24 bg-gradient-to-br ${getPlanColor(plan.planType)} relative`}>
+                              <div className="absolute inset-0 bg-black/20"></div>
+                              <div className="relative h-full p-4 flex items-center justify-between text-white">
+                                <div className="flex items-center space-x-2">
+                                  {getPlanIcon(plan.planType)}
+                                  <span className="font-semibold capitalize">{plan.planType}</span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold">
+                                    ${(plan.monthlyPrice / 100).toFixed(0)}
+                                  </div>
+                                  <div className="text-xs opacity-90">per month</div>
+                                </div>
+                              </div>
+                            </div>
+                            <CardContent className="p-4">
+                              <h4 className="font-semibold mb-2">{plan.name}</h4>
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {plan.description}
+                              </p>
+                              <div className="flex items-center text-xs text-muted-foreground mb-3">
+                                <Check className="h-3 w-3 mr-1 text-green-600" />
+                                {plan.features?.length || 0} features included
+                              </div>
+                            </CardContent>
+                            <CardFooter className="p-4 pt-0">
+                              <Button
+                                className="w-full wellness-button-primary text-sm"
+                                disabled={purchaseMembershipMutation.isPending}
+                                onClick={() => purchaseMembershipMutation.mutate(plan)}
+                              >
+                                {purchaseMembershipMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <ShoppingCart className="h-4 w-4 mr-2" />
+                                )}
+                                {purchaseMembershipMutation.isPending ? 'Processing...' : 'Purchase Plan'}
+                              </Button>
+                            </CardFooter>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Punch Cards */}
+                  <div>
+                    <h3 className="font-semibold text-lg mb-4">Day Pass Packages</h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {punchCardOptions?.slice(0, 2).map((option, index) => (
+                        <Card key={index} className="border-2 border-amber-200">
+                          <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200 p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <Ticket className="h-5 w-5 text-amber-600" />
+                                <span className="font-semibold text-amber-800">{option.name}</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-bold text-amber-800">
+                                  ${(option.totalPrice / 100).toFixed(0)}
+                                </div>
+                                <div className="text-xs text-amber-600">
+                                  ${(option.pricePerPunch / 100).toFixed(0)} per visit
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Total Visits:</span>
+                                <span className="font-semibold">{option.totalPunches}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Full access to all thermal facilities
+                              </div>
+                            </div>
+                          </CardContent>
+                          <CardFooter className="p-4 pt-0">
+                            <Button
+                              className="w-full bg-amber-600 hover:bg-amber-700 text-white text-sm"
+                              disabled={purchasePunchCardMutation.isPending}
+                              onClick={() => purchasePunchCardMutation.mutate(option)}
+                            >
+                              {purchasePunchCardMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Ticket className="h-4 w-4 mr-2" />
+                              )}
+                              {purchasePunchCardMutation.isPending ? 'Processing...' : 'Purchase Package'}
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* View All Link */}
+                  <div className="text-center pt-4 border-t border-border">
+                    <Link href="/payments">
+                      <Button variant="outline" className="w-full sm:w-auto">
+                        View All Plans & Options
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Facilities */}
             <Card className="wellness-card">

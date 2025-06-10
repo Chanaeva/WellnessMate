@@ -131,20 +131,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/check-in", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertCheckInSchema.parse(req.body);
+      const userId = req.user!.id;
       
-      // Verify membership is active
-      const membership = await storage.getMembershipById(validatedData.membershipId);
-      if (!membership || membership.status !== 'active') {
-        return res.status(400).json({ message: "Invalid or inactive membership" });
+      // Check if user has active membership
+      const membership = await storage.getMembershipByUserId(userId);
+      
+      // Check if user has active punch cards
+      const userPunchCards = await storage.getPunchCardsByUserId(userId);
+      const activePunchCards = userPunchCards.filter(card => 
+        card.status === 'active' && card.remainingPunches > 0
+      );
+      
+      // User needs either active membership or punch card with remaining visits
+      if ((!membership || membership.status !== 'active') && activePunchCards.length === 0) {
+        return res.status(400).json({ 
+          message: "No active membership or punch cards found. Please purchase a membership or day pass." 
+        });
       }
+      
+      // If user has punch cards, consume one visit
+      if (activePunchCards.length > 0) {
+        const oldestCard = activePunchCards.sort((a, b) => 
+          new Date(a.purchasedAt || 0).getTime() - new Date(b.purchasedAt || 0).getTime()
+        )[0];
+        
+        // Use one punch from the card
+        await storage.usePunchCardEntry(oldestCard.id);
+        
+        // Create check-in record with punch card reference
+        const checkIn = await storage.createCheckIn({
+          userId: userId,
+          membershipId: membership?.membershipId || `punch-card-${oldestCard.id}`,
+          location: validatedData.location || 'QR Code Check-in',
+          method: 'qr'
+        });
 
-      // Create check-in record
-      const checkIn = await storage.createCheckIn({
-        ...validatedData,
-        userId: req.user.id,
-      });
+        res.status(201).json({ 
+          checkIn, 
+          message: `Check-in successful! Remaining visits: ${oldestCard.remainingPunches - 1}`,
+          punchCardUsed: true,
+          remainingPunches: oldestCard.remainingPunches - 1
+        });
+      } else {
+        // Regular membership check-in
+        const checkIn = await storage.createCheckIn({
+          userId: userId,
+          membershipId: membership!.membershipId,
+          location: validatedData.location || 'QR Code Check-in',
+          method: 'qr'
+        });
 
-      res.status(201).json(checkIn);
+        res.status(201).json({ 
+          checkIn, 
+          message: "Check-in successful!",
+          membershipUsed: true
+        });
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors });

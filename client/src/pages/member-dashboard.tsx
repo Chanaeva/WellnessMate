@@ -239,20 +239,19 @@ export default function MemberDashboard() {
             </Card>
 
             {/* Quick Purchase Cards */}
-            {(!membership || membership.status !== 'active') && (
-              <Card className="wellness-card">
-                <CardHeader>
-                  <CardTitle className="text-xl font-display text-foreground flex items-center">
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    Quick Purchase
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Monthly Packages */}
-                  <div>
-                    <h3 className="font-semibold text-lg mb-4">Monthly Packages</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {membershipPlans?.filter(plan => plan.planType !== 'daily').slice(0, 2).map((plan) => {
+            <Card className="wellness-card">
+              <CardHeader>
+                <CardTitle className="text-xl font-display text-foreground flex items-center">
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Quick Purchase
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Monthly Packages */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4">Monthly Packages</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {membershipPlans?.filter(plan => plan.planType !== 'daily').slice(0, 2).map((plan) => {
                         const getPlanIcon = (planType: string) => {
                           switch (planType) {
                             case 'basic': return <CreditCard className="h-5 w-5" />;
@@ -318,11 +317,11 @@ export default function MemberDashboard() {
                     </div>
                   </div>
 
-                  {/* Day Pass Packages */}
-                  <div>
-                    <h3 className="font-semibold text-lg mb-4">Day Pass Packages</h3>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {punchCardOptions?.slice(0, 2).map((option, index) => (
+                {/* Day Pass Packages */}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4">Day Pass Packages</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {punchCardOptions?.slice(0, 2).map((option, index) => (
                         <Card key={index} className="border-2 border-secondary/30">
                           <CardHeader className="bg-gradient-to-r from-secondary/20 to-accent/20 border-b border-secondary/30 p-4">
                             <div className="flex items-center justify-between">
@@ -381,7 +380,6 @@ export default function MemberDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            )}
 
             {/* Facilities */}
             <Card className="wellness-card">

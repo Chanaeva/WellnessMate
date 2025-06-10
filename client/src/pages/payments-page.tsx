@@ -240,7 +240,13 @@ export default function PaymentsPage() {
                 <Card>
                   <CardContent className="p-4">
                     <h4 className="text-sm text-gray-500 mb-1">Payment Method</h4>
-                    <p className="font-medium">Visa ending in 4242</p>
+                    {paymentMethods && paymentMethods.length > 0 ? (
+                      <p className="font-medium">
+                        {paymentMethods.find(pm => pm.isDefault)?.cardBrand || paymentMethods[0]?.cardBrand || 'Card'} ending in {paymentMethods.find(pm => pm.isDefault)?.cardLast4 || paymentMethods[0]?.cardLast4 || '****'}
+                      </p>
+                    ) : (
+                      <p className="font-medium text-gray-500">No payment method</p>
+                    )}
                     <div className="mt-2 flex">
                       <Button 
                         variant="link" 
@@ -250,7 +256,7 @@ export default function PaymentsPage() {
                           setShowAddPaymentMethod(true);
                         }}
                       >
-                        Update
+                        {paymentMethods && paymentMethods.length > 0 ? 'Update' : 'Add Payment Method'}
                       </Button>
                       <Button 
                         variant="link" 

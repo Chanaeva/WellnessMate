@@ -147,19 +147,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async initializePunchCardTemplates() {
-    // Initialize default punch card templates if they don't exist
+    // Check if templates already exist to prevent duplicates
+    const existing = await db.select().from(punchCardTemplates).limit(1);
+    if (existing.length > 0) return;
+
+    // Initialize default punch card templates only if none exist
     const defaultTemplates = [
       { name: "5-Day Pass", totalPunches: 5, totalPrice: 13500, pricePerPunch: 2700, description: "Perfect for trying out our facilities", sortOrder: 1 },
       { name: "10-Day Pass", totalPunches: 10, totalPrice: 24000, pricePerPunch: 2400, description: "Great value for regular visitors", sortOrder: 2 },
       { name: "20-Day Pass", totalPunches: 20, totalPrice: 42000, pricePerPunch: 2100, description: "Best value for committed wellness enthusiasts", sortOrder: 3 },
     ];
 
-    for (const template of defaultTemplates) {
-      try {
-        await db.insert(punchCardTemplates).values(template).onConflictDoNothing();
-      } catch (error) {
-        // Templates might already exist, continue
-      }
+    try {
+      await db.insert(punchCardTemplates).values(defaultTemplates);
+    } catch (error) {
+      // Templates might already exist, continue silently
     }
   }
 

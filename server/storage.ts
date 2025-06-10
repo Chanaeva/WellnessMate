@@ -6,6 +6,7 @@ import {
   payments, type Payment, type InsertPayment,
   paymentMethods, type PaymentMethod, type InsertPaymentMethod,
   membershipPlans, type MembershipPlan, type InsertMembershipPlan,
+  punchCardTemplates, type PunchCardTemplate, type InsertPunchCardTemplate,
   punchCards, type PunchCard, type InsertPunchCard,
   memberPreferences, type MemberPreferences, type InsertMemberPreferences,
   therapySessions, type TherapySession, type InsertTherapySession,
@@ -62,6 +63,12 @@ export interface IStorage {
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
   createOrUpdateMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
 
+  // Punch card template methods
+  getAllPunchCardTemplates(): Promise<PunchCardTemplate[]>;
+  createPunchCardTemplate(template: InsertPunchCardTemplate): Promise<PunchCardTemplate>;
+  updatePunchCardTemplate(id: number, template: Partial<PunchCardTemplate>): Promise<PunchCardTemplate>;
+  deletePunchCardTemplate(id: number): Promise<void>;
+
   // Punch card methods
   getPunchCardsByUserId(userId: number): Promise<PunchCard[]>;
   getPunchCardById(id: number): Promise<PunchCard | undefined>;
@@ -108,6 +115,7 @@ export class DatabaseStorage implements IStorage {
     });
     
     this.initializeMembershipPlans();
+    this.initializePunchCardTemplates();
   }
 
   private async initializeMembershipPlans() {
@@ -134,6 +142,23 @@ export class DatabaseStorage implements IStorage {
         await db.insert(membershipPlans).values(plan).onConflictDoNothing();
       } catch (error) {
         // Plans might already exist, continue
+      }
+    }
+  }
+
+  private async initializePunchCardTemplates() {
+    // Initialize default punch card templates if they don't exist
+    const defaultTemplates = [
+      { name: "5-Day Pass", totalPunches: 5, totalPrice: 13500, pricePerPunch: 2700, description: "Perfect for trying out our facilities", sortOrder: 1 },
+      { name: "10-Day Pass", totalPunches: 10, totalPrice: 24000, pricePerPunch: 2400, description: "Great value for regular visitors", sortOrder: 2 },
+      { name: "20-Day Pass", totalPunches: 20, totalPrice: 42000, pricePerPunch: 2100, description: "Best value for committed wellness enthusiasts", sortOrder: 3 },
+    ];
+
+    for (const template of defaultTemplates) {
+      try {
+        await db.insert(punchCardTemplates).values(template).onConflictDoNothing();
+      } catch (error) {
+        // Templates might already exist, continue
       }
     }
   }
@@ -519,6 +544,31 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updatedCard;
+  }
+
+  async getAllPunchCardTemplates(): Promise<PunchCardTemplate[]> {
+    return await db.select().from(punchCardTemplates).orderBy(punchCardTemplates.sortOrder, punchCardTemplates.totalPunches);
+  }
+
+  async createPunchCardTemplate(template: InsertPunchCardTemplate): Promise<PunchCardTemplate> {
+    const [newTemplate] = await db
+      .insert(punchCardTemplates)
+      .values(template)
+      .returning();
+    return newTemplate;
+  }
+
+  async updatePunchCardTemplate(id: number, template: Partial<PunchCardTemplate>): Promise<PunchCardTemplate> {
+    const [updatedTemplate] = await db
+      .update(punchCardTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(punchCardTemplates.id, id))
+      .returning();
+    return updatedTemplate;
+  }
+
+  async deletePunchCardTemplate(id: number): Promise<void> {
+    await db.delete(punchCardTemplates).where(eq(punchCardTemplates.id, id));
   }
 
   async getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]> {

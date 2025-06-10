@@ -247,6 +247,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin punch card template management
+  app.get("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
+    try {
+      const templates = await storage.getAllPunchCardTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
+    try {
+      const validatedData = insertPunchCardTemplateSchema.parse(req.body);
+      const template = await storage.createPunchCardTemplate(validatedData);
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.put("/api/admin/punch-card-templates/:id", isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const validatedData = insertPunchCardTemplateSchema.partial().parse(req.body);
+      const template = await storage.updatePunchCardTemplate(id, validatedData);
+      res.json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.delete("/api/admin/punch-card-templates/:id", isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deletePunchCardTemplate(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Punch card routes
 
   // Get available punch card options

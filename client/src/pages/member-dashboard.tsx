@@ -238,16 +238,16 @@ export default function MemberDashboard() {
 
                         const getPlanColor = (planType: string) => {
                           switch (planType) {
-                            case 'basic': return 'from-blue-500 to-blue-600';
-                            case 'premium': return 'from-purple-500 to-purple-600';
-                            case 'vip': return 'from-amber-500 to-amber-600';
-                            default: return 'from-gray-500 to-gray-600';
+                            case 'basic': return 'thermal-gradient';
+                            case 'premium': return 'cold-gradient'; 
+                            case 'vip': return 'from-primary to-secondary';
+                            default: return 'from-muted to-muted-foreground';
                           }
                         };
 
                         return (
                           <Card key={plan.id} className="overflow-hidden border-2 border-primary/20">
-                            <div className={`h-24 bg-gradient-to-br ${getPlanColor(plan.planType)} relative`}>
+                            <div className={`h-24 ${getPlanColor(plan.planType)} relative`}>
                               <div className="absolute inset-0 bg-black/20"></div>
                               <div className="relative h-full p-4 flex items-center justify-between text-white">
                                 <div className="flex items-center space-x-2">
@@ -297,18 +297,18 @@ export default function MemberDashboard() {
                     <h3 className="font-semibold text-lg mb-4">Day Pass Packages</h3>
                     <div className="grid md:grid-cols-2 gap-4">
                       {punchCardOptions?.slice(0, 2).map((option, index) => (
-                        <Card key={index} className="border-2 border-amber-200">
-                          <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200 p-4">
+                        <Card key={index} className="border-2 border-secondary/30">
+                          <CardHeader className="bg-gradient-to-r from-secondary/20 to-accent/20 border-b border-secondary/30 p-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
-                                <Ticket className="h-5 w-5 text-amber-600" />
-                                <span className="font-semibold text-amber-800">{option.name}</span>
+                                <Ticket className="h-5 w-5 text-primary" />
+                                <span className="font-semibold text-foreground">{option.name}</span>
                               </div>
                               <div className="text-right">
-                                <div className="text-xl font-bold text-amber-800">
+                                <div className="text-xl font-bold text-foreground">
                                   ${(option.totalPrice / 100).toFixed(0)}
                                 </div>
-                                <div className="text-xs text-amber-600">
+                                <div className="text-xs text-muted-foreground">
                                   ${(option.pricePerPunch / 100).toFixed(0)} per visit
                                 </div>
                               </div>
@@ -327,7 +327,7 @@ export default function MemberDashboard() {
                           </CardContent>
                           <CardFooter className="p-4 pt-0">
                             <Button
-                              className="w-full bg-amber-600 hover:bg-amber-700 text-white text-sm"
+                              className="w-full wellness-button-primary text-sm"
                               disabled={purchasePunchCardMutation.isPending}
                               onClick={() => purchasePunchCardMutation.mutate(option)}
                             >
@@ -458,25 +458,25 @@ export default function MemberDashboard() {
                 <CardContent className="p-6 pt-0">
                   <div className="space-y-3">
                     {userPunchCards.map((card) => (
-                      <div key={card.id} className="border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-4">
+                      <div key={card.id} className="border-2 border-secondary/30 bg-gradient-to-br from-secondary/20 to-accent/20 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-amber-800">{card.name}</h4>
-                          <Badge className={`${card.status === 'active' ? 'bg-green-500' : card.status === 'exhausted' ? 'bg-red-500' : 'bg-gray-500'} text-white`}>
+                          <h4 className="font-semibold text-foreground">{card.name}</h4>
+                          <Badge className={`${card.status === 'active' ? 'bg-success text-success-foreground' : card.status === 'exhausted' ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground'}`}>
                             {card.status}
                           </Badge>
                         </div>
                         <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600">Remaining:</span>
-                          <span className="font-bold text-amber-700">{card.remainingPunches} visits</span>
+                          <span className="text-muted-foreground">Remaining:</span>
+                          <span className="font-bold text-primary">{card.remainingPunches} visits</span>
                         </div>
                         <div className="flex justify-between items-center text-sm mt-1">
-                          <span className="text-gray-600">Total:</span>
-                          <span className="text-gray-700">{card.totalPunches} visits</span>
+                          <span className="text-muted-foreground">Total:</span>
+                          <span className="text-foreground">{card.totalPunches} visits</span>
                         </div>
                         {card.status === 'active' && (
                           <div className="mt-3">
                             <Link href="/qr-code">
-                              <Button size="sm" className="w-full bg-amber-600 hover:bg-amber-700">
+                              <Button size="sm" className="w-full wellness-button-primary">
                                 Use for Check-in
                               </Button>
                             </Link>

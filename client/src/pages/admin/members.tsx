@@ -166,19 +166,8 @@ export default function AdminMembers() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-light">
-      <Header />
-
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar Navigation */}
-          <div className="lg:w-1/5">
-            <Sidebar />
-          </div>
-
-          {/* Main Content Area */}
-          <div className="lg:w-4/5 space-y-6">
-            <Card>
+    <div className="space-y-6">
+      <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl font-bold">
                   Member Management
@@ -626,11 +615,6 @@ export default function AdminMembers() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </main>
-
-      <Footer />
     </div>
   );
 }

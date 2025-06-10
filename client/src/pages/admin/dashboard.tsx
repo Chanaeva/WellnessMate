@@ -454,9 +454,8 @@ export default function AdminDashboard() {
 
             {/* Members Tab */}
             <TabsContent value="members" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Member Management</h2>
-                <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
+              <AdminMembers />
+            </TabsContent>
                   <DialogTrigger asChild>
                     <Button>
                       <UserPlus className="h-4 w-4 mr-2" />

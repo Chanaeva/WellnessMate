@@ -134,10 +134,10 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding Card...
+                  {isUpdating ? "Updating..." : "Adding Card..."}
                 </>
               ) : (
-                "Add Payment Method"
+                isUpdating ? "Update Payment Method" : "Add Payment Method"
               )}
             </Button>
             

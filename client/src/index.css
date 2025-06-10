@@ -117,22 +117,24 @@
   
   .wellness-button-primary {
     @apply px-6 py-3 rounded-lg font-medium transition-all duration-200;
-    background-color: #D6A8A1;
-    color: white;
+    background-color: #5C6656;
+    color: #D6A8A1;
   }
   
   .wellness-button-primary:hover {
-    background-color: #c89287;
+    background-color: #4a5549;
+    color: #D6A8A1;
   }
   
   .wellness-button-secondary {
     @apply px-6 py-3 rounded-lg font-medium transition-all duration-200;
-    background-color: #5C6656;
+    background-color: #D6A8A1;
     color: white;
   }
   
   .wellness-button-secondary:hover {
-    background-color: #4a5549;
+    background-color: #c89287;
+    color: white;
   }
   
   .wellness-badge {

@@ -241,8 +241,20 @@ export default function PaymentsPage() {
                     <h4 className="text-sm text-gray-500 mb-1">Payment Method</h4>
                     <p className="font-medium">Visa ending in 4242</p>
                     <div className="mt-2 flex">
-                      <Button variant="link" className="text-primary p-0 h-auto mr-3">Update</Button>
-                      <Button variant="link" className="text-primary p-0 h-auto">Add New</Button>
+                      <Button 
+                        variant="link" 
+                        className="text-primary p-0 h-auto mr-3"
+                        onClick={() => setShowAddPaymentMethod(true)}
+                      >
+                        Update
+                      </Button>
+                      <Button 
+                        variant="link" 
+                        className="text-primary p-0 h-auto"
+                        onClick={() => setShowAddPaymentMethod(true)}
+                      >
+                        Add New
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

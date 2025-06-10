@@ -369,15 +369,15 @@ export default function MemberDashboard() {
                     </div>
                   </div>
 
-                  {/* View All Link */}
-                  <div className="text-center pt-4 border-t border-border">
-                    <Link href="/payments">
-                      <Button variant="outline" className="w-full sm:w-auto">
-                        View All Plans & Options
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </Link>
-                  </div>
+                {/* View All Link */}
+                <div className="text-center pt-4 border-t border-border">
+                  <Link href="/payments">
+                    <Button variant="outline" className="w-full sm:w-auto">
+                      View All Plans & Options
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
                 </CardContent>
               </Card>
 

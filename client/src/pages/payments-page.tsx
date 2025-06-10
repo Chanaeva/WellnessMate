@@ -185,7 +185,10 @@ export default function PaymentsPage() {
         filterDate.setMonth(now.getMonth() - 3);
     }
     
-    return payments.filter(payment => new Date(payment.transactionDate) >= filterDate);
+    return payments.filter(payment => {
+      if (!payment.transactionDate) return false;
+      return new Date(payment.transactionDate) >= filterDate;
+    });
   };
   
   const filteredPayments = getFilteredPayments();
@@ -314,7 +317,7 @@ export default function PaymentsPage() {
                           {currentPageData.map((payment, index) => (
                             <tr key={payment.id} className={index % 2 === 1 ? "bg-gray-50" : ""}>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {format(new Date(payment.transactionDate), "MMM d, yyyy")}
+                                {payment.transactionDate ? format(payment.transactionDate, "MMM d, yyyy") : "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {payment.description}

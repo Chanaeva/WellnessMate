@@ -352,7 +352,7 @@ export default function AdminDashboard() {
                           <div>
                             <p className="font-medium">Member #{checkIn.userId}</p>
                             <p className="text-sm text-muted-foreground">
-                              {format(new Date(checkIn.checkInTime), "h:mm a")}
+                              {checkIn.timestamp ? format(new Date(checkIn.timestamp), "h:mm a") : "N/A"}
                             </p>
                           </div>
                           <Badge variant="default">

@@ -5,49 +5,49 @@
 @tailwind utilities;
 
 :root {
-  /* Wolf Mother Wellness - Green Theme Color Palette */
-  --background: 210 20% 98%;     /* Very light gray background */
-  --foreground: 150 25% 25%;     /* Dark forest green for text */
-  --muted: 210 15% 92%;          /* Light gray muted backgrounds */
-  --muted-foreground: 150 15% 40%; /* Medium forest green for secondary text */
-  --popover: 0 0% 100%;          /* Pure white for popovers */
-  --popover-foreground: 150 25% 25%;
-  --card: 0 0% 100%;             /* Pure white cards for clarity */
-  --card-foreground: 150 25% 25%;
-  --border: 210 15% 85%;         /* Light gray borders */
-  --input: 210 15% 95%;          /* Very light input backgrounds */
-  --primary: 150 30% 35%;        /* Deep forest green - matching DARK 1 */
-  --primary-foreground: 0 0% 100%;
-  --secondary: 150 20% 45%;      /* Medium forest green */
-  --secondary-foreground: 0 0% 100%;
-  --accent: 150 25% 55%;         /* Lighter forest green accent */
-  --accent-foreground: 0 0% 100%;
+  /* Wolf Mother Wellness - Brand Color Palette */
+  --background: 45 20% 94%;      /* Ivory Veil #EFEDE9 */
+  --foreground: 0 0% 12%;        /* Charred Ash #1F1F1F */
+  --muted: 30 15% 80%;           /* Earthen Linen #C9BBAA */
+  --muted-foreground: 90 8% 40%; /* Deep Moss #5C6656 */
+  --popover: 45 20% 94%;         /* Ivory Veil */
+  --popover-foreground: 0 0% 12%;
+  --card: 45 20% 96%;            /* Slightly lighter Ivory Veil */
+  --card-foreground: 0 0% 12%;
+  --border: 30 15% 75%;          /* Earthen Linen border */
+  --input: 45 15% 92%;           /* Light Ivory input backgrounds */
+  --primary: 90 8% 36%;          /* Deep Moss #5C6656 */
+  --primary-foreground: 45 20% 94%;
+  --secondary: 12 20% 67%;       /* Rosy Smoke #D6A8A1 */
+  --secondary-foreground: 0 0% 12%;
+  --accent: 30 15% 78%;          /* Earthen Linen #C9BBAA */
+  --accent-foreground: 0 0% 12%;
   --destructive: 0 75% 50%;      /* Clear red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --success: 150 50% 30%;        /* Success green */
-  --success-foreground: 0 0% 100%;
+  --success: 90 8% 36%;          /* Deep Moss for success */
+  --success-foreground: 45 20% 94%;
   --warning: 45 90% 50%;         /* Warm amber for warnings */
   --warning-foreground: 0 0% 100%;
-  --ring: 150 30% 35%;
+  --ring: 90 8% 36%;
   --radius: 0.75rem;
 }
 
 .dark {
-  /* Wolf Mother Wellness - Dark Green Theme */
-  --background: 150 20% 8%;       /* Very dark forest green background */
-  --foreground: 150 15% 85%;      /* Light greenish-white text */
-  --muted: 150 15% 12%;           /* Dark muted green background */
-  --muted-foreground: 150 10% 65%; /* Medium light green for secondary text */
-  --popover: 150 20% 10%;         /* Slightly lighter dark green for popovers */
-  --popover-foreground: 150 15% 85%;
-  --card: 150 20% 10%;            /* Dark green cards */
-  --card-foreground: 150 15% 85%;
-  --border: 150 15% 18%;          /* Subtle dark green borders */
-  --input: 150 15% 15%;           /* Dark green input backgrounds */
-  --primary: 150 40% 45%;         /* Brighter forest green for dark mode */
-  --primary-foreground: 0 0% 100%;
-  --secondary: 150 30% 55%;       /* Medium bright green */
-  --secondary-foreground: 0 0% 100%;
+  /* Wolf Mother Wellness - Dark Brand Theme */
+  --background: 0 0% 8%;          /* Deep Charred Ash background */
+  --foreground: 45 20% 90%;       /* Light Ivory Veil text */
+  --muted: 0 0% 15%;              /* Dark muted background */
+  --muted-foreground: 30 15% 65%; /* Medium Earthen Linen for secondary text */
+  --popover: 0 0% 10%;            /* Dark popover background */
+  --popover-foreground: 45 20% 90%;
+  --card: 0 0% 12%;               /* Dark cards */
+  --card-foreground: 45 20% 90%;
+  --border: 0 0% 20%;             /* Subtle dark borders */
+  --input: 0 0% 18%;              /* Dark input backgrounds */
+  --primary: 12 20% 67%;          /* Rosy Smoke for dark mode primary */
+  --primary-foreground: 0 0% 12%;
+  --secondary: 90 8% 50%;         /* Lighter Deep Moss */
+  --secondary-foreground: 45 20% 94%;
   --accent: 150 35% 65%;          /* Light forest green accent */
   --accent-foreground: 150 20% 8%;
   --destructive: 0 70% 55%;       /* Bright red for alerts */
@@ -80,13 +80,13 @@
 }
 
 @layer components {
-  /* Thermal Wellness Theme Components */
+  /* Wolf Mother Wellness Theme Components */
   .thermal-gradient {
-    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
+    background: linear-gradient(135deg, #D6A8A1 0%, #5C6656 100%); /* Rosy Smoke to Deep Moss */
   }
   
   .cold-gradient {
-    background: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(200 70% 45%) 100%);
+    background: linear-gradient(135deg, #C9BBAA 0%, #5C6656 100%); /* Earthen Linen to Deep Moss */
   }
   
   .wellness-card {
@@ -98,19 +98,19 @@
   }
   
   .thermal-badge-success {
-    @apply thermal-badge bg-green-50 text-green-700 border border-green-200;
+    @apply thermal-badge bg-accent/20 text-foreground border border-accent;
   }
   
   .thermal-badge-warning {
-    @apply thermal-badge bg-amber-50 text-amber-700 border border-amber-200;
+    @apply thermal-badge bg-secondary/20 text-foreground border border-secondary;
   }
   
   .thermal-badge-info {
-    @apply thermal-badge bg-blue-50 text-blue-700 border border-blue-200;
+    @apply thermal-badge bg-muted text-muted-foreground border border-border;
   }
   
   .thermal-badge-primary {
-    @apply thermal-badge bg-green-50 text-green-800 border border-green-200;
+    @apply thermal-badge bg-primary/20 text-primary border border-primary;
   }
   
   .wellness-button-primary {

@@ -258,12 +258,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update a membership plan
+  // Update a membership plan  
   app.put("/api/admin/membership-plans/:id", isAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const validatedData = insertMembershipPlanSchema.parse(req.body);
-      const plan = await storage.createOrUpdateMembershipPlan({ ...validatedData, id });
+      const plan = await storage.updateMembershipPlan(id, validatedData);
       res.json(plan);
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -62,6 +62,7 @@ export interface IStorage {
   // Membership plan methods
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
   createOrUpdateMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
+  updateMembershipPlan(id: number, plan: Partial<InsertMembershipPlan>): Promise<MembershipPlan>;
   deleteMembershipPlan(id: number): Promise<void>;
 
   // Punch card template methods
@@ -387,6 +388,19 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return plan;
+  }
+
+  async updateMembershipPlan(id: number, planData: Partial<InsertMembershipPlan>): Promise<MembershipPlan> {
+    const [plan] = await db
+      .update(membershipPlans)
+      .set(planData)
+      .where(eq(membershipPlans.id, id))
+      .returning();
+    return plan;
+  }
+
+  async deleteMembershipPlan(id: number): Promise<void> {
+    await db.delete(membershipPlans).where(eq(membershipPlans.id, id));
   }
 
   async getMemberPreferences(userId: number): Promise<MemberPreferences | undefined> {

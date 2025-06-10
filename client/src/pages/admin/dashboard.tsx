@@ -36,6 +36,7 @@ import { format } from "date-fns";
 import Header from "@/components/layout/header";
 import QRCode from "qrcode";
 import PackagesManagement from "./packages";
+import AdminMembers from "./members";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({

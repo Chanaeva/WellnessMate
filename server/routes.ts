@@ -574,20 +574,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Record payment in database
       const payment = await storage.createPayment(simulatedSuccessfulPayment);
       
-      // If this is a membership purchase, create or update the membership
-      if (description && description.includes('Membership') || description.includes('membership')) {
+      // If this is a membership or day pass purchase, create or update the membership
+      if (planType || (description && (description.includes('Membership') || description.includes('membership') || description.includes('Day Pass') || description.includes('day pass')))) {
         try {
-          // Extract plan type from description or use provided planType
+          // Use provided planType or extract from description
           let membershipPlanType = planType;
           if (!membershipPlanType) {
             if (description.toLowerCase().includes('basic')) membershipPlanType = 'basic';
             else if (description.toLowerCase().includes('premium')) membershipPlanType = 'premium';
             else if (description.toLowerCase().includes('vip')) membershipPlanType = 'vip';
+            else if (description.toLowerCase().includes('day pass')) membershipPlanType = 'daily';
             else membershipPlanType = 'basic'; // default
           }
           
           // Check if user already has a membership
           const existingMembership = await storage.getMembershipByUserId(user.id);
+          
+          // Calculate end date based on plan type
+          let endDate;
+          let autoRenew = true;
+          
+          if (membershipPlanType === 'daily') {
+            // Day pass expires at end of day
+            endDate = new Date();
+            endDate.setHours(23, 59, 59, 999);
+            autoRenew = false; // Day passes don't auto-renew
+          } else {
+            // Monthly memberships last 30 days
+            endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          }
           
           if (existingMembership) {
             // Update existing membership
@@ -595,8 +610,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               planType: membershipPlanType,
               status: 'active',
               startDate: new Date().toISOString(),
-              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              autoRenew: true
+              endDate: endDate.toISOString(),
+              autoRenew: autoRenew
             });
           } else {
             // Create new membership
@@ -608,8 +623,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               planType: membershipPlanType,
               status: 'active',
               startDate: new Date().toISOString(),
-              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              autoRenew: true
+              endDate: endDate.toISOString(),
+              autoRenew: autoRenew
             });
           }
         } catch (membershipError) {

@@ -136,44 +136,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user has active membership
       const membership = await storage.getMembershipByUserId(userId);
       
-      // Check if user has active punch cards
+      // Check if user has day pass packages (punch cards)
       const userPunchCards = await storage.getPunchCardsByUserId(userId);
-      const activePunchCards = userPunchCards.filter(card => 
+      const activeDayPasses = userPunchCards.filter(card => 
         card.status === 'active' && card.remainingPunches > 0
       );
       
-      // User needs either active membership or punch card with remaining visits
-      if ((!membership || membership.status !== 'active') && activePunchCards.length === 0) {
+      // User needs either active monthly membership or day passes
+      if ((!membership || membership.status !== 'active') && activeDayPasses.length === 0) {
         return res.status(400).json({ 
-          message: "No active membership or punch cards found. Please purchase a membership or day pass." 
+          message: "No active membership found. Please purchase a monthly membership or day pass package." 
         });
       }
       
-      // If user has punch cards, consume one visit
-      if (activePunchCards.length > 0) {
-        const oldestCard = activePunchCards.sort((a, b) => 
+      // If user has day passes, use those first (they're more expensive per visit)
+      if (activeDayPasses.length > 0) {
+        const oldestDayPass = activeDayPasses.sort((a, b) => 
           new Date(a.purchasedAt || '1970-01-01').getTime() - new Date(b.purchasedAt || '1970-01-01').getTime()
         )[0];
         
-        // Use one punch from the card
-        await storage.usePunchCardEntry(oldestCard.id);
+        // Use one visit from the day pass
+        await storage.usePunchCardEntry(oldestDayPass.id);
         
-        // Create check-in record with punch card reference
+        // Create check-in record
         const checkIn = await storage.createCheckIn({
           userId: userId,
-          membershipId: membership?.membershipId || `punch-card-${oldestCard.id}`,
+          membershipId: membership?.membershipId || `day-pass-${oldestDayPass.id}`,
           location: validatedData.location || 'QR Code Check-in',
           method: 'qr'
         });
 
         res.status(201).json({ 
           checkIn, 
-          message: `Check-in successful! Remaining visits: ${oldestCard.remainingPunches - 1}`,
-          punchCardUsed: true,
-          remainingPunches: oldestCard.remainingPunches - 1
+          message: `Check-in successful using day pass! Remaining visits: ${oldestDayPass.remainingPunches - 1}`,
+          dayPassUsed: true,
+          remainingVisits: oldestDayPass.remainingPunches - 1,
+          packageName: oldestDayPass.name
         });
       } else {
-        // Regular membership check-in
+        // Use monthly membership
         const checkIn = await storage.createCheckIn({
           userId: userId,
           membershipId: membership!.membershipId,

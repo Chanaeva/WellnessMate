@@ -222,9 +222,9 @@ export default function MemberDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Membership Plans */}
+                  {/* Monthly Packages */}
                   <div>
-                    <h3 className="font-semibold text-lg mb-4">Membership Plans</h3>
+                    <h3 className="font-semibold text-lg mb-4">Monthly Packages</h3>
                     <div className="grid md:grid-cols-2 gap-4">
                       {membershipPlans?.filter(plan => plan.planType !== 'daily').slice(0, 2).map((plan) => {
                         const getPlanIcon = (planType: string) => {
@@ -292,7 +292,7 @@ export default function MemberDashboard() {
                     </div>
                   </div>
 
-                  {/* Punch Cards */}
+                  {/* Day Pass Packages */}
                   <div>
                     <h3 className="font-semibold text-lg mb-4">Day Pass Packages</h3>
                     <div className="grid md:grid-cols-2 gap-4">
@@ -446,13 +446,13 @@ export default function MemberDashboard() {
               currentPlan={currentPlan}
             />
 
-            {/* Digital Punch Cards - Show when purchased */}
+            {/* Day Pass Packages - Show when purchased */}
             {userPunchCards && userPunchCards.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center">
                     <Ticket className="h-5 w-5 text-amber-600 mr-2" />
-                    Your Digital Punch Cards
+                    Your Day Pass Packages
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 pt-0">

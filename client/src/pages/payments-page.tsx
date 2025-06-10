@@ -53,13 +53,13 @@ export default function PaymentsPage() {
     queryKey: ["/api/membership-plans"],
   });
 
-  // Fetch punch card options
-  const { data: punchCardOptions, isLoading: isPunchCardOptionsLoading } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
+  // Fetch day pass options
+  const { data: dayPassOptions, isLoading: isDayPassOptionsLoading } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
     queryKey: ["/api/punch-cards/options"],
   });
 
-  // Fetch user's punch cards
-  const { data: userPunchCards, isLoading: isUserPunchCardsLoading } = useQuery<PunchCard[]>({
+  // Fetch user's day pass packages
+  const { data: userDayPasses, isLoading: isUserDayPassesLoading } = useQuery<PunchCard[]>({
     queryKey: ["/api/punch-cards"],
     enabled: !!user,
   });

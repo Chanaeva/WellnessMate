@@ -31,8 +31,8 @@ const MemberCard = ({
           <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
             <Crown className="h-8 w-8 text-muted-foreground" />
           </div>
-          <CardTitle className="text-xl">No Active Plan</CardTitle>
-          <p className="text-muted-foreground">Get started with a membership plan to access all thermal wellness facilities.</p>
+          <CardTitle className="text-xl">Wolf Mother Member</CardTitle>
+          <p className="text-muted-foreground">Purchase a monthly package or day passes to access thermal wellness facilities.</p>
         </CardHeader>
       </Card>
     );

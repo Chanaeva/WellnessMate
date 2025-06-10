@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MembershipPlan, InsertMembershipPlan } from "@shared/schema";
+import { MembershipPlan, InsertMembershipPlan, PunchCardTemplate, InsertPunchCardTemplate } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +17,22 @@ export default function PricingManagement() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<PunchCardTemplate | null>(null);
   const [formData, setFormData] = useState<Partial<InsertMembershipPlan>>({
     planType: 'basic',
     name: '',
     monthlyPrice: 0,
     description: '',
     features: []
+  });
+  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate>>({
+    name: '',
+    totalPunches: 0,
+    pricePerPunch: 0,
+    totalPrice: 0,
+    description: '',
+    isActive: true,
+    sortOrder: 0
   });
 
   // Fetch membership plans

@@ -12,6 +12,7 @@ import {
   insertCheckInSchema, 
   insertPaymentSchema, 
   insertMembershipPlanSchema,
+  insertPunchCardTemplateSchema,
   insertPunchCardSchema
 } from "@shared/schema";
 import { z } from "zod";

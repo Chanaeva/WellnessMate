@@ -108,42 +108,42 @@ export default function PaymentsPage() {
     },
   });
 
-  // Purchase punch card mutation
-  const purchasePunchCardMutation = useMutation({
-    mutationFn: async (punchCardData: any) => {
+  // Purchase day pass mutation
+  const purchaseDayPassMutation = useMutation({
+    mutationFn: async (dayPassData: any) => {
       // Create payment intent
       const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
-        amount: punchCardData.totalPrice / 100,
-        description: `Wolf Mother Wellness - ${punchCardData.name}`
+        amount: dayPassData.totalPrice / 100,
+        description: `Wolf Mother Wellness - ${dayPassData.name}`
       });
       const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
 
-      // Confirm payment and create punch card
+      // Confirm payment and create day pass package
       const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
         paymentIntentId,
         membershipId: null,
-        description: `Wolf Mother Wellness - ${punchCardData.name}`
+        description: `Wolf Mother Wellness - ${dayPassData.name}`
       });
       
       if (!confirmRes.ok) {
         throw new Error('Payment confirmation failed');
       }
 
-      // Create punch card
-      const punchCardRes = await apiRequest("POST", "/api/punch-cards", {
-        name: punchCardData.name,
-        totalPunches: punchCardData.totalPunches,
-        remainingPunches: punchCardData.totalPunches,
-        pricePerPunch: punchCardData.pricePerPunch,
-        totalPrice: punchCardData.totalPrice,
+      // Create day pass package
+      const dayPassRes = await apiRequest("POST", "/api/punch-cards", {
+        name: dayPassData.name,
+        totalPunches: dayPassData.totalPunches,
+        remainingPunches: dayPassData.totalPunches,
+        pricePerPunch: dayPassData.pricePerPunch,
+        totalPrice: dayPassData.totalPrice,
       });
 
-      return await punchCardRes.json();
+      return await dayPassRes.json();
     },
     onSuccess: () => {
       toast({
-        title: "Punch Card Purchased!",
-        description: "Your punch card has been added to your account.",
+        title: "Day Pass Package Purchased!",
+        description: "Your day pass package has been added to your account.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
@@ -151,7 +151,7 @@ export default function PaymentsPage() {
     onError: (error: any) => {
       toast({
         title: "Purchase Failed",
-        description: error.message || "Failed to purchase punch card",
+        description: error.message || "Failed to purchase day pass package",
         variant: "destructive",
       });
     },

@@ -136,7 +136,7 @@ export default function MembershipPage() {
                       <Button variant="outline" className="w-full h-20 flex-col items-center justify-center p-3 space-y-1">
                         <CreditCard className="h-5 w-5" />
                         <div className="text-center">
-                          <div className="text-sm font-medium leading-tight">Payment History</div>
+                          <div className="text-sm font-medium leading-tight">Payments</div>
                           <div className="text-xs text-muted-foreground">View transactions</div>
                         </div>
                       </Button>

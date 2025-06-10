@@ -130,31 +130,31 @@ export default function MembershipPage() {
 
                 {/* Quick Actions */}
                 <div className="pt-6 border-t border-border">
-                  <h4 className="text-sm font-medium text-muted-foreground mb-3">Quick Actions</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-4">Quick Actions</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <Link href="/payments" className="block">
-                      <Button variant="outline" className="w-full h-auto p-4 justify-start">
-                        <CreditCard className="h-5 w-5 mr-3 flex-shrink-0" />
-                        <div className="text-left">
-                          <div className="font-medium">Payment History</div>
+                      <Button variant="outline" className="w-full h-20 flex-col items-center justify-center p-3 space-y-1">
+                        <CreditCard className="h-5 w-5" />
+                        <div className="text-center">
+                          <div className="text-sm font-medium leading-tight">Payment History</div>
                           <div className="text-xs text-muted-foreground">View transactions</div>
                         </div>
                       </Button>
                     </Link>
                     <Link href="/payments" className="block">
-                      <Button variant="outline" className="w-full h-auto p-4 justify-start">
-                        <ShoppingCart className="h-5 w-5 mr-3 flex-shrink-0" />
-                        <div className="text-left">
-                          <div className="font-medium">Purchase Add-ons</div>
+                      <Button variant="outline" className="w-full h-20 flex-col items-center justify-center p-3 space-y-1">
+                        <ShoppingCart className="h-5 w-5" />
+                        <div className="text-center">
+                          <div className="text-sm font-medium leading-tight">Purchase Add-ons</div>
                           <div className="text-xs text-muted-foreground">Buy day passes</div>
                         </div>
                       </Button>
                     </Link>
                     <Link href="/qr-code" className="block sm:col-span-2 lg:col-span-1">
-                      <Button className="w-full h-auto p-4 justify-start wellness-button-primary">
-                        <Calendar className="h-5 w-5 mr-3 flex-shrink-0" />
-                        <div className="text-left">
-                          <div className="font-medium">Check In Now</div>
+                      <Button className="w-full h-20 flex-col items-center justify-center p-3 space-y-1 wellness-button-primary">
+                        <Calendar className="h-5 w-5" />
+                        <div className="text-center">
+                          <div className="text-sm font-medium leading-tight">Check In Now</div>
                           <div className="text-xs opacity-90">Access QR code</div>
                         </div>
                       </Button>

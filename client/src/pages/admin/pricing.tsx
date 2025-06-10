@@ -35,9 +35,9 @@ export default function PricingManagement() {
     sortOrder: 0
   });
 
-  // Fetch membership plans
+  // Fetch membership plans from admin endpoint
   const { data: plans, isLoading } = useQuery<MembershipPlan[]>({
-    queryKey: ["/api/membership-plans"],
+    queryKey: ["/api/admin/membership-plans"],
   });
 
   // Fetch punch card templates
@@ -52,6 +52,7 @@ export default function PricingManagement() {
       return await res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/membership-plans"] });
       queryClient.invalidateQueries({ queryKey: ["/api/membership-plans"] });
       toast({
         title: "Success",
@@ -602,7 +603,7 @@ export default function PricingManagement() {
                   <Label htmlFor="template-description">Description</Label>
                   <Input
                     id="template-description"
-                    value={templateFormData.description}
+                    value={templateFormData.description || ''}
                     onChange={(e) => setTemplateFormData(prev => ({...prev, description: e.target.value}))}
                     placeholder="Brief description of this package"
                   />

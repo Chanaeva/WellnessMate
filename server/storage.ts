@@ -114,7 +114,7 @@ export class DatabaseStorage implements IStorage {
       createTableIfMissing: true 
     });
     
-    this.initializeMembershipPlans();
+    // Only initialize basic templates - admin manages all packages
     this.initializePunchCardTemplates();
   }
 

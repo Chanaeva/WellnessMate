@@ -40,6 +40,11 @@ export default function PricingManagement() {
     queryKey: ["/api/membership-plans"],
   });
 
+  // Fetch punch card templates
+  const { data: templates, isLoading: templatesLoading } = useQuery<PunchCardTemplate[]>({
+    queryKey: ["/api/admin/punch-card-templates"],
+  });
+
   // Create/Update plan mutation
   const planMutation = useMutation({
     mutationFn: async (planData: InsertMembershipPlan) => {
@@ -63,6 +68,55 @@ export default function PricingManagement() {
     },
   });
 
+  // Template mutations
+  const templateMutation = useMutation({
+    mutationFn: async (templateData: InsertPunchCardTemplate) => {
+      const url = editingTemplate 
+        ? `/api/admin/punch-card-templates/${editingTemplate.id}`
+        : "/api/admin/punch-card-templates";
+      const method = editingTemplate ? "PUT" : "POST";
+      const res = await apiRequest(method, url, templateData);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/punch-card-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards/options"] });
+      toast({
+        title: "Success",
+        description: editingTemplate ? "Day pass updated successfully" : "Day pass created successfully",
+      });
+      resetTemplateForm();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/punch-card-templates/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/punch-card-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards/options"] });
+      toast({
+        title: "Success",
+        description: "Day pass deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error", 
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       planType: 'basic',
@@ -73,6 +127,19 @@ export default function PricingManagement() {
     });
     setEditingPlan(null);
     setIsCreateDialogOpen(false);
+  };
+
+  const resetTemplateForm = () => {
+    setTemplateFormData({
+      name: '',
+      totalPunches: 0,
+      pricePerPunch: 0,
+      totalPrice: 0,
+      description: '',
+      isActive: true,
+      sortOrder: 0
+    });
+    setEditingTemplate(null);
   };
 
   const handleEdit = (plan: MembershipPlan) => {
@@ -117,6 +184,39 @@ export default function PricingManagement() {
       ...prev,
       features: prev.features?.filter((_, i) => i !== index) || []
     }));
+  };
+
+  const handleTemplateEdit = (template: PunchCardTemplate) => {
+    setEditingTemplate(template);
+    setTemplateFormData({
+      name: template.name,
+      totalPunches: template.totalPunches,
+      pricePerPunch: template.pricePerPunch,
+      totalPrice: template.totalPrice,
+      description: template.description || '',
+      isActive: template.isActive,
+      sortOrder: template.sortOrder
+    });
+  };
+
+  const handleTemplateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!templateFormData.name || !templateFormData.totalPunches || !templateFormData.pricePerPunch) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalPrice = templateFormData.totalPrice || 
+      (templateFormData.totalPunches * templateFormData.pricePerPunch);
+
+    templateMutation.mutate({
+      ...templateFormData,
+      totalPrice,
+    } as InsertPunchCardTemplate);
   };
 
   const getPlanIcon = (planType: string) => {
@@ -328,6 +428,197 @@ export default function PricingManagement() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Day Pass Templates Section */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Day Pass Packages</h2>
+            <p className="text-muted-foreground">Manage available day pass options for members</p>
+          </div>
+          <Button onClick={() => {
+            resetTemplateForm();
+            setEditingTemplate(null);
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Day Pass
+          </Button>
+        </div>
+
+        {templatesLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-6">
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded mb-4 w-2/3"></div>
+                  <div className="h-8 bg-gray-200 rounded"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templates?.map((template) => (
+              <Card key={template.id} className={`relative transition-all ${!template.isActive ? 'opacity-60' : ''}`}>
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg">{template.name}</h3>
+                      <p className="text-sm text-muted-foreground">{template.description}</p>
+                    </div>
+                    <Badge variant={template.isActive ? "default" : "secondary"}>
+                      {template.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span>Total Visits:</span>
+                      <span className="font-medium">{template.totalPunches}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Per Visit:</span>
+                      <span className="font-medium">${(template.pricePerPunch / 100).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold border-t pt-2">
+                      <span>Total Price:</span>
+                      <span>${(template.totalPrice / 100).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => handleTemplateEdit(template)}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteTemplateMutation.mutate(template.id)}
+                      disabled={deleteTemplateMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Template Form */}
+        {(editingTemplate || templateFormData.name) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{editingTemplate ? 'Edit Day Pass' : 'Create New Day Pass'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleTemplateSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="template-name">Package Name *</Label>
+                    <Input
+                      id="template-name"
+                      value={templateFormData.name}
+                      onChange={(e) => setTemplateFormData(prev => ({...prev, name: e.target.value}))}
+                      placeholder="e.g., 10-Day Pass"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="total-punches">Total Visits *</Label>
+                    <Input
+                      id="total-punches"
+                      type="number"
+                      value={templateFormData.totalPunches}
+                      onChange={(e) => {
+                        const punches = parseInt(e.target.value) || 0;
+                        setTemplateFormData(prev => ({
+                          ...prev, 
+                          totalPunches: punches,
+                          totalPrice: punches * (prev.pricePerPunch || 0)
+                        }));
+                      }}
+                      placeholder="10"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="price-per-punch">Price Per Visit (cents) *</Label>
+                    <Input
+                      id="price-per-punch"
+                      type="number"
+                      value={templateFormData.pricePerPunch}
+                      onChange={(e) => {
+                        const price = parseInt(e.target.value) || 0;
+                        setTemplateFormData(prev => ({
+                          ...prev, 
+                          pricePerPunch: price,
+                          totalPrice: (prev.totalPunches || 0) * price
+                        }));
+                      }}
+                      placeholder="2500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="total-price">Total Price (cents)</Label>
+                    <Input
+                      id="total-price"
+                      type="number"
+                      value={templateFormData.totalPrice}
+                      onChange={(e) => setTemplateFormData(prev => ({...prev, totalPrice: parseInt(e.target.value) || 0}))}
+                      placeholder="Auto-calculated"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sort-order">Sort Order</Label>
+                    <Input
+                      id="sort-order"
+                      type="number"
+                      value={templateFormData.sortOrder}
+                      onChange={(e) => setTemplateFormData(prev => ({...prev, sortOrder: parseInt(e.target.value) || 0}))}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is-active"
+                      checked={templateFormData.isActive}
+                      onChange={(e) => setTemplateFormData(prev => ({...prev, isActive: e.target.checked}))}
+                    />
+                    <Label htmlFor="is-active">Active (visible to members)</Label>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="template-description">Description</Label>
+                  <Input
+                    id="template-description"
+                    value={templateFormData.description}
+                    onChange={(e) => setTemplateFormData(prev => ({...prev, description: e.target.value}))}
+                    placeholder="Brief description of this package"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={templateMutation.isPending}>
+                    {templateMutation.isPending ? "Saving..." : editingTemplate ? "Update Day Pass" : "Create Day Pass"}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={resetTemplateForm}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

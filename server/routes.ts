@@ -47,7 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get membership for current user
   app.get("/api/membership", isAuthenticated, async (req, res) => {
     try {
-      const membership = await storage.getMembershipByUserId(req.user.id);
+      const membership = await storage.getMembershipByUserId(req.user!.id);
       if (!membership) {
         return res.status(404).json({ message: "Membership not found" });
       }
@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get check-ins for current user
   app.get("/api/check-ins", isAuthenticated, async (req, res) => {
     try {
-      const checkIns = await storage.getCheckInsByUserId(req.user.id);
+      const checkIns = await storage.getCheckInsByUserId(req.user!.id);
       res.json(checkIns);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
@@ -92,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get payments for current user
   app.get("/api/payments", isAuthenticated, async (req, res) => {
     try {
-      const payments = await storage.getPaymentsByUserId(req.user.id);
+      const payments = await storage.getPaymentsByUserId(req.user!.id);
       res.json(payments);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
@@ -152,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If user has punch cards, consume one visit
       if (activePunchCards.length > 0) {
         const oldestCard = activePunchCards.sort((a, b) => 
-          new Date(a.purchasedAt || 0).getTime() - new Date(b.purchasedAt || 0).getTime()
+          new Date(a.purchasedAt || '1970-01-01').getTime() - new Date(b.purchasedAt || '1970-01-01').getTime()
         )[0];
         
         // Use one punch from the card
@@ -401,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertPunchCardSchema.parse({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user!.id,
       });
       const punchCard = await storage.createPunchCard(validatedData);
       res.status(201).json(punchCard);
@@ -423,13 +423,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Punch card not found" });
       }
       
-      if (punchCard.userId !== req.user.id) {
+      if (punchCard.userId !== req.user!.id) {
         return res.status(403).json({ message: "Not your punch card" });
       }
 
       const updatedCard = await storage.usePunchCardEntry(cardId);
       res.json(updatedCard);
-    } catch (error) {
+    } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
   });

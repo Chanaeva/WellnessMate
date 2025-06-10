@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Membership, CheckIn, MembershipPlan, PunchCard } from "@shared/schema";
+import { Membership, CheckIn, MembershipPlan, PunchCard, Notification } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
@@ -66,6 +66,11 @@ export default function MemberDashboard() {
   // Fetch punch card options
   const { data: punchCardOptions } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
     queryKey: ["/api/punch-cards/options"],
+  });
+
+  // Fetch active notifications
+  const { data: activeNotifications } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications/active"],
   });
 
   // Purchase membership mutation

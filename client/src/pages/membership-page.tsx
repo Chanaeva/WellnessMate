@@ -63,20 +63,20 @@ export default function MembershipPage() {
                   <div>
                     <div className="flex items-center space-x-3 mb-3">
                       <Crown className="h-6 w-6 text-white" />
-                      <Badge className="bg-white/20 text-white border-white/30 text-sm">
+                      <Badge className="bg-white/20 text-white border-white/30 text-xs sm:text-sm">
                         Active Membership
                       </Badge>
                     </div>
-                    <h2 className="text-3xl font-display font-bold text-white">
+                    <h2 className="text-lg sm:text-2xl md:text-3xl font-display font-bold text-white">
                       {currentPlan.name}
                     </h2>
-                    <p className="text-white/90 text-lg mt-1">
+                    <p className="text-white/90 text-sm sm:text-base md:text-lg mt-1">
                       Member ID: {membership.membershipId}
                     </p>
                   </div>
                   <div className="text-right text-white">
-                    <div className="text-white/80 text-lg">Monthly</div>
-                    <div className="text-4xl font-bold">${(currentPlan.monthlyPrice / 100).toFixed(0)}</div>
+                    <div className="text-white/80 text-xs sm:text-sm md:text-lg">Monthly</div>
+                    <div className="text-xl sm:text-2xl md:text-4xl font-bold">${(currentPlan.monthlyPrice / 100).toFixed(0)}</div>
                   </div>
                 </div>
               </div>

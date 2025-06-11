@@ -47,17 +47,17 @@ const MemberCard = ({
           <div>
             <div className="flex items-center space-x-2 mb-2">
               <Crown className="h-5 w-5 text-white" />
-              <Badge className="bg-white/20 text-white border-white/30">
+              <Badge className="bg-white/20 text-white border-white/30 text-xs sm:text-sm">
                 Active Plan
               </Badge>
             </div>
-            <h3 className="text-xl font-display font-bold text-white">
+            <h3 className="text-sm sm:text-lg md:text-xl font-display font-bold text-white">
               {currentPlan?.name || planName}
             </h3>
           </div>
           <div className="text-right">
-            <div className="text-white/80 text-sm">Monthly</div>
-            <div className="text-2xl font-bold text-white">${membershipPrice}</div>
+            <div className="text-white/80 text-xs sm:text-sm">Monthly</div>
+            <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">${membershipPrice}</div>
           </div>
         </div>
       </div>
@@ -68,17 +68,17 @@ const MemberCard = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Next Billing</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">Next Billing</span>
             </div>
-            <span className="font-semibold">{membershipEndDate}</span>
+            <span className="font-semibold text-xs sm:text-sm">{membershipEndDate}</span>
           </div>
           
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Member ID</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">Member ID</span>
             </div>
-            <span className="font-mono text-sm">
+            <span className="font-mono text-xs sm:text-sm">
               {membership.membershipId}
             </span>
           </div>

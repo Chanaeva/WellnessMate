@@ -214,7 +214,7 @@ export default function MemberDashboard() {
                 <div className="absolute inset-0 bg-black/20"></div>
                 <div className="relative h-full p-6 flex items-end">
                   <div>
-                    <h1 className="text-4xl font-heading text-white">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading text-white">
                       Welcome back, {user?.firstName || "Member"}!
                     </h1>
                     <p className="text-white/90 font-medium">
@@ -241,7 +241,7 @@ export default function MemberDashboard() {
             {/* Quick Purchase Cards */}
             <Card className="wellness-card">
               <CardHeader>
-                <CardTitle className="text-2xl font-heading text-foreground flex items-center">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center">
                   <ShoppingCart className="h-5 w-5 mr-2" />
                   Quick Purchase
                 </CardTitle>
@@ -249,7 +249,7 @@ export default function MemberDashboard() {
               <CardContent className="space-y-6">
                 {/* Monthly Packages */}
                 <div>
-                  <h3 className="font-heading text-xl mb-4">Monthly Packages</h3>
+                  <h3 className="font-heading text-lg sm:text-xl mb-4">Monthly Packages</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     {membershipPlans?.filter(plan => plan.planType !== 'daily').slice(0, 2).map((plan) => {
                         const getPlanIcon = (planType: string) => {
@@ -319,7 +319,7 @@ export default function MemberDashboard() {
 
                 {/* Day Pass Packages */}
                 <div>
-                  <h3 className="font-heading text-xl mb-4">Day Pass Packages</h3>
+                  <h3 className="font-heading text-lg sm:text-xl mb-4">Day Pass Packages</h3>
                   <div className="grid md:grid-cols-2 gap-4">
                     {punchCardOptions?.slice(0, 2).map((option, index) => (
                         <Card key={index} className="border-2 border-secondary/30">
@@ -384,7 +384,7 @@ export default function MemberDashboard() {
             {/* Facilities */}
             <Card className="wellness-card">
               <CardContent className="p-6">
-                <h2 className="text-3xl font-heading mb-6 text-foreground">Our Thermal Facilities</h2>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-heading mb-6 text-foreground">Our Thermal Facilities</h2>
                 <div className="wellness-grid">
                   {/* Facility Item 1 */}
                   <div className="wellness-card overflow-hidden">
@@ -422,7 +422,7 @@ export default function MemberDashboard() {
             {/* Thermal Wellness Benefits */}
             <Card className="wellness-card">
               <CardContent className="p-6">
-                <h2 className="text-3xl font-heading mb-6 text-foreground">Thermal Wellness Benefits</h2>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-heading mb-6 text-foreground">Thermal Wellness Benefits</h2>
                 <div className="space-y-4">
                   <div className="flex items-start space-x-4">
                     <div className="bg-primary/10 p-3 rounded-xl">
@@ -474,7 +474,7 @@ export default function MemberDashboard() {
             {userPunchCards && userPunchCards.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-xl font-heading flex items-center">
+                  <CardTitle className="text-lg sm:text-xl font-heading flex items-center">
                     <Ticket className="h-5 w-5 text-amber-600 mr-2" />
                     Your Day Pass Packages
                   </CardTitle>
@@ -516,7 +516,7 @@ export default function MemberDashboard() {
             {/* Quick Actions */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-xl font-heading mb-4">Quick Actions</h3>
+                <h3 className="text-lg sm:text-xl font-heading mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <Link href="/qr-code">
                     <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-muted hover:bg-muted/80 py-6">

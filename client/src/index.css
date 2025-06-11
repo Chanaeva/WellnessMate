@@ -1,4 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+/* Wolf Mother Wellness Custom Fonts */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-weight: 400;
+  font-style: normal;
+  src: url('/fonts/HankenGrotesk-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-weight: 500;
+  font-style: normal;
+  src: url('/fonts/HankenGrotesk-Medium.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-weight: 600;
+  font-style: normal;
+  src: url('/fonts/HankenGrotesk-SemiBold.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-weight: 700;
+  font-style: normal;
+  src: url('/fonts/HankenGrotesk-Bold.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'LeCharisme';
+  font-weight: 400;
+  font-style: normal;
+  src: url('/fonts/LeCharisme-Regular.otf') format('opentype');
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -66,16 +105,26 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-body antialiased bg-background text-foreground;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 600;
+    @apply font-heading;
+    font-weight: 400;
   }
 
   .font-display {
-    font-family: 'Cormorant Garamond', serif;
+    @apply font-heading;
+  }
+
+  .font-heading {
+    font-family: 'LeCharisme', serif;
+    font-feature-settings: 'liga' 1, 'kern' 1;
+  }
+
+  .font-body {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    font-feature-settings: 'liga' 1, 'kern' 1;
   }
 }
 

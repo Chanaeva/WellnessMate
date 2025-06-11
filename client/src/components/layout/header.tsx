@@ -54,8 +54,8 @@ const Header = () => {
                 className="h-12 w-12 object-contain"
               />
               <div className="ml-3">
-                <h1 className="text-xl font-heading font-semibold text-neutral-dark">Wolf Mother Wellness</h1>
-                <p className="text-xs text-neutral-dark opacity-70">Thermal Wellness Center</p>
+                <h1 className="text-2xl font-heading text-foreground">Wolf Mother Wellness</h1>
+                <p className="text-xs font-body text-muted-foreground">Thermal Wellness Center</p>
               </div>
             </Link>
           </div>

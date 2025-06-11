@@ -214,7 +214,7 @@ export default function MemberDashboard() {
                 <div className="absolute inset-0 bg-black/20"></div>
                 <div className="relative h-full p-6 flex items-end">
                   <div>
-                    <h1 className="text-3xl font-display font-bold text-white">
+                    <h1 className="text-4xl font-heading text-white">
                       Welcome back, {user?.firstName || "Member"}!
                     </h1>
                     <p className="text-white/90 font-medium">

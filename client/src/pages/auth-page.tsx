@@ -359,7 +359,7 @@ function AuthPage() {
               className="absolute inset-0 bg-cover bg-center"
               style={{ backgroundImage: "url('/apothecary-plants-bg.png')" }}
             ></div>
-            <div className="absolute inset-0 bg-gradient-to-b from-primary/70 to-primary/30"></div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/40"></div>
             <div className="relative p-8 flex flex-col h-full justify-between text-white">
               <div className="flex items-center justify-center mb-8">
                 <img 

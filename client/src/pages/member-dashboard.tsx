@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import MemberCard from "@/components/dashboard/member-card";
 import StatsCard from "@/components/dashboard/stats-card";
 import ScheduleItem from "@/components/dashboard/schedule-item";
@@ -40,6 +41,7 @@ export default function MemberDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [purchasingPunchCardId, setPurchasingPunchCardId] = useState<string | null>(null);
+  const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
 
   // Fetch membership data
   const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
@@ -127,13 +129,7 @@ export default function MemberDashboard() {
   // Handle purchase attempts
   const handlePurchaseAttempt = (punchCardData: any) => {
     if (!hasPaymentMethod) {
-      toast({
-        title: "Payment Method Required",
-        description: "Please add a payment method before making a purchase.",
-        variant: "destructive",
-      });
-      // Redirect to payments page to add card
-      window.location.href = '/payments';
+      setShowPaymentMethodAlert(true);
       return;
     }
     purchasePunchCardMutation.mutate(punchCardData);
@@ -142,16 +138,16 @@ export default function MemberDashboard() {
   // Handle membership purchase attempts
   const handleMembershipPurchaseAttempt = (plan: MembershipPlan) => {
     if (!hasPaymentMethod) {
-      toast({
-        title: "Payment Method Required",
-        description: "Please add a payment method before making a purchase.",
-        variant: "destructive",
-      });
-      // Redirect to payments page to add card
-      window.location.href = '/payments';
+      setShowPaymentMethodAlert(true);
       return;
     }
     purchaseMembershipMutation.mutate(plan);
+  };
+
+  // Handle redirect to payments page
+  const handleAddPaymentMethod = () => {
+    setShowPaymentMethodAlert(false);
+    window.location.href = '/payments';
   };
 
   // Purchase punch card mutation
@@ -642,6 +638,38 @@ export default function MemberDashboard() {
       </main>
       
       <Footer />
+
+      {/* Payment Method Required Alert Dialog */}
+      <AlertDialog open={showPaymentMethodAlert} onOpenChange={setShowPaymentMethodAlert}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center text-destructive">
+              <svg className="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              Payment Method Required
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              You need to add a payment method before making any purchases. This helps us process your membership or day pass orders securely.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowPaymentMethodAlert(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <AlertDialogAction 
+              onClick={handleAddPaymentMethod}
+              className="w-full sm:w-auto wellness-button-primary"
+            >
+              Add Payment Method
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

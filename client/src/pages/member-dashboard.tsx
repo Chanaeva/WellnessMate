@@ -459,75 +459,7 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
-            {/* Payment Methods */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment Methods
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {paymentMethods && paymentMethods.length > 0 ? (
-                  <div className="space-y-3">
-                    {paymentMethods.map((method) => (
-                      <div key={method.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{method.cardBrand} ending in {method.cardLast4}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Expires {method.cardExpMonth}/{method.cardExpYear}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          {method.isDefault && (
-                            <Badge variant="default" className="text-xs">Default</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-4">No payment methods added yet</p>
-                    <Button onClick={() => setShowAddPaymentMethod(true)} className="wellness-button-primary">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Payment Method
-                    </Button>
-                  </div>
-                )}
 
-                {paymentMethods && paymentMethods.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowAddPaymentMethod(true)}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Another Card
-                  </Button>
-                )}
-
-                {showAddPaymentMethod && (
-                  <div className="mt-6">
-                    <Elements stripe={stripePromise}>
-                      <AddPaymentMethod
-                        isUpdating={isUpdatingPaymentMethod}
-                        onSuccess={() => {
-                          setShowAddPaymentMethod(false);
-                          setIsUpdatingPaymentMethod(false);
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                        }}
-                        onCancel={() => {
-                          setShowAddPaymentMethod(false);
-                          setIsUpdatingPaymentMethod(false);
-                        }}
-                      />
-                    </Elements>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* Recent Transactions */}
             <Card>

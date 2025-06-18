@@ -190,11 +190,11 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Active members see "Explore More" at bottom, inactive see main CTA prominently
   - Simplified checkout flow with payment method management only in cart/dashboard
 
-- June 18, 2025: Restored inline payment method form to checkout page ✓
-  - Added back Stripe Elements form directly on checkout page
-  - Users can add payment methods without leaving checkout flow
-  - Maintains streamlined purchase experience
-  - Payment methods still manageable from dashboard as well
+- June 18, 2025: Centralized payment method management to checkout page only ✓
+  - Removed payment method management from dashboard sidebar
+  - Removed payment method management from cart sidebar  
+  - Payment methods can only be added/managed on checkout page
+  - Streamlined single location for payment handling
 
 ## Changelog
 

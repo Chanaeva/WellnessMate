@@ -420,7 +420,7 @@ function AuthPage() {
                 <img
                   src={logoMossGreen}
                   alt="Wolf Mother Wellness"
-                  className="h-16 w-16 object-contain filter brightness-0 invert"
+                  className="max-h-25 max-w-24 object-contain filter brightness-0 invert pt-6"
                 />
               </div>
               <div>

@@ -38,8 +38,8 @@ const Header = () => {
   ] : [
     { href: "/", label: "Dashboard", active: location === "/" },
     { href: "/qr-code", label: "My QR Code", active: location === "/qr-code" },
-    { href: "/membership", label: "Membership", active: location === "/membership" },
-    { href: "/payments", label: "Payments", active: location === "/payments" }
+    { href: "/payments", label: "Payments", active: location === "/payments" },
+    { href: "/packages", label: "Plans & Packages", active: location === "/packages" }
   ];
 
   return (

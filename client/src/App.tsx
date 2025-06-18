@@ -11,7 +11,7 @@ import ForgotPasswordPage from "@/pages/forgot-password-page";
 import ResetPasswordPage from "@/pages/reset-password-page";
 import MemberDashboard from "@/pages/member-dashboard";
 import QRCodePage from "@/pages/qr-code-page";
-import MembershipPage from "@/pages/membership-page";
+
 import PaymentsPage from "@/pages/payments-page";
 import PackagesPage from "@/pages/packages-page";
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -32,7 +32,7 @@ function Router() {
       {/* Member routes */}
       <ProtectedRoute path="/" component={MemberDashboard} />
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
-      <ProtectedRoute path="/membership" component={MembershipPage} />
+
       <ProtectedRoute path="/payments" component={PaymentsPage} />
       <ProtectedRoute path="/packages" component={PackagesPage} />
       

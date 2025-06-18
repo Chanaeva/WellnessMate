@@ -156,6 +156,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Large accessible buttons with clear actions
   - Add payment method form now opens by default on payments page
 
+- June 18, 2025: Consolidated membership page into dashboard for simplification ✓
+  - Removed standalone membership page and integrated functionality into dashboard
+  - Updated navigation to include packages page instead of membership page
+  - Unified user experience with all member features in single dashboard view
+  - Enhanced member card with additional membership details
+
 ## Changelog
 
 Changelog:

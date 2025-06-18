@@ -419,16 +419,19 @@ export default function MemberDashboard() {
                 {paymentMethods && paymentMethods.length > 0 ? (
                   <div className="space-y-3">
                     {paymentMethods.map((method) => (
-                      <PaymentMethodCard
-                        key={method.id}
-                        paymentMethod={method}
-                        onDelete={() => {
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                        }}
-                        onSetDefault={() => {
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                        }}
-                      />
+                      <div key={method.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{method.cardBrand} ending in {method.cardLast4}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Expires {method.cardExpMonth}/{method.cardExpYear}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {method.isDefault && (
+                            <Badge variant="default" className="text-xs">Default</Badge>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -490,7 +493,7 @@ export default function MemberDashboard() {
                         <div className="flex-1">
                           <p className="font-medium text-sm">{payment.description}</p>
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(payment.transactionDate), "MMM d, yyyy 'at' h:mm a")}
+                            {payment.transactionDate ? format(new Date(payment.transactionDate), "MMM d, yyyy 'at' h:mm a") : 'Date not available'}
                           </p>
                         </div>
                         <div className="text-right">

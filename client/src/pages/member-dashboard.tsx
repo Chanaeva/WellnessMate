@@ -56,6 +56,16 @@ export default function MemberDashboard() {
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
 
+  // Check if we should auto-open add payment form from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('add-payment') === 'true') {
+      setShowAddPaymentMethod(true);
+      // Clean up URL without causing navigation
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
+
   // Fetch membership data
   const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
     queryKey: ["/api/membership"],

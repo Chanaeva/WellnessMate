@@ -200,9 +200,12 @@ export default function CheckoutPage() {
                     <div className="text-center py-6">
                       <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <p className="text-muted-foreground mb-4">No payment method on file</p>
-                      <Link href="/payments">
-                        <Button variant="outline">Add Payment Method</Button>
-                      </Link>
+                      <Button 
+                        variant="outline"
+                        onClick={() => setShowPaymentMethodAlert(true)}
+                      >
+                        Add Payment Method
+                      </Button>
                     </div>
                   )}
                 </CardContent>

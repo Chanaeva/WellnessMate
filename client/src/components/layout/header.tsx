@@ -39,7 +39,6 @@ const Header = () => {
   ] : [
     { href: "/", label: "Dashboard", active: location === "/" },
     { href: "/qr-code", label: "My QR Code", active: location === "/qr-code" },
-    { href: "/payments", label: "Payments", active: location === "/payments" },
     { href: "/packages", label: "Plans & Packages", active: location === "/packages" }
   ];
 

@@ -36,12 +36,21 @@ import {
   Loader2
 } from "lucide-react";
 import { format } from "date-fns";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { AddPaymentMethod } from "@/components/payment/add-payment-method";
+import { PaymentMethodCard } from "@/components/payment/payment-method-card";
+
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
 
 export default function MemberDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [purchasingPunchCardId, setPurchasingPunchCardId] = useState<string | null>(null);
   const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
+  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
+  const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
 
   // Fetch membership data
   const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
@@ -77,8 +86,14 @@ export default function MemberDashboard() {
   });
 
   // Fetch payment methods
-  const { data: paymentMethods } = useQuery<any[]>({
+  const { data: paymentMethods } = useQuery<PaymentMethod[]>({
     queryKey: ["/api/payment-methods"],
+    enabled: !!user,
+  });
+
+  // Fetch payment history
+  const { data: payments } = useQuery<Payment[]>({
+    queryKey: ["/api/payments"],
     enabled: !!user,
   });
 
@@ -147,7 +162,7 @@ export default function MemberDashboard() {
   // Handle redirect to payments page
   const handleAddPaymentMethod = () => {
     setShowPaymentMethodAlert(false);
-    window.location.href = '/payments';
+    setShowAddPaymentMethod(true);
   };
 
   // Purchase punch card mutation
@@ -387,6 +402,112 @@ export default function MemberDashboard() {
               memberSince="Jan 2023"
               currentPlan={currentPlan}
             />
+
+            {/* Payment Methods */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Payment Methods
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {paymentMethods && paymentMethods.length > 0 ? (
+                  <div className="space-y-3">
+                    {paymentMethods.map((method) => (
+                      <PaymentMethodCard
+                        key={method.id}
+                        paymentMethod={method}
+                        onDelete={() => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                        }}
+                        onSetDefault={() => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-4">No payment methods added yet</p>
+                    <Button onClick={() => setShowAddPaymentMethod(true)} className="wellness-button-primary">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Payment Method
+                    </Button>
+                  </div>
+                )}
+
+                {paymentMethods && paymentMethods.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowAddPaymentMethod(true)}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Another Card
+                  </Button>
+                )}
+
+                {showAddPaymentMethod && (
+                  <div className="mt-6">
+                    <Elements stripe={stripePromise}>
+                      <AddPaymentMethod
+                        isUpdating={isUpdatingPaymentMethod}
+                        onSuccess={() => {
+                          setShowAddPaymentMethod(false);
+                          setIsUpdatingPaymentMethod(false);
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                        }}
+                        onCancel={() => {
+                          setShowAddPaymentMethod(false);
+                          setIsUpdatingPaymentMethod(false);
+                        }}
+                      />
+                    </Elements>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Transactions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Recent Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {payments && payments.length > 0 ? (
+                  <div className="space-y-3">
+                    {payments.slice(0, 5).map((payment) => (
+                      <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{payment.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(payment.transactionDate), "MMM d, yyyy 'at' h:mm a")}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">
+                            ${(payment.amount / 100).toFixed(2)}
+                          </p>
+                          <p className={`text-xs ${payment.status === 'successful' ? 'text-green-600' : 'text-red-600'}`}>
+                            {payment.status}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No transactions yet</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Day Pass Packages - Show when purchased */}
             {userPunchCards && userPunchCards.length > 0 && (

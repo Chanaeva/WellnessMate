@@ -177,6 +177,13 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Cleaner, more focused dashboard design
   - Directs users to comprehensive packages page for shopping
 
+- June 18, 2025: Consolidated payments functionality into dashboard ✓
+  - Moved payment methods management to dashboard sidebar
+  - Integrated recent transactions display
+  - Removed standalone payments page for unified experience
+  - Updated navigation to remove payments link
+  - All payment features now accessible from main dashboard
+
 ## Changelog
 
 Changelog:

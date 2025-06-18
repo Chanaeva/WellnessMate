@@ -162,6 +162,21 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Unified user experience with all member features in single dashboard view
   - Enhanced member card with additional membership details
 
+- June 18, 2025: Created shopping cart system for packages and memberships ✓
+  - Added cart context provider for state management
+  - Created cart sidebar component with add/remove functionality
+  - Built comprehensive checkout page with order summary
+  - Added "Add to Cart" buttons to packages page
+  - Integrated cart icon in header navigation
+  - Added backend checkout endpoint to process cart purchases
+  - Cleaned up old test purchase data from database
+
+- June 18, 2025: Simplified dashboard Quick Purchase section ✓
+  - Removed complex Quick Purchase cards section
+  - Replaced with simple "View Plans & Packages" button
+  - Cleaner, more focused dashboard design
+  - Directs users to comprehensive packages page for shopping
+
 ## Changelog
 
 Changelog:

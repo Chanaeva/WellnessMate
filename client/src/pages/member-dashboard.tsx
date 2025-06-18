@@ -278,148 +278,26 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
-            {/* Quick Purchase Cards */}
+            {/* Plans and Packages Link */}
             <Card className="wellness-card">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center">
+              <CardHeader className="text-center">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center justify-center">
                   <ShoppingCart className="h-5 w-5 mr-2" />
-                  Quick Purchase
+                  Membership Plans & Packages
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Monthly Packages */}
-                <div>
-                  <h3 className="font-heading text-lg sm:text-xl mb-4">Monthly Packages</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {membershipPlans?.filter(plan => plan.planType !== 'daily').slice(0, 2).map((plan) => {
-                        const getPlanIcon = (planType: string) => {
-                          switch (planType) {
-                            case 'basic': return <CreditCard className="h-5 w-5" />;
-                            case 'premium': return <Star className="h-5 w-5" />;
-                            case 'vip': return <Crown className="h-5 w-5" />;
-                            default: return <CreditCard className="h-5 w-5" />;
-                          }
-                        };
-
-                        const getPlanColor = (planType: string) => {
-                          switch (planType) {
-                            case 'basic': return 'thermal-gradient';
-                            case 'premium': return 'cold-gradient'; 
-                            case 'vip': return 'from-primary to-secondary';
-                            default: return 'from-muted to-muted-foreground';
-                          }
-                        };
-
-                        return (
-                          <Card key={plan.id} className="overflow-hidden border-2 border-primary/20">
-                            <div className={`h-24 ${getPlanColor(plan.planType)} relative`}>
-                              <div className="absolute inset-0 bg-black/20"></div>
-                              <div className="relative h-full p-4 flex items-center justify-between text-white">
-                                <div className="flex items-center space-x-2">
-                                  {getPlanIcon(plan.planType)}
-                                  <span className="font-semibold capitalize">{plan.planType}</span>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-2xl font-bold">
-                                    ${(plan.monthlyPrice / 100).toFixed(0)}
-                                  </div>
-                                  <div className="text-xs opacity-90">per month</div>
-                                </div>
-                              </div>
-                            </div>
-                            <CardContent className="p-4">
-                              <h4 className="font-semibold mb-2">{plan.name}</h4>
-                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                                {plan.description}
-                              </p>
-                              <div className="flex items-center text-xs text-muted-foreground mb-3">
-                                <Check className="h-3 w-3 mr-1 text-green-600" />
-                                {plan.features?.length || 0} features included
-                              </div>
-                            </CardContent>
-                            <CardFooter className="p-4 pt-0">
-                              <Button
-                                className="w-full wellness-button-primary text-sm"
-                                disabled={purchaseMembershipMutation.isPending}
-                                onClick={() => handleMembershipPurchaseAttempt(plan)}
-                              >
-                                {purchaseMembershipMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                  <ShoppingCart className="h-4 w-4 mr-2" />
-                                )}
-                                {purchaseMembershipMutation.isPending ? 'Processing...' : 'Purchase Plan'}
-                              </Button>
-                            </CardFooter>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                {/* Day Pass Packages */}
-                <div>
-                  <h3 className="font-heading text-lg sm:text-xl mb-4">Day Pass Packages</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {punchCardOptions?.slice(0, 2).map((option, index) => (
-                        <Card key={index} className="border-2 border-secondary/30">
-                          <CardHeader className="bg-gradient-to-r from-secondary/20 to-accent/20 border-b border-secondary/30 p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <Ticket className="h-5 w-5 text-primary" />
-                                <span className="font-semibold text-foreground">{option.name}</span>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-foreground">
-                                  ${(option.totalPrice / 100).toFixed(0)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  ${(option.pricePerPunch / 100).toFixed(0)} per visit
-                                </div>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="p-4">
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center text-sm">
-                                <span className="text-muted-foreground">Total Visits:</span>
-                                <span className="font-semibold">{option.totalPunches}</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Full access to all thermal facilities
-                              </div>
-                            </div>
-                          </CardContent>
-                          <CardFooter className="p-4 pt-0">
-                            <Button
-                              className="w-full wellness-button-primary text-sm"
-                              disabled={purchasingPunchCardId === option.name}
-                              onClick={() => handlePurchaseAttempt(option)}
-                            >
-                              {purchasingPunchCardId === option.name ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <Ticket className="h-4 w-4 mr-2" />
-                              )}
-                              {purchasingPunchCardId === option.name ? 'Processing...' : 'Purchase Package'}
-                            </Button>
-                          </CardFooter>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-
-                {/* View All Link */}
-                <div className="text-center pt-4 border-t border-border">
-                  <Link href="/packages">
-                    <Button variant="outline" className="w-full sm:w-auto">
-                      View All Plans & Options
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </Link>
-                </div>
-                </CardContent>
-              </Card>
+              <CardContent className="text-center space-y-4">
+                <p className="text-muted-foreground">
+                  Explore our monthly memberships and day pass packages designed for your wellness journey.
+                </p>
+                <Link href="/packages">
+                  <Button className="wellness-button-primary px-8 py-3 text-lg">
+                    View Plans & Packages
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
 
             {/* Facilities */}
             <Card className="wellness-card">

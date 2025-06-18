@@ -931,6 +931,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create HTTP server
+  // Cart checkout endpoint
+  app.post("/api/checkout", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const { items, totalAmount } = req.body;
+      const userId = req.user.id;
+
+      // Process each item in the cart
+      for (const item of items) {
+        if (item.type === 'membership') {
+          // Create payment record for membership
+          const planData = item.data;
+          await storage.createPayment({
+            userId,
+            membershipId: "general-purchase",
+            amount: planData.monthlyPrice,
+            description: `${planData.name} - Monthly Membership`,
+            status: "successful",
+            method: "credit_card",
+            stripePaymentIntentId: "cart_" + Date.now(),
+            stripePaymentMethodId: "default"
+          });
+        } else if (item.type === 'punch_card') {
+          // Create punch card
+          const cardData = item.data;
+          const quantity = item.quantity || 1;
+          
+          for (let i = 0; i < quantity; i++) {
+            await storage.createPunchCard({
+              userId,
+              name: cardData.name,
+              totalPunches: cardData.totalPunches,
+              remainingPunches: cardData.totalPunches,
+              pricePerPunch: cardData.pricePerPunch,
+              totalPrice: cardData.totalPrice,
+              status: 'active'
+            });
+
+            await storage.createPayment({
+              userId,
+              membershipId: "general-purchase",
+              amount: cardData.totalPrice,
+              description: `${cardData.name} - Day Pass Package`,
+              status: "successful",
+              method: "credit_card",
+              stripePaymentIntentId: "cart_" + Date.now(),
+              stripePaymentMethodId: "default"
+            });
+          }
+        }
+      }
+
+      res.json({ success: true, message: "Purchase completed successfully" });
+    } catch (error: any) {
+      console.error("Checkout error:", error);
+      res.status(500).json({ message: "Error processing checkout: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

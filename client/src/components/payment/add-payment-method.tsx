@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import { useStripe, useElements, CardNumberElement, CardExpiryElement, CardCvcElement } from "@stripe/react-stripe-js";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { CreditCard, Loader2 } from "lucide-react";
 
-const cardElementOptions = {
+const elementOptions = {
   style: {
     base: {
-      fontSize: '18px', // Larger font for better mobile readability
+      fontSize: '18px',
       color: '#1f2937',
       fontFamily: 'system-ui, -apple-system, sans-serif',
       lineHeight: '1.5',
@@ -18,7 +18,7 @@ const cardElementOptions = {
         color: '#6b7280',
       },
       iconColor: '#374151',
-      padding: '12px 0', // Add padding for better touch targets
+      padding: '16px 0',
     },
     invalid: {
       color: '#ef4444',
@@ -86,15 +86,15 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
       // Get setup intent
       const { clientSecret } = await setupIntentMutation.mutateAsync();
       
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error("Card element not found");
+      const cardNumberElement = elements.getElement(CardNumberElement);
+      if (!cardNumberElement) {
+        throw new Error("Card number element not found");
       }
 
       // Confirm setup intent
       const { error, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
         payment_method: {
-          card: cardElement,
+          card: cardNumberElement,
         }
       });
 
@@ -130,11 +130,30 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
       </CardHeader>
       <CardContent className="px-4 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-3">
-            <label className="text-base font-medium text-gray-900 block">Card Details</label>
-            <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-              <CardElement options={cardElementOptions} />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-base font-medium text-gray-900 block">Card Number</label>
+              <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                <CardNumberElement options={elementOptions} />
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-base font-medium text-gray-900 block">Expiry Date</label>
+                <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                  <CardExpiryElement options={elementOptions} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-base font-medium text-gray-900 block">CVC</label>
+                <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                  <CardCvcElement options={elementOptions} />
+                </div>
+              </div>
+            </div>
+
             <p className="text-sm text-gray-500 mt-2">
               Your card information is securely processed by Stripe and never stored on our servers.
             </p>

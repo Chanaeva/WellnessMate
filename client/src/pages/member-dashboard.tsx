@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Membership, CheckIn, MembershipPlan, PunchCard, Notification } from "@shared/schema";
@@ -39,6 +39,7 @@ import { format } from "date-fns";
 export default function MemberDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [purchasingPunchCardId, setPurchasingPunchCardId] = useState<string | null>(null);
 
   // Fetch membership data
   const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
@@ -117,6 +118,8 @@ export default function MemberDashboard() {
   // Purchase punch card mutation
   const purchasePunchCardMutation = useMutation({
     mutationFn: async (punchCardData: any) => {
+      setPurchasingPunchCardId(punchCardData.name);
+      
       // Create payment intent
       const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
         amount: punchCardData.totalPrice / 100,
@@ -147,6 +150,7 @@ export default function MemberDashboard() {
       return await punchCardRes.json();
     },
     onSuccess: () => {
+      setPurchasingPunchCardId(null);
       toast({
         title: "Punch Card Purchased!",
         description: "Your punch card has been added to your account.",
@@ -155,6 +159,7 @@ export default function MemberDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
     },
     onError: (error: any) => {
+      setPurchasingPunchCardId(null);
       toast({
         title: "Purchase Failed",
         description: error.message || "Failed to purchase punch card",
@@ -353,15 +358,15 @@ export default function MemberDashboard() {
                           <CardFooter className="p-4 pt-0">
                             <Button
                               className="w-full wellness-button-primary text-sm"
-                              disabled={purchasePunchCardMutation.isPending}
+                              disabled={purchasingPunchCardId === option.name}
                               onClick={() => purchasePunchCardMutation.mutate(option)}
                             >
-                              {purchasePunchCardMutation.isPending ? (
+                              {purchasingPunchCardId === option.name ? (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               ) : (
                                 <Ticket className="h-4 w-4 mr-2" />
                               )}
-                              {purchasePunchCardMutation.isPending ? 'Processing...' : 'Purchase Package'}
+                              {purchasingPunchCardId === option.name ? 'Processing...' : 'Purchase Package'}
                             </Button>
                           </CardFooter>
                         </Card>

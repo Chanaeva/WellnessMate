@@ -132,6 +132,17 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Included security reassurance text
   - User confirmed: "Looks much better"
 
+- June 18, 2025: Reorganized payments page layout ✓
+  - Moved Transaction History section below Payment Methods section
+  - Removed export option from Transaction History
+  - Maintained all existing functionality with cleaner structure
+  - User confirmed: "Yeah I like it much better"
+
+- June 18, 2025: Fixed punch card purchase loading states on dashboard ✓
+  - Added specific tracking for which punch card is being purchased
+  - Only the selected button shows loading state instead of all buttons
+  - Improved user experience with precise feedback
+
 ## Changelog
 
 Changelog:

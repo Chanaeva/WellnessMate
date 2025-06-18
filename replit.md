@@ -122,13 +122,15 @@ This is a full-stack web application for managing a thermal wellness center's me
 
 ## Recent Changes
 
-- June 18, 2025: Improved mobile usability of add payment method form
+- June 18, 2025: Improved mobile usability of add payment method form ✓
+  - Separated card inputs into individual fields (card number, expiry, CVC)
   - Increased font size from 16px to 18px for better readability
   - Changed from dark theme to light theme for better form visibility
   - Added responsive button layout (stacked on mobile, side-by-side on desktop)
   - Enhanced touch targets with larger padding
   - Added visual feedback states for card input validation
   - Included security reassurance text
+  - User confirmed: "Looks much better"
 
 ## Changelog
 

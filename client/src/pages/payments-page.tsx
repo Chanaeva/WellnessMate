@@ -275,128 +275,6 @@ export default function PaymentsPage() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Transaction History */}
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold">Transaction History</h3>
-                  <div className="flex items-center">
-                    <Select value={timeFilter} onValueChange={setTimeFilter}>
-                      <SelectTrigger className="w-[180px] mr-2 h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3months">Last 3 Months</SelectItem>
-                        <SelectItem value="6months">Last 6 Months</SelectItem>
-                        <SelectItem value="year">Last Year</SelectItem>
-                        <SelectItem value="all">All Time</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="outline" size="sm" className="flex items-center h-9">
-                      <Download className="h-4 w-4 mr-1" /> Export
-                    </Button>
-                  </div>
-                </div>
-
-                {isPaymentsLoading ? (
-                  <div className="p-6 text-center">Loading payment history...</div>
-                ) : filteredPayments.length > 0 ? (
-                  <>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {currentPageData.map((payment, index) => (
-                            <tr key={payment.id} className={index % 2 === 1 ? "bg-gray-50" : ""}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {payment.transactionDate ? format(payment.transactionDate, "MMM d, yyyy") : "N/A"}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {payment.description}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatPrice(payment.amount)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge className={
-                                  payment.status === 'successful' ? 'bg-green-100 text-green-800' : 
-                                  payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                                  payment.status === 'failed' ? 'bg-red-100 text-red-800' : 
-                                  'bg-gray-100 text-gray-800'
-                                }>
-                                  {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                                </Badge>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                <Button variant="link" className="text-primary p-0 h-auto">Download</Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="mt-4 flex justify-between items-center">
-                        <div className="text-sm text-gray-500">
-                          Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredPayments.length)} of {filteredPayments.length} transactions
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(currentPage - 1)}
-                          >
-                            <span className="sr-only">Previous page</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-left">
-                              <path d="m15 18-6-6 6-6" />
-                            </svg>
-                          </Button>
-                          <div className="flex items-center">
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                              <Button
-                                key={page}
-                                variant={currentPage === page ? "default" : "outline"}
-                                className="mx-1 h-8 w-8 p-0"
-                                onClick={() => setCurrentPage(page)}
-                              >
-                                {page}
-                              </Button>
-                            ))}
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            disabled={currentPage === totalPages}
-                            onClick={() => setCurrentPage(currentPage + 1)}
-                          >
-                            <span className="sr-only">Next page</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right">
-                              <path d="m9 18 6-6-6-6" />
-                            </svg>
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-6 text-center bg-gray-50 rounded-lg">
-                    <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium text-gray-900">No payment history</h3>
-                    <p className="mt-1 text-sm text-gray-500">Your payment history will appear here once you make a payment</p>
-                  </div>
-                )}
-              </div>
             </CardContent>
           </Card>
 
@@ -490,6 +368,129 @@ export default function PaymentsPage() {
                   )}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Transaction History Section */}
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Transaction History</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    View your payment history and receipts
+                  </CardDescription>
+                </div>
+                <Select value={timeFilter} onValueChange={setTimeFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3months">Last 3 Months</SelectItem>
+                    <SelectItem value="6months">Last 6 Months</SelectItem>
+                    <SelectItem value="year">Last Year</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {isPaymentsLoading ? (
+                  <div className="p-6 text-center">Loading payment history...</div>
+                ) : filteredPayments.length > 0 ? (
+                  <>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentPageData.map((payment, index) => (
+                            <tr key={payment.id} className={index % 2 === 1 ? "bg-gray-50" : ""}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {payment.transactionDate ? format(payment.transactionDate, "MMM d, yyyy") : "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {payment.description}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {formatPrice(payment.amount)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <Badge className={
+                                  payment.status === 'successful' ? 'bg-green-100 text-green-800' : 
+                                  payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                  payment.status === 'failed' ? 'bg-red-100 text-red-800' : 
+                                  'bg-gray-100 text-gray-800'
+                                }>
+                                  {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                <Button variant="link" className="text-primary p-0 h-auto">Download</Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="mt-4 flex justify-between items-center">
+                        <div className="text-sm text-gray-500">
+                          Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredPayments.length)} of {filteredPayments.length} transactions
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(currentPage - 1)}
+                          >
+                            <span className="sr-only">Previous page</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-left">
+                              <path d="m15 18-6-6 6-6" />
+                            </svg>
+                          </Button>
+                          <div className="flex items-center">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                              <Button
+                                key={page}
+                                variant={currentPage === page ? "default" : "outline"}
+                                className="mx-1 h-8 w-8 p-0"
+                                onClick={() => setCurrentPage(page)}
+                              >
+                                {page}
+                              </Button>
+                            ))}
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(currentPage + 1)}
+                          >
+                            <span className="sr-only">Next page</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chevron-right">
+                              <path d="m9 18 6-6-6-6" />
+                            </svg>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-gray-500">No transactions found for the selected time period.</p>
+                  </div>
+                )}
             </CardContent>
           </Card>
         </div>

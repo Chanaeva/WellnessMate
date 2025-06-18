@@ -149,6 +149,13 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Redirects users to payments page to add card if none exists
   - Shows clear error message explaining requirement
 
+- June 18, 2025: Enhanced payment method requirement notifications ✓
+  - Replaced small toast with prominent full-screen alert dialog
+  - Added warning icon and red styling for immediate attention
+  - Clear explanation of why payment method is needed
+  - Large accessible buttons with clear actions
+  - Add payment method form now opens by default on payments page
+
 ## Changelog
 
 Changelog:

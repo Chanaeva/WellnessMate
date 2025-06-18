@@ -26,7 +26,7 @@ export default function PaymentsPage() {
   const { toast } = useToast();
   const [timeFilter, setTimeFilter] = useState("3months");
   const [currentPage, setCurrentPage] = useState(1);
-  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
+  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(true);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
   const itemsPerPage = 5;
 

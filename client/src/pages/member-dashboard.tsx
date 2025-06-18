@@ -417,6 +417,46 @@ export default function MemberDashboard() {
               currentPlan={currentPlan}
             />
 
+            {/* Your Day Pass Packages */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Ticket className="h-5 w-5" />
+                  Your Day Pass Packages
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {userPunchCards && userPunchCards.length > 0 ? (
+                  <div className="space-y-3">
+                    {userPunchCards.map((card) => (
+                      <div key={card.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{card.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {card.remainingPunches} of {card.totalPunches} visits remaining
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            ${(card.pricePerPunch / 100).toFixed(2)} per visit
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
+                            {card.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-2">No day pass packages yet</p>
+                    <p className="text-xs text-muted-foreground">Purchase packages to see them here</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Payment Methods */}
             <Card>
               <CardHeader>
@@ -526,48 +566,7 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
-            {/* Day Pass Packages - Show when purchased */}
-            {userPunchCards && userPunchCards.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg sm:text-xl font-heading flex items-center">
-                    <Ticket className="h-5 w-5 text-amber-600 mr-2" />
-                    Your Day Pass Packages
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 pt-0">
-                  <div className="space-y-3">
-                    {userPunchCards.map((card) => (
-                      <div key={card.id} className="border-2 border-secondary/30 bg-gradient-to-br from-secondary/20 to-accent/20 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-foreground">{card.name}</h4>
-                          <Badge className={`${card.status === 'active' ? 'bg-success text-success-foreground' : card.status === 'exhausted' ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground'}`}>
-                            {card.status}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">Remaining:</span>
-                          <span className="font-bold text-primary">{card.remainingPunches} visits</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm mt-1">
-                          <span className="text-muted-foreground">Total:</span>
-                          <span className="text-foreground">{card.totalPunches} visits</span>
-                        </div>
-                        {card.status === 'active' && (
-                          <div className="mt-3">
-                            <Link href="/qr-code">
-                              <Button size="sm" className="w-full wellness-button-primary">
-                                Use for Check-in
-                              </Button>
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+
 
             {/* Quick Actions */}
             <Card>

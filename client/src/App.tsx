@@ -13,6 +13,7 @@ import MemberDashboard from "@/pages/member-dashboard";
 import QRCodePage from "@/pages/qr-code-page";
 import MembershipPage from "@/pages/membership-page";
 import PaymentsPage from "@/pages/payments-page";
+import PackagesPage from "@/pages/packages-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminNotifications from "@/pages/admin/notifications";
@@ -33,6 +34,7 @@ function Router() {
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
       <ProtectedRoute path="/membership" component={MembershipPage} />
       <ProtectedRoute path="/payments" component={PaymentsPage} />
+      <ProtectedRoute path="/packages" component={PackagesPage} />
       
       {/* Test payment - accessible to all authenticated users */}
       <ProtectedRoute path="/test-payment" component={TestPayment} />

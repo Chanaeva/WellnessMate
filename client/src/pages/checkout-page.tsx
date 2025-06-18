@@ -188,20 +188,44 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {hasPaymentMethod ? (
-                    <div className="flex items-center gap-3 p-4 border rounded-lg">
-                      <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <CreditCard className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium">
-                          {paymentMethods?.[0]?.cardBrand?.toUpperCase()} •••• {paymentMethods?.[0]?.cardLast4}
+                  {showAddPaymentMethod ? (
+                    <Elements stripe={stripePromise}>
+                      <AddPaymentMethod
+                        onSuccess={() => {
+                          setShowAddPaymentMethod(false);
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                          toast({
+                            title: "Payment Method Added",
+                            description: "You can now complete your purchase.",
+                          });
+                        }}
+                        onCancel={() => setShowAddPaymentMethod(false)}
+                      />
+                    </Elements>
+                  ) : hasPaymentMethod ? (
+                    <div>
+                      <div className="flex items-center gap-3 p-4 border rounded-lg mb-3">
+                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
+                          <CreditCard className="h-5 w-5 text-primary" />
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Expires {paymentMethods?.[0]?.cardExpMonth}/{paymentMethods?.[0]?.cardExpYear}
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            {paymentMethods?.[0]?.cardBrand?.toUpperCase()} •••• {paymentMethods?.[0]?.cardLast4}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Expires {paymentMethods?.[0]?.cardExpMonth}/{paymentMethods?.[0]?.cardExpYear}
+                          </div>
                         </div>
+                        <Check className="h-5 w-5 text-success" />
                       </div>
-                      <Check className="h-5 w-5 text-success" />
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAddPaymentMethod(true)}
+                        className="w-full"
+                      >
+                        Add Another Payment Method
+                      </Button>
                     </div>
                   ) : (
                     <div className="text-center py-6">
@@ -289,29 +313,7 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
 
-              {/* Add Payment Method Form */}
-              {showAddPaymentMethod && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Add Payment Method</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Elements stripe={stripePromise}>
-                      <AddPaymentMethod
-                        onSuccess={() => {
-                          setShowAddPaymentMethod(false);
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                          toast({
-                            title: "Payment Method Added",
-                            description: "You can now complete your purchase.",
-                          });
-                        }}
-                        onCancel={() => setShowAddPaymentMethod(false)}
-                      />
-                    </Elements>
-                  </CardContent>
-                </Card>
-              )}
+
             </div>
           </div>
         </div>

@@ -190,6 +190,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Active members see "Explore More" at bottom, inactive see main CTA prominently
   - Simplified checkout flow with payment method management only in cart/dashboard
 
+- June 18, 2025: Fixed cart payment method flow ✓
+  - Removed inline add payment method form from checkout page
+  - Fixed 404 redirect issue when adding payment methods from checkout
+  - Centralized payment method management in dashboard only
+  - Auto-opens payment form when redirected from checkout with ?add-payment=true parameter
+
 ## Changelog
 
 Changelog:

@@ -84,7 +84,8 @@ export default function CheckoutPage() {
 
   const handleAddPaymentMethod = () => {
     setShowPaymentMethodAlert(false);
-    setLocation("/payments");
+    // Redirect to dashboard where payment methods are managed
+    setLocation("/?add-payment=true");
   };
 
   // Redirect if cart is empty

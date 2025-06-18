@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, ChevronDown, User, Settings, LogOut } from "lucide-react";
+import { CartSidebar } from "@/components/cart/cart-sidebar";
 import logoBlack from "@assets/WM Emblem Black.png";
 import logoTransparent from "@assets/WM Emblem BLK transparent.png";
 
@@ -69,6 +70,7 @@ const Header = () => {
           </div>
           
           <div className="flex items-center space-x-4">
+            {!isAdmin && <CartSidebar />}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 focus:outline-none">

@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CartProvider } from "@/hooks/use-cart";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -14,6 +15,7 @@ import QRCodePage from "@/pages/qr-code-page";
 
 import PaymentsPage from "@/pages/payments-page";
 import PackagesPage from "@/pages/packages-page";
+import CheckoutPage from "@/pages/checkout-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminNotifications from "@/pages/admin/notifications";
@@ -35,6 +37,7 @@ function Router() {
 
       <ProtectedRoute path="/payments" component={PaymentsPage} />
       <ProtectedRoute path="/packages" component={PackagesPage} />
+      <ProtectedRoute path="/checkout" component={CheckoutPage} />
       
       {/* Test payment - accessible to all authenticated users */}
       <ProtectedRoute path="/test-payment" component={TestPayment} />

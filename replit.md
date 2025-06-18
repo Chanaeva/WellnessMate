@@ -143,6 +143,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Only the selected button shows loading state instead of all buttons
   - Improved user experience with precise feedback
 
+- June 18, 2025: Added payment method validation for purchases ✓
+  - Users must have a payment method on file before purchasing
+  - Added validation for both punch card and membership purchases
+  - Redirects users to payments page to add card if none exists
+  - Shows clear error message explaining requirement
+
 ## Changelog
 
 Changelog:

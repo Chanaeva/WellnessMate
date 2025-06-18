@@ -74,6 +74,12 @@ export default function MemberDashboard() {
     queryKey: ["/api/notifications/active"],
   });
 
+  // Fetch payment methods
+  const { data: paymentMethods } = useQuery<any[]>({
+    queryKey: ["/api/payment-methods"],
+    enabled: !!user,
+  });
+
   // Purchase membership mutation
   const purchaseMembershipMutation = useMutation({
     mutationFn: async (plan: MembershipPlan) => {
@@ -114,6 +120,39 @@ export default function MemberDashboard() {
       });
     },
   });
+
+  // Helper function to check if user has a payment method
+  const hasPaymentMethod = paymentMethods && paymentMethods.length > 0;
+
+  // Handle purchase attempts
+  const handlePurchaseAttempt = (punchCardData: any) => {
+    if (!hasPaymentMethod) {
+      toast({
+        title: "Payment Method Required",
+        description: "Please add a payment method before making a purchase.",
+        variant: "destructive",
+      });
+      // Redirect to payments page to add card
+      window.location.href = '/payments';
+      return;
+    }
+    purchasePunchCardMutation.mutate(punchCardData);
+  };
+
+  // Handle membership purchase attempts
+  const handleMembershipPurchaseAttempt = (plan: MembershipPlan) => {
+    if (!hasPaymentMethod) {
+      toast({
+        title: "Payment Method Required",
+        description: "Please add a payment method before making a purchase.",
+        variant: "destructive",
+      });
+      // Redirect to payments page to add card
+      window.location.href = '/payments';
+      return;
+    }
+    purchaseMembershipMutation.mutate(plan);
+  };
 
   // Purchase punch card mutation
   const purchasePunchCardMutation = useMutation({
@@ -306,7 +345,7 @@ export default function MemberDashboard() {
                               <Button
                                 className="w-full wellness-button-primary text-sm"
                                 disabled={purchaseMembershipMutation.isPending}
-                                onClick={() => purchaseMembershipMutation.mutate(plan)}
+                                onClick={() => handleMembershipPurchaseAttempt(plan)}
                               >
                                 {purchaseMembershipMutation.isPending ? (
                                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -359,7 +398,7 @@ export default function MemberDashboard() {
                             <Button
                               className="w-full wellness-button-primary text-sm"
                               disabled={purchasingPunchCardId === option.name}
-                              onClick={() => purchasePunchCardMutation.mutate(option)}
+                              onClick={() => handlePurchaseAttempt(option)}
                             >
                               {purchasingPunchCardId === option.name ? (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

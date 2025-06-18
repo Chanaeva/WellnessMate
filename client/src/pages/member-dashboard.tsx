@@ -307,26 +307,28 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
-            {/* Plans and Packages Link */}
-            <Card className="wellness-card">
-              <CardHeader className="text-center">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center justify-center">
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  Membership Plans & Packages
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center space-y-4">
-                <p className="text-muted-foreground">
-                  Explore our monthly memberships and day pass packages designed for your wellness journey.
-                </p>
-                <Link href="/packages">
-                  <Button className="wellness-button-primary px-8 py-3 text-lg">
-                    View Plans & Packages
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+            {/* Plans and Packages Link - Show if no active membership */}
+            {(!membership || membership.status !== 'active') && (
+              <Card className="wellness-card">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center justify-center">
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Membership Plans & Packages
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-center space-y-4">
+                  <p className="text-muted-foreground">
+                    Explore our monthly memberships and day pass packages designed for your wellness journey.
+                  </p>
+                  <Link href="/packages">
+                    <Button className="wellness-button-primary px-8 py-3 text-lg">
+                      View Plans & Packages
+                      <ArrowRight className="h-5 w-5 ml-2" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Facilities */}
             <Card className="wellness-card">
@@ -568,49 +570,47 @@ export default function MemberDashboard() {
 
 
 
-            {/* Quick Actions */}
+            {/* External Links Section */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg sm:text-xl font-heading mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                  <Link href="/qr-code">
-                    <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-muted hover:bg-muted/80 py-6">
-                      <QrCode className="h-6 w-6 text-primary mb-2" />
-                      <span className="text-sm text-center">View Code</span>
-                    </Button>
-                  </Link>
-                  <Link href="/payments">
-                    <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-muted hover:bg-muted/80 py-6">
-                      <CreditCard className="h-6 w-6 text-primary mb-2" />
-                      <span className="text-sm text-center">Payments</span>
-                    </Button>
-                  </Link>
-                  <Link href="/membership">
-                    <Button variant="outline" className="w-full h-full flex flex-col items-center justify-center bg-muted hover:bg-muted/80 py-6">
-                      <Users className="h-6 w-6 text-primary mb-2" />
-                      <span className="text-sm text-center">Membership</span>
-                    </Button>
-                  </Link>
-                </div>
-                
-                {/* External Links Section */}
-                <div className="border-t border-border pt-4">
-                  <a 
-                    href="https://www.wolfmothertulsa.com/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block"
-                  >
-                    <Button variant="outline" className="w-full flex items-center justify-center bg-primary/5 hover:bg-primary/10 py-3 border-primary/20">
-                      <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
-                      </svg>
-                      <span className="text-sm text-primary font-medium">Visit Our Website</span>
-                    </Button>
-                  </a>
-                </div>
+                <a 
+                  href="https://www.wolfmothertulsa.com/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <Button variant="outline" className="w-full flex items-center justify-center bg-primary/5 hover:bg-primary/10 py-3 border-primary/20">
+                    <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                    </svg>
+                    <span className="text-sm text-primary font-medium">Visit Our Website</span>
+                  </Button>
+                </a>
               </CardContent>
             </Card>
+
+            {/* Conditional Plans & Packages for Active Members */}
+            {membership && membership.status === 'active' && (
+              <Card className="wellness-card">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center justify-center">
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Explore More Plans & Packages
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-center space-y-4">
+                  <p className="text-muted-foreground">
+                    Discover additional wellness packages to enhance your journey.
+                  </p>
+                  <Link href="/packages">
+                    <Button className="wellness-button-primary px-8 py-3 text-lg">
+                      View Plans & Packages
+                      <ArrowRight className="h-5 w-5 ml-2" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Notifications */}
             <Card>

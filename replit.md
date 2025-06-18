@@ -184,6 +184,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Updated navigation to remove payments link
   - All payment features now accessible from main dashboard
 
+- June 18, 2025: Streamlined dashboard layout for better UX ✓
+  - Removed Quick Actions card to reduce clutter
+  - Made plans & packages button conditional based on membership status
+  - Active members see "Explore More" at bottom, inactive see main CTA prominently
+  - Simplified checkout flow with payment method management only in cart/dashboard
+
 ## Changelog
 
 Changelog:

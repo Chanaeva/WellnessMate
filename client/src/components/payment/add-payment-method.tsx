@@ -10,11 +10,23 @@ import { CreditCard, Loader2 } from "lucide-react";
 const cardElementOptions = {
   style: {
     base: {
-      fontSize: '16px',
-      color: '#fff',
+      fontSize: '18px', // Larger font for better mobile readability
+      color: '#1f2937',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      lineHeight: '1.5',
       '::placeholder': {
-        color: '#aab7c4',
+        color: '#6b7280',
       },
+      iconColor: '#374151',
+      padding: '12px 0', // Add padding for better touch targets
+    },
+    invalid: {
+      color: '#ef4444',
+      iconColor: '#ef4444',
+    },
+    complete: {
+      color: '#059669',
+      iconColor: '#059669',
     },
   },
 };
@@ -106,34 +118,38 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
   };
 
   return (
-    <Card className="bg-slate-800/50 border-slate-700">
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl text-white flex items-center justify-center gap-2">
-          <CreditCard className="h-5 w-5" />
+    <Card className="bg-white border-gray-200 shadow-lg">
+      <CardHeader className="text-center pb-4">
+        <CardTitle className="text-xl text-gray-900 flex items-center justify-center gap-2">
+          <CreditCard className="h-5 w-5 text-primary" />
           {isUpdating ? "Update Payment Method" : "Add New Payment Method"}
         </CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-gray-600 text-base">
           {isUpdating ? "Replace your current payment method" : "Add a credit or debit card for secure payments"}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white">Card Details</label>
-            <div className="p-3 bg-slate-700/50 border border-slate-600 rounded-md">
+          <div className="space-y-3">
+            <label className="text-base font-medium text-gray-900 block">Card Details</label>
+            <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
               <CardElement options={cardElementOptions} />
             </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Your card information is securely processed by Stripe and never stored on our servers.
+            </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
+              className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-white py-3 text-base font-medium"
               disabled={!stripe || isProcessing}
+              size="lg"
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   {isUpdating ? "Updating..." : "Adding Card..."}
                 </>
               ) : (
@@ -147,7 +163,8 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
                 variant="outline"
                 onClick={onCancel}
                 disabled={isProcessing}
-                className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                className="w-full sm:w-auto border-gray-300 text-gray-700 hover:bg-gray-50 py-3 text-base font-medium"
+                size="lg"
               >
                 Cancel
               </Button>

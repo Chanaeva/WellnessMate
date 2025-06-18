@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight } from "lucide-react";
+import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart } from "lucide-react";
 import { Link } from "wouter";
+import { useCart } from "@/hooks/use-cart";
+import { useToast } from "@/hooks/use-toast";
 
 const planIcons = {
   basic: Star,
@@ -24,6 +26,9 @@ const planGradients = {
 };
 
 export default function PackagesPage() {
+  const { addItem } = useCart();
+  const { toast } = useToast();
+
   // Fetch membership plans
   const { data: membershipPlans, isLoading: isPlansLoading } = useQuery<MembershipPlan[]>({
     queryKey: ["/api/membership-plans"],
@@ -39,6 +44,36 @@ export default function PackagesPage() {
       style: 'currency',
       currency: 'USD',
     }).format(price / 100);
+  };
+
+  const handleAddMembershipToCart = (plan: MembershipPlan) => {
+    addItem({
+      id: `membership-${plan.id}`,
+      type: 'membership',
+      name: plan.name,
+      price: plan.monthlyPrice,
+      description: plan.description,
+      data: plan
+    });
+    toast({
+      title: "Added to Cart",
+      description: `${plan.name} has been added to your cart.`,
+    });
+  };
+
+  const handleAddPunchCardToCart = (option: any) => {
+    addItem({
+      id: `punch-card-${option.name.replace(/\s+/g, '-').toLowerCase()}`,
+      type: 'punch_card',
+      name: option.name,
+      price: option.totalPrice,
+      description: `${option.totalPunches} day passes`,
+      data: option
+    });
+    toast({
+      title: "Added to Cart",
+      description: `${option.name} has been added to your cart.`,
+    });
   };
 
   if (isPlansLoading || isPunchCardsLoading) {
@@ -170,12 +205,13 @@ export default function PackagesPage() {
                     </CardContent>
                     
                     <CardFooter className="pt-0">
-                      <Link href="/member-dashboard" className="w-full">
-                        <Button className="w-full wellness-button-primary">
-                          Choose Plan
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                      </Link>
+                      <Button 
+                        className="w-full wellness-button-primary"
+                        onClick={() => handleAddMembershipToCart(plan)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
+                      </Button>
                     </CardFooter>
                   </Card>
                 );
@@ -250,12 +286,13 @@ export default function PackagesPage() {
                   </CardContent>
                   
                   <CardFooter className="pt-0">
-                    <Link href="/member-dashboard" className="w-full">
-                      <Button className="w-full wellness-button-primary">
-                        Purchase Package
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </Link>
+                    <Button 
+                      className="w-full wellness-button-primary"
+                      onClick={() => handleAddPunchCardToCart(option)}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Add to Cart
+                    </Button>
                   </CardFooter>
                 </Card>
               ))}

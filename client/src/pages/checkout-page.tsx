@@ -95,7 +95,17 @@ export default function CheckoutPage() {
   }, [items, setLocation]);
 
   if (items.length === 0) {
-    return null; // Will redirect
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <Header />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-muted-foreground">Redirecting to packages...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   return (

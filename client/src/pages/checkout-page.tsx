@@ -202,7 +202,7 @@ export default function CheckoutPage() {
                       <p className="text-muted-foreground mb-4">No payment method on file</p>
                       <Button 
                         variant="outline"
-                        onClick={() => setShowAddPaymentMethod(true)}
+                        onClick={() => setShowPaymentMethodAlert(true)}
                       >
                         Add Payment Method
                       </Button>
@@ -211,22 +211,7 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
 
-              {/* Add Payment Method Form */}
-              {showAddPaymentMethod && (
-                <Elements stripe={stripePromise}>
-                  <AddPaymentMethod
-                    onSuccess={() => {
-                      setShowAddPaymentMethod(false);
-                      queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                      toast({
-                        title: "Payment Method Added",
-                        description: "You can now complete your purchase.",
-                      });
-                    }}
-                    onCancel={() => setShowAddPaymentMethod(false)}
-                  />
-                </Elements>
-              )}
+
             </div>
 
             {/* Order Total & Checkout */}

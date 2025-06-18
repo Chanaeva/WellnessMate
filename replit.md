@@ -196,6 +196,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Payment methods can only be added/managed on checkout page
   - Streamlined single location for payment handling
 
+- June 18, 2025: Added payment methods display to dashboard ✓
+  - Members can now view their saved payment methods in dashboard
+  - Read-only display showing card details and default status
+  - Payment method addition still only available at checkout
+  - Provides confirmation to users that their cards are saved
+
 ## Changelog
 
 Changelog:

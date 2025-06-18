@@ -14,6 +14,12 @@ import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ShoppingCart, CreditCard, Shield, ArrowLeft, Check } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { AddPaymentMethod } from "@/components/payment/add-payment-method";
+
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
 
 export default function CheckoutPage() {
   const { user } = useAuth();
@@ -21,6 +27,7 @@ export default function CheckoutPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
+  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Fetch payment methods
@@ -84,8 +91,7 @@ export default function CheckoutPage() {
 
   const handleAddPaymentMethod = () => {
     setShowPaymentMethodAlert(false);
-    // Redirect to dashboard where payment methods are managed
-    setLocation("/?add-payment=true");
+    setShowAddPaymentMethod(true);
   };
 
   // Redirect if cart is empty
@@ -203,7 +209,7 @@ export default function CheckoutPage() {
                       <p className="text-muted-foreground mb-4">No payment method on file</p>
                       <Button 
                         variant="outline"
-                        onClick={() => setShowPaymentMethodAlert(true)}
+                        onClick={() => setShowAddPaymentMethod(true)}
                       >
                         Add Payment Method
                       </Button>
@@ -282,6 +288,30 @@ export default function CheckoutPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Add Payment Method Form */}
+              {showAddPaymentMethod && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Add Payment Method</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Elements stripe={stripePromise}>
+                      <AddPaymentMethod
+                        onSuccess={() => {
+                          setShowAddPaymentMethod(false);
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                          toast({
+                            title: "Payment Method Added",
+                            description: "You can now complete your purchase.",
+                          });
+                        }}
+                        onCancel={() => setShowAddPaymentMethod(false)}
+                      />
+                    </Elements>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>

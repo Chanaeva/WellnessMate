@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Membership, CheckIn, MembershipPlan, PunchCard, Notification } from "@shared/schema";
+import { Membership, CheckIn, MembershipPlan, PunchCard, Notification, PaymentMethod, Payment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
@@ -33,7 +33,11 @@ import {
   Star,
   Zap,
   Check,
-  Loader2
+  Loader2,
+  Plus,
+  Trash2,
+  Shield,
+  DollarSign
 } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";

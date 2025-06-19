@@ -209,6 +209,9 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Created success page for post-payment confirmation
   - Simplified cart checkout to redirect to Stripe's secure payment page
   - Automatic fulfillment of memberships and punch cards via webhooks
+  - Fixed 500 error by reordering authentication routes before checkout endpoint
+  - Fixed 404 error by adding missing success page route
+  - Removed "Ready to Start Your Wellness Journey?" section from packages page
 
 ## Changelog
 

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { MembershipPlan } from "@shared/schema";
 
 export interface CartItem {
@@ -23,8 +23,43 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+const CART_STORAGE_KEY = 'wolf-mother-cart';
+
+function loadCartFromStorage(): CartItem[] {
+  try {
+    const stored = localStorage.getItem(CART_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load cart from storage:', error);
+    return [];
+  }
+}
+
+function saveCartToStorage(items: CartItem[]) {
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  } catch (error) {
+    console.error('Failed to save cart to storage:', error);
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    const storedItems = loadCartFromStorage();
+    setItems(storedItems);
+    setIsInitialized(true);
+  }, []);
+
+  // Save cart to localStorage whenever items change (but not on initial load)
+  useEffect(() => {
+    if (isInitialized) {
+      saveCartToStorage(items);
+    }
+  }, [items, isInitialized]);
 
   const addItem = (newItem: CartItem) => {
     setItems(prevItems => {

@@ -6,16 +6,23 @@ import { CheckCircle, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import { useCart } from "@/hooks/use-cart";
 
 export default function SuccessPage() {
   const [location] = useLocation();
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const { clearCart } = useCart();
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const id = urlParams.get('session_id');
     setSessionId(id);
-  }, [location]);
+    
+    // Clear cart on successful payment
+    if (id) {
+      clearCart();
+    }
+  }, [location, clearCart]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

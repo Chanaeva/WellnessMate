@@ -1,10 +1,13 @@
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useCart } from "@/hooks/use-cart";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
-import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface CartSidebarProps {
   trigger?: React.ReactNode;
@@ -12,6 +15,44 @@ interface CartSidebarProps {
 
 export function CartSidebar({ trigger }: CartSidebarProps) {
   const { items, removeItem, updateQuantity, getTotalPrice, getItemCount, clearCart } = useCart();
+  const { toast } = useToast();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  const checkoutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/create-checkout-session", {
+        items: items
+      });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      // Clear cart and redirect to Stripe Checkout
+      clearCart();
+      window.location.href = data.url;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Checkout Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsCheckingOut(false);
+    },
+  });
+
+  const handleCheckout = () => {
+    if (items.length === 0) {
+      toast({
+        title: "Cart Empty",
+        description: "Please add items to your cart before checking out.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsCheckingOut(true);
+    checkoutMutation.mutate();
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -131,11 +172,20 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Link href="/checkout">
-                    <Button className="w-full wellness-button-primary">
-                      Proceed to Checkout
-                    </Button>
-                  </Link>
+                  <Button 
+                    className="w-full wellness-button-primary"
+                    onClick={handleCheckout}
+                    disabled={isCheckingOut}
+                  >
+                    {isCheckingOut ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      "Proceed to Checkout"
+                    )}
+                  </Button>
                   <Button 
                     variant="outline" 
                     className="w-full" 

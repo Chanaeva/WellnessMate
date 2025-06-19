@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
@@ -26,6 +27,129 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Create Stripe Checkout Session
+  app.post("/api/create-checkout-session", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+
+    try {
+      const { items } = req.body;
+      
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "Items are required" });
+      }
+
+      // Convert cart items to Stripe line items
+      const lineItems = items.map((item: any) => ({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: item.name,
+            description: item.description || '',
+          },
+          unit_amount: item.price, // Price in cents
+          ...(item.type === 'membership' && {
+            recurring: {
+              interval: 'month',
+            },
+          }),
+        },
+        quantity: item.quantity || 1,
+      }));
+
+      const session = await stripe.checkout.sessions.create({
+        line_items: lineItems,
+        mode: items.some((item: any) => item.type === 'membership') ? 'subscription' : 'payment',
+        success_url: `${req.headers.origin}/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.origin}/packages`,
+        customer_email: req.user.email,
+        metadata: {
+          userId: req.user.id.toString(),
+          cartItems: JSON.stringify(items),
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Stripe webhook handler
+  app.post("/api/stripe/webhook", express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    } catch (err: any) {
+      console.log(`Webhook signature verification failed.`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed':
+        const session = event.data.object;
+        await handleCheckoutSessionCompleted(session);
+        break;
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({ received: true });
+  });
+
+  async function handleCheckoutSessionCompleted(session: any) {
+    try {
+      const userId = parseInt(session.metadata.userId);
+      const cartItems = JSON.parse(session.metadata.cartItems);
+      
+      // Process each item in the cart
+      for (const item of cartItems) {
+        if (item.type === 'membership') {
+          // Create or update membership
+          await storage.createMembership({
+            userId,
+            membershipId: `WM-${Date.now()}`,
+            planType: item.planType,
+            status: 'active',
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+            autoRenew: true,
+          });
+        } else if (item.type === 'punch_card') {
+          // Create punch card
+          await storage.createPunchCard({
+            userId,
+            name: item.name,
+            totalPunches: item.totalPunches,
+            remainingPunches: item.totalPunches,
+            pricePerPunch: Math.round(item.price / item.totalPunches),
+            status: 'active',
+          });
+        }
+      }
+
+      // Record payment
+      await storage.createPayment({
+        userId,
+        amount: session.amount_total,
+        currency: session.currency,
+        status: 'successful',
+        stripePaymentIntentId: session.payment_intent,
+        description: `Purchase via Stripe Checkout`,
+        transactionDate: new Date(),
+      });
+
+    } catch (error) {
+      console.error('Error handling checkout session completed:', error);
+    }
+  }
+
   // Setup authentication routes (/api/register, /api/login, /api/logout, /api/user)
   setupAuth(app);
 

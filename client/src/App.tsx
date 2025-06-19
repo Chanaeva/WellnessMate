@@ -16,6 +16,7 @@ import QRCodePage from "@/pages/qr-code-page";
 
 import PackagesPage from "@/pages/packages-page";
 import CheckoutPage from "@/pages/checkout-page";
+import SuccessPage from "@/pages/success-page";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminNotifications from "@/pages/admin/notifications";

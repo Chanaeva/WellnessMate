@@ -39,6 +39,7 @@ function Router() {
 
       <ProtectedRoute path="/packages" component={PackagesPage} />
       <ProtectedRoute path="/checkout" component={CheckoutPage} />
+      <ProtectedRoute path="/success" component={SuccessPage} />
       
       {/* Test payment - accessible to all authenticated users */}
       <ProtectedRoute path="/test-payment" component={TestPayment} />

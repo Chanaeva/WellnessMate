@@ -340,34 +340,7 @@ export default function PackagesPage() {
           </div>
         </div>
 
-        {/* CTA Section */}
-        <div className="mt-16 text-center">
-          <Card className="wellness-card bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
-            <CardContent className="p-8">
-              <h2 className="text-2xl font-heading text-foreground mb-4">Ready to Start Your Wellness Journey?</h2>
-              <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-                Join Wolf Mother Wellness today and discover the transformative power of thermal therapy. Choose your plan and start experiencing the benefits of regular sauna and cold plunge sessions.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/member-dashboard">
-                  <Button size="lg" className="wellness-button-primary">
-                    Get Started Today
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </Button>
-                </Link>
-                <a 
-                  href="https://www.wolfmothertulsa.com/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                >
-                  <Button size="lg" variant="outline">
-                    Learn More About Our Facility
-                  </Button>
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
       </main>
       
       <Footer />

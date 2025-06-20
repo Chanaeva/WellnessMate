@@ -261,6 +261,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update member details (Admin only)
+  app.put("/api/admin/members/:id", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const { password, ...updateData } = req.body;
+      
+      // If password is provided, hash it
+      if (password && password.trim()) {
+        const salt = randomBytes(32);
+        const hashedPassword = await scryptAsync(password, salt, 64) as Buffer;
+        updateData.password = `${salt.toString('hex')}:${hashedPassword.toString('hex')}`;
+      }
+      
+      const updatedUser = await storage.updateUser(memberId, updateData);
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Toggle member active status (Admin only)
+  app.patch("/api/admin/members/:id/status", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const { isActive } = req.body;
+      
+      const updatedUser = await storage.updateUser(memberId, { isActive });
+      res.json(updatedUser);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete member (Admin only)
+  app.delete("/api/admin/members/:id", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      await storage.deleteUser(memberId);
+      res.json({ message: "Member deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all check-ins (with pagination)
   app.get("/api/admin/check-ins", isAdmin, async (req, res) => {
     try {

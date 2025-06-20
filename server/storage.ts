@@ -28,7 +28,9 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(userId: number, data: Partial<User>): Promise<User>;
   updateUserPassword(userId: number, newPassword: string): Promise<User>;
+  deleteUser(userId: number): Promise<void>;
 
   // Password reset methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;

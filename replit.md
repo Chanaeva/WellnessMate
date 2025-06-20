@@ -258,6 +258,16 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Integrated admin navigation links in header for easy access to plan management
   - Enhanced admin dashboard with membership plan overview cards and statistics
 
+- June 21, 2025: Enhanced admin member management with full CRUD for inactive members ✓
+  - Added comprehensive member editing functionality with role management
+  - Implemented member status toggle (activate/deactivate) with visual indicators
+  - Created status filtering to view active, inactive, or all members
+  - Added secure member deletion with cascade handling for related data
+  - Enhanced member form with phone number and role selection fields
+  - Improved member table with status badges and action buttons
+  - Added backend API endpoints for member updates, status changes, and deletion
+  - Password updates optional for existing members with secure handling
+
 ## Changelog
 
 Changelog:

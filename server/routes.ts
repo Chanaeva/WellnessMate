@@ -110,6 +110,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== ADMIN MEMBERSHIP PLANS CRUD =====
+
+  // Get all membership plans (Admin only - includes inactive plans)
+  app.get("/api/admin/membership-plans", isAdmin, async (req, res) => {
+    try {
+      const plans = await storage.getAllMembershipPlans();
+      res.json(plans);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create membership plan (Admin only)
+  app.post("/api/admin/membership-plans", isAdmin, async (req, res) => {
+    try {
+      const validatedData = insertMembershipPlanSchema.parse(req.body);
+      const plan = await storage.createOrUpdateMembershipPlan(validatedData);
+      res.status(201).json(plan);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Update membership plan (Admin only)
+  app.put("/api/admin/membership-plans/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertMembershipPlanSchema.partial().parse(req.body);
+      const plan = await storage.updateMembershipPlan(id, validatedData);
+      res.json(plan);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Delete membership plan (Admin only)
+  app.delete("/api/admin/membership-plans/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMembershipPlan(id);
+      res.json({ message: "Membership plan deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create or update membership plan (admin-only endpoint)
   app.post("/api/admin/membership-plans", isAdmin, async (req, res) => {
     console.log('POST /api/admin/membership-plans hit with body:', req.body);

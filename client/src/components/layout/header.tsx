@@ -70,8 +70,9 @@ const Header = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Desktop: Show cart and user dropdown side by side */}
+            {/* Desktop: Show audio, cart and user dropdown side by side */}
             <div className="hidden md:flex items-center space-x-4">
+              <AudioControls />
               {!isAdmin && <CartSidebar />}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

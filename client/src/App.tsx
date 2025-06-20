@@ -61,12 +61,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <CartProvider>
-          <AuthProvider>
-            <Router />
-            <Toaster />
-          </AuthProvider>
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <AudioProvider>
+              <Router />
+              <Toaster />
+            </AudioProvider>
+          </CartProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

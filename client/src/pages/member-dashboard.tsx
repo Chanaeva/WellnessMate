@@ -565,6 +565,8 @@ export default function MemberDashboard() {
               planName={currentPlan?.name || "Basic Membership"}
               memberSince="Jan 2023"
               currentPlan={currentPlan}
+              userPunchCards={userPunchCards}
+              payments={payments}
               isLoading={isMembershipLoading}
             />
 

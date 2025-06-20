@@ -1,4 +1,4 @@
-import { User, Membership, MembershipPlan } from "@shared/schema";
+import { User, Membership, MembershipPlan, PunchCard, Payment } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Crown, Calendar, CreditCard } from "lucide-react";
@@ -11,6 +11,8 @@ interface MemberCardProps {
   planName: string;
   memberSince: string;
   currentPlan?: MembershipPlan;
+  userPunchCards?: PunchCard[];
+  payments?: Payment[];
 }
 
 const MemberCard = ({
@@ -20,10 +22,15 @@ const MemberCard = ({
   planName,
   memberSince,
   currentPlan,
+  userPunchCards = [],
+  payments = [],
   isLoading = false
 }: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
   const membershipPrice = currentPlan?.monthlyPrice ? (currentPlan.monthlyPrice / 100).toFixed(0) : '65';
+  
+  // Check if user has any purchased items
+  const hasPurchasedItems = userPunchCards.length > 0 || payments.length > 0;
   
   if (isLoading) {
     return (
@@ -47,7 +54,12 @@ const MemberCard = ({
             <Crown className="h-8 w-8 text-muted-foreground" />
           </div>
           <CardTitle className="text-xl">Wolf Mother Member</CardTitle>
-          <p className="text-muted-foreground">Purchase a monthly package or day passes to access thermal wellness facilities.</p>
+          {!hasPurchasedItems && (
+            <p className="text-muted-foreground">Purchase a monthly package or day passes to access thermal wellness facilities.</p>
+          )}
+          {hasPurchasedItems && (
+            <p className="text-muted-foreground">Welcome back! Your day passes are ready to use.</p>
+          )}
         </CardHeader>
       </Card>
     );

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePageAmbient, useAudioEffects } from "@/hooks/use-audio-effects";
 import { useLocation, Link } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -48,10 +49,14 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
+  const { playLoginSuccess, playError } = useAudioEffects();
   const [location, navigate] = useLocation();
   const isAdminLogin = location === "/admin-login";
   const [activeTab, setActiveTab] = useState<string>("login");
   const [showSMSReset, setShowSMSReset] = useState(false);
+
+  // Set ambient sound for auth page
+  usePageAmbient('auth');
 
   // Redirect if already logged in
   useEffect(() => {
@@ -95,13 +100,27 @@ function AuthPage() {
   });
 
   const onLoginSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate(data);
+    loginMutation.mutate(data, {
+      onSuccess: () => {
+        playLoginSuccess();
+      },
+      onError: () => {
+        playError();
+      }
+    });
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
     // Remove confirmPassword before submitting
     const { confirmPassword, ...registerData } = data;
-    registerMutation.mutate(registerData);
+    registerMutation.mutate(registerData, {
+      onSuccess: () => {
+        playLoginSuccess();
+      },
+      onError: () => {
+        playError();
+      }
+    });
   };
 
   // Show SMS reset form if requested
@@ -181,7 +200,7 @@ function AuthPage() {
                               <div className="relative">
                                 <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  placeholder="johndoe"
+                                  placeholder="wolf_foundling"
                                   className="pl-10"
                                   {...field}
                                 />
@@ -352,7 +371,7 @@ function AuthPage() {
                               <div className="relative">
                                 <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  placeholder="johndoe"
+                                  placeholder="remus_warrior"
                                   className="pl-10"
                                   {...field}
                                 />

@@ -13,16 +13,21 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
+  phoneNumber: text("phone_number"),
   role: roleEnum("role").notNull().default('member'),
   stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Reset method enum
+export const resetMethodEnum = pgEnum('reset_method', ['email', 'sms']);
 
 // Password reset tokens table
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   token: text("token").notNull().unique(),
+  method: resetMethodEnum("method").notNull().default('email'),
   expiresAt: timestamp("expires_at").notNull(),
   used: boolean("used").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),

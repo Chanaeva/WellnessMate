@@ -993,6 +993,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SMS Password Reset - Request code
+  app.post("/api/auth/reset-password/sms/request", async (req, res) => {
+    try {
+      const { phoneNumber } = req.body;
+      
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      // Find user by phone number
+      const user = await storage.getUserByPhoneNumber(phoneNumber);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with this phone number" });
+      }
+
+      // Generate reset code
+      const resetCode = generateResetCode();
+      
+      // Create reset token in database
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        token: resetCode,
+        method: 'sms',
+        expiresAt,
+        used: false
+      });
+
+      // Send SMS
+      const message = `Your Wolf Mother Wellness password reset code is: ${resetCode}. This code expires in 15 minutes.`;
+      await sendSMS(phoneNumber, message);
+
+      res.json({ message: "Reset code sent successfully" });
+    } catch (error: any) {
+      console.error("SMS reset request error:", error);
+      res.status(500).json({ message: "Failed to send reset code" });
+    }
+  });
+
+  // SMS Password Reset - Verify code and reset password
+  app.post("/api/auth/reset-password/sms/verify", async (req, res) => {
+    try {
+      const { phoneNumber, code, newPassword } = req.body;
+      
+      if (!phoneNumber || !code || !newPassword) {
+        return res.status(400).json({ message: "Phone number, code, and new password are required" });
+      }
+
+      // Find user by phone number
+      const user = await storage.getUserByPhoneNumber(phoneNumber);
+      if (!user) {
+        return res.status(404).json({ message: "No account found with this phone number" });
+      }
+
+      // Verify reset token
+      const resetToken = await storage.getPasswordResetToken(code);
+      if (!resetToken || resetToken.userId !== user.id || resetToken.used || resetToken.method !== 'sms') {
+        return res.status(400).json({ message: "Invalid or expired reset code" });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ message: "Reset code has expired" });
+      }
+
+      // Update password
+      await storage.updateUserPassword(user.id, newPassword);
+      
+      // Mark token as used
+      await storage.markTokenAsUsed(resetToken.id);
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error: any) {
+      console.error("SMS reset verification error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

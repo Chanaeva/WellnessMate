@@ -35,6 +35,7 @@ export interface IStorage {
   getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markTokenAsUsed(tokenId: number): Promise<void>;
   cleanupExpiredTokens(): Promise<void>;
+  getUserByPhoneNumber(phoneNumber: string): Promise<User | undefined>;
   
   // Membership methods
   getMembershipByUserId(userId: number): Promise<Membership | undefined>;

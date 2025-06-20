@@ -48,6 +48,18 @@ export default function CheckoutPage() {
   // Process checkout mutation
   const checkoutMutation = useMutation({
     mutationFn: async () => {
+      // Check if user is trying to purchase a membership when they already have one
+      const membershipItems = items.filter(item => item.type === 'membership');
+      if (membershipItems.length > 0) {
+        const membershipRes = await apiRequest("GET", "/api/membership");
+        if (membershipRes.ok) {
+          const currentMembership = await membershipRes.json();
+          if (currentMembership && currentMembership.status === 'active') {
+            throw new Error("You already have an active membership. Only one membership can be active at a time.");
+          }
+        }
+      }
+
       const cartData = {
         items: items.map(item => ({
           id: item.id,

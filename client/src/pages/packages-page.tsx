@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MembershipPlan, PunchCardTemplate } from "@shared/schema";
+import { MembershipPlan, PunchCardTemplate, Membership } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart, Shield, Flame, Waves } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart, Shield, Flame, Waves, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/hooks/use-toast";
@@ -56,6 +59,8 @@ const planThemes = {
 export default function PackagesPage() {
   const { addItem } = useCart();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [showMembershipAlert, setShowMembershipAlert] = useState(false);
 
   // Fetch membership plans
   const { data: membershipPlans, isLoading: isPlansLoading } = useQuery<MembershipPlan[]>({
@@ -67,6 +72,12 @@ export default function PackagesPage() {
     queryKey: ["/api/punch-cards/options"],
   });
 
+  // Fetch current membership status
+  const { data: currentMembership } = useQuery<Membership>({
+    queryKey: ["/api/membership"],
+    enabled: !!user,
+  });
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -75,6 +86,12 @@ export default function PackagesPage() {
   };
 
   const handleAddMembershipToCart = (plan: MembershipPlan) => {
+    // Check if user already has an active membership
+    if (currentMembership && currentMembership.status === 'active') {
+      setShowMembershipAlert(true);
+      return;
+    }
+
     addItem({
       id: `membership-${plan.id}`,
       type: 'membership',
@@ -248,9 +265,10 @@ export default function PackagesPage() {
                       <Button 
                         className="w-full wellness-button-primary"
                         onClick={() => handleAddMembershipToCart(plan)}
+                        disabled={currentMembership && currentMembership.status === 'active'}
                       >
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        Begin Journey
+                        {currentMembership && currentMembership.status === 'active' ? 'Active Member' : 'Begin Journey'}
                       </Button>
                     </CardFooter>
                   </Card>
@@ -394,6 +412,29 @@ export default function PackagesPage() {
       </main>
       
       <Footer />
+
+      {/* Membership Restriction Alert */}
+      <AlertDialog open={showMembershipAlert} onOpenChange={setShowMembershipAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="bg-amber-100 p-2 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <AlertDialogTitle>Active Membership Detected</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2">
+              You already have an active membership. Only one membership package can be active at a time. 
+              To change your membership plan, please contact our support team or wait for your current membership to expire.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowMembershipAlert(false)}>
+              Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

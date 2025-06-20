@@ -240,6 +240,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Added audio controls to header for easy access
   - Simple implementation focusing on atmosphere without complexity
 
+- June 21, 2025: Enhanced membership purchase restrictions and upgrade functionality ✓
+  - Implemented one membership per user restriction preventing duplicate active memberships
+  - Added membership upgrade capability allowing users to change between plans
+  - Disabled purchase buttons for current membership plan while enabling upgrades to different plans
+  - Updated checkout logic to handle membership upgrades by updating existing memberships instead of creating duplicates
+  - Enhanced user feedback with upgrade-specific messaging and validation
+  - Added backend validation to prevent purchasing same membership plan twice
+  - Improved member dashboard to dynamically reflect membership changes with real-time updates
+
 ## Changelog
 
 Changelog:

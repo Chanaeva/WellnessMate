@@ -86,11 +86,14 @@ export default function PackagesPage() {
   };
 
   const handleAddMembershipToCart = (plan: MembershipPlan) => {
-    // Check if user already has an active membership
-    if (currentMembership && currentMembership.status === 'active') {
+    // Check if user is selecting the same plan they already have
+    if (currentMembership && currentMembership.status === 'active' && currentMembership.planType === plan.planType) {
       setShowMembershipAlert(true);
       return;
     }
+
+    // For upgrades, allow the purchase and show upgrade messaging
+    const isUpgrade = currentMembership && currentMembership.status === 'active';
 
     addItem({
       id: `membership-${plan.id}`,
@@ -98,11 +101,14 @@ export default function PackagesPage() {
       name: plan.name,
       price: plan.monthlyPrice,
       description: plan.description,
-      data: plan
+      data: { ...plan, isUpgrade }
     });
+    
     toast({
-      title: "Added to Cart",
-      description: `${plan.name} has been added to your cart.`,
+      title: isUpgrade ? "Upgrade Added to Cart" : "Added to Cart",
+      description: isUpgrade 
+        ? `${plan.name} upgrade will replace your current membership.`
+        : `${plan.name} has been added to your cart.`,
     });
   };
 
@@ -265,10 +271,12 @@ export default function PackagesPage() {
                       <Button 
                         className="w-full wellness-button-primary"
                         onClick={() => handleAddMembershipToCart(plan)}
-                        disabled={currentMembership && currentMembership.status === 'active'}
+                        disabled={currentMembership && currentMembership.status === 'active' && currentMembership.planType === plan.planType}
                       >
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        {currentMembership && currentMembership.status === 'active' ? 'Active Member' : 'Begin Journey'}
+                        {currentMembership && currentMembership.status === 'active' 
+                          ? (currentMembership.planType === plan.planType ? 'Current Plan' : 'Upgrade Plan')
+                          : 'Begin Journey'}
                       </Button>
                     </CardFooter>
                   </Card>
@@ -421,11 +429,11 @@ export default function PackagesPage() {
               <div className="bg-amber-100 p-2 rounded-full">
                 <AlertTriangle className="h-5 w-5 text-amber-600" />
               </div>
-              <AlertDialogTitle>Active Membership Detected</AlertDialogTitle>
+              <AlertDialogTitle>Current Plan Selected</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="pt-2">
-              You already have an active membership. Only one membership package can be active at a time. 
-              To change your membership plan, please contact our support team or wait for your current membership to expire.
+              You are already subscribed to this membership plan. To upgrade or downgrade to a different plan, 
+              please select one of the other available membership options.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

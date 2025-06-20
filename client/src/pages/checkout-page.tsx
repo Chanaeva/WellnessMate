@@ -48,14 +48,17 @@ export default function CheckoutPage() {
   // Process checkout mutation
   const checkoutMutation = useMutation({
     mutationFn: async () => {
-      // Check if user is trying to purchase a membership when they already have one
+      // Check if user is trying to purchase the same membership plan they already have
       const membershipItems = items.filter(item => item.type === 'membership');
       if (membershipItems.length > 0) {
         const membershipRes = await apiRequest("GET", "/api/membership");
         if (membershipRes.ok) {
           const currentMembership = await membershipRes.json();
           if (currentMembership && currentMembership.status === 'active') {
-            throw new Error("You already have an active membership. Only one membership can be active at a time.");
+            const newPlan = membershipItems[0].data;
+            if (currentMembership.planType === newPlan.planType) {
+              throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
+            }
           }
         }
       }
@@ -74,9 +77,14 @@ export default function CheckoutPage() {
       return await res.json();
     },
     onSuccess: (data) => {
+      const hasMembers = items.some(item => item.type === 'membership');
+      const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
+      
       toast({
-        title: "Order Successful!",
-        description: "Your purchase has been processed successfully.",
+        title: isUpgrade ? "Membership Upgraded!" : "Order Successful!",
+        description: isUpgrade 
+          ? "Your membership plan has been upgraded successfully."
+          : "Your purchase has been processed successfully.",
       });
       clearCart();
       

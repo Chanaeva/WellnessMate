@@ -202,6 +202,11 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Payment method addition still only available at checkout
   - Provides confirmation to users that their cards are saved
 
+- June 20, 2025: Cleaned up packages page layout ✓
+  - Removed "Ready to Start Your Wellness Journey?" CTA section
+  - Streamlined page to focus on product selection
+  - Maintained facility overview section for educational content
+
 ## Changelog
 
 Changelog:

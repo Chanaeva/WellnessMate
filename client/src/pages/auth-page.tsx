@@ -204,15 +204,24 @@ function AuthPage() {
                     </form>
                   </Form>
                   <div className="text-center mt-4 space-y-2">
-                    <div>
+                    <div className="flex justify-center gap-4">
                       <Link href="/forgot-password">
                         <Button
                           variant="link"
                           className="text-sm text-muted-foreground p-0"
                         >
-                          Forgot your password?
+                          <Mail className="h-3 w-3 mr-1" />
+                          Reset via Email
                         </Button>
                       </Link>
+                      <Button
+                        variant="link"
+                        onClick={() => setShowSMSReset(true)}
+                        className="text-sm text-muted-foreground p-0"
+                      >
+                        <Smartphone className="h-3 w-3 mr-1" />
+                        Reset via SMS
+                      </Button>
                     </div>
                     {!isAdminLogin && (
                       <>

@@ -212,6 +212,14 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Applied to member card, dashboard welcome banner, and admin pricing cards
   - Created lighter, more subtle overlay effect
 
+- June 21, 2025: Added SMS password reset functionality ✓
+  - Integrated Twilio for SMS messaging capabilities
+  - Added phone number field to user schema
+  - Created SMS reset form with 6-digit code verification
+  - Added backend endpoints for SMS reset request and verification
+  - Enhanced login page with SMS reset option alongside email reset
+  - 15-minute expiration for reset codes with secure token management
+
 ## Changelog
 
 Changelog:

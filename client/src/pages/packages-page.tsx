@@ -135,7 +135,7 @@ export default function PackagesPage() {
         <Tabs defaultValue="memberships" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-primary/10 border border-primary/20">
             <TabsTrigger value="memberships" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200">Sacred Memberships</TabsTrigger>
-            <TabsTrigger value="day-passes" className="data-[state=active]:bg-secondary/20 data-[state=active]:text-secondary hover:bg-secondary/10 transition-colors duration-200">Sacred Passages</TabsTrigger>
+            <TabsTrigger value="day-passes" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200">Sacred Passages</TabsTrigger>
           </TabsList>
 
           {/* Membership Plans Tab */}

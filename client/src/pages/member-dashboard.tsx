@@ -77,7 +77,7 @@ export default function MemberDashboard() {
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
 
-  // Check if we should auto-open add payment form from URL params and listen for purchase completions
+  // Check if we should auto-open add payment form from URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("add-payment") === "true") {
@@ -85,52 +85,7 @@ export default function MemberDashboard() {
       // Clean up URL without causing navigation
       window.history.replaceState({}, "", "/");
     }
-    
-    // Listen for purchase completion events from checkout page
-    const handlePurchaseComplete = () => {
-      // Show immediate feedback
-      toast({
-        title: "Updating Membership",
-        description: "Refreshing your membership details...",
-      });
-      
-      // Refetch all membership-related data when a purchase is completed
-      setTimeout(() => {
-        refetchMembership();
-        refetchPunchCards();
-        refetchPaymentMethods();
-        queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-      }, 2000); // Wait 2 seconds for backend to process
-    };
-
-    // Listen for storage events (when checkout page sets completion flag)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'purchase_completed' && e.newValue === 'true') {
-        handlePurchaseComplete();
-        // Clear the flag
-        localStorage.removeItem('purchase_completed');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check on focus in case we missed the storage event
-    const handleFocus = () => {
-      if (localStorage.getItem('purchase_completed') === 'true') {
-        handlePurchaseComplete();
-        localStorage.removeItem('purchase_completed');
-      }
-    };
-    
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [refetchMembership, refetchPunchCards, refetchPaymentMethods, toast]);
+  }, []);
 
   // Fetch membership data with automatic refetching
   const { data: membership, isLoading: isMembershipLoading, refetch: refetchMembership } =
@@ -192,6 +147,54 @@ export default function MemberDashboard() {
     queryKey: ["/api/payments"],
     enabled: !!user,
   });
+
+  // Listen for purchase completion events from checkout page (after all queries are declared)
+  useEffect(() => {
+    // Listen for purchase completion events from checkout page
+    const handlePurchaseComplete = () => {
+      // Show immediate feedback
+      toast({
+        title: "Updating Membership",
+        description: "Refreshing your membership details...",
+      });
+      
+      // Refetch all membership-related data when a purchase is completed
+      setTimeout(() => {
+        refetchMembership();
+        refetchPunchCards();
+        refetchPaymentMethods();
+        queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+      }, 2000); // Wait 2 seconds for backend to process
+    };
+
+    // Listen for storage events (when checkout page sets completion flag)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'purchase_completed' && e.newValue === 'true') {
+        handlePurchaseComplete();
+        // Clear the flag
+        localStorage.removeItem('purchase_completed');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check on focus in case we missed the storage event
+    const handleFocus = () => {
+      if (localStorage.getItem('purchase_completed') === 'true') {
+        handlePurchaseComplete();
+        localStorage.removeItem('purchase_completed');
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [refetchMembership, refetchPunchCards, refetchPaymentMethods, toast]);
 
   // Purchase membership mutation
   const purchaseMembershipMutation = useMutation({

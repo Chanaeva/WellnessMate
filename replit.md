@@ -213,6 +213,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Fixed 404 error by adding missing success page route
   - Removed "Ready to Start Your Wellness Journey?" section from packages page
 
+- June 19, 2025: Added cart persistence with localStorage ✓
+  - Cart items now persist across browser sessions and page refreshes
+  - Cart automatically clears after successful purchase
+  - Users won't lose items when navigating between pages
+  - localStorage implementation handles errors gracefully
+
 ## Changelog
 
 Changelog:

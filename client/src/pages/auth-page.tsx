@@ -89,6 +89,7 @@ function AuthPage() {
       confirmPassword: "",
       firstName: "",
       lastName: "",
+      phoneNumber: "",
       role: "member",
     },
   });

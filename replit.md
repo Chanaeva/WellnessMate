@@ -220,6 +220,11 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Enhanced login page with SMS reset option alongside email reset
   - 15-minute expiration for reset codes with secure token management
 
+- June 21, 2025: Updated registration form with phone number field ✓
+  - Added optional phone number field to user registration
+  - Enhanced registration form with phone icon and proper validation
+  - Users can now provide phone number during account creation for SMS features
+
 ## Changelog
 
 Changelog:

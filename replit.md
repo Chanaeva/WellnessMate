@@ -202,23 +202,6 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Payment method addition still only available at checkout
   - Provides confirmation to users that their cards are saved
 
-- June 19, 2025: Implemented Stripe Checkout integration ✓
-  - Replaced custom payment flow with Stripe's hosted checkout
-  - Added checkout session creation endpoint
-  - Implemented webhook handling for payment completion
-  - Created success page for post-payment confirmation
-  - Simplified cart checkout to redirect to Stripe's secure payment page
-  - Automatic fulfillment of memberships and punch cards via webhooks
-  - Fixed 500 error by reordering authentication routes before checkout endpoint
-  - Fixed 404 error by adding missing success page route
-  - Removed "Ready to Start Your Wellness Journey?" section from packages page
-
-- June 19, 2025: Added cart persistence with localStorage ✓
-  - Cart items now persist across browser sessions and page refreshes
-  - Cart automatically clears after successful purchase
-  - Users won't lose items when navigating between pages
-  - localStorage implementation handles errors gracefully
-
 ## Changelog
 
 Changelog:

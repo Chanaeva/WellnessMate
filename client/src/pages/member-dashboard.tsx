@@ -1,48 +1,26 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  Membership,
-  CheckIn,
-  MembershipPlan,
-  PunchCard,
-  Notification,
-  PaymentMethod,
-  Payment,
-} from "@shared/schema";
+import { Membership, CheckIn, MembershipPlan, PunchCard, Notification, PaymentMethod, Payment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import MemberCard from "@/components/dashboard/member-card";
 import StatsCard from "@/components/dashboard/stats-card";
 import ScheduleItem from "@/components/dashboard/schedule-item";
 import { Link } from "wouter";
-import {
-  QrCode,
-  Calendar,
-  Users,
-  Settings,
-  CreditCard,
+import { 
+  QrCode, 
+  Calendar, 
+  Users, 
+  Settings, 
+  CreditCard, 
   ArrowRight,
   CheckCircle,
   XCircle,
@@ -59,7 +37,7 @@ import {
   Plus,
   Trash2,
   Shield,
-  DollarSign,
+  DollarSign
 } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";
@@ -73,9 +51,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
 export default function MemberDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [purchasingPunchCardId, setPurchasingPunchCardId] = useState<
-    string | null
-  >(null);
+  const [purchasingPunchCardId, setPurchasingPunchCardId] = useState<string | null>(null);
   const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
@@ -83,19 +59,18 @@ export default function MemberDashboard() {
   // Check if we should auto-open add payment form from URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("add-payment") === "true") {
+    if (urlParams.get('add-payment') === 'true') {
       setShowAddPaymentMethod(true);
       // Clean up URL without causing navigation
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState({}, '', '/');
     }
   }, []);
 
   // Fetch membership data
-  const { data: membership, isLoading: isMembershipLoading } =
-    useQuery<Membership>({
-      queryKey: ["/api/membership"],
-      enabled: !!user,
-    });
+  const { data: membership, isLoading: isMembershipLoading } = useQuery<Membership>({
+    queryKey: ["/api/membership"],
+    enabled: !!user,
+  });
 
   // Fetch check-ins data
   const { data: checkIns, isLoading: isCheckInsLoading } = useQuery<CheckIn[]>({
@@ -115,14 +90,7 @@ export default function MemberDashboard() {
   });
 
   // Fetch punch card options
-  const { data: punchCardOptions } = useQuery<
-    {
-      name: string;
-      totalPunches: number;
-      totalPrice: number;
-      pricePerPunch: number;
-    }[]
-  >({
+  const { data: punchCardOptions } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
     queryKey: ["/api/punch-cards/options"],
   });
 
@@ -147,14 +115,10 @@ export default function MemberDashboard() {
   const purchaseMembershipMutation = useMutation({
     mutationFn: async (plan: MembershipPlan) => {
       // Create payment intent
-      const paymentIntentRes = await apiRequest(
-        "POST",
-        "/api/create-payment-intent",
-        {
-          amount: plan.monthlyPrice / 100,
-          description: `Wolf Mother Wellness - ${plan.name}`,
-        },
-      );
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: plan.monthlyPrice / 100,
+        description: `Wolf Mother Wellness - ${plan.name}`
+      });
       const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
 
       // Confirm payment and create membership
@@ -162,11 +126,11 @@ export default function MemberDashboard() {
         paymentIntentId,
         membershipId: null,
         description: `Wolf Mother Wellness - ${plan.name}`,
-        planType: plan.planType,
+        planType: plan.planType
       });
-
+      
       if (!confirmRes.ok) {
-        throw new Error("Payment confirmation failed");
+        throw new Error('Payment confirmation failed');
       }
 
       return await confirmRes.json();
@@ -219,27 +183,23 @@ export default function MemberDashboard() {
   const purchasePunchCardMutation = useMutation({
     mutationFn: async (punchCardData: any) => {
       setPurchasingPunchCardId(punchCardData.name);
-
+      
       // Create payment intent
-      const paymentIntentRes = await apiRequest(
-        "POST",
-        "/api/create-payment-intent",
-        {
-          amount: punchCardData.totalPrice / 100,
-          description: `Wolf Mother Wellness - ${punchCardData.name}`,
-        },
-      );
+      const paymentIntentRes = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: punchCardData.totalPrice / 100,
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
+      });
       const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
 
       // Confirm payment and create punch card
       const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
         paymentIntentId,
         membershipId: null,
-        description: `Wolf Mother Wellness - ${punchCardData.name}`,
+        description: `Wolf Mother Wellness - ${punchCardData.name}`
       });
-
+      
       if (!confirmRes.ok) {
-        throw new Error("Payment confirmation failed");
+        throw new Error('Payment confirmation failed');
       }
 
       // Create punch card
@@ -275,59 +235,44 @@ export default function MemberDashboard() {
   // Helper functions for notification styling
   const getNotificationColor = (type: string) => {
     switch (type) {
-      case "announcement":
-        return "border-blue-500 bg-blue-50";
-      case "maintenance":
-        return "border-orange-500 bg-orange-50";
-      case "promotion":
-        return "border-green-500 bg-green-50";
-      case "alert":
-        return "border-red-500 bg-red-50";
-      default:
-        return "border-gray-300 bg-gray-50";
+      case 'announcement': return 'border-blue-500 bg-blue-50';
+      case 'maintenance': return 'border-orange-500 bg-orange-50';
+      case 'promotion': return 'border-green-500 bg-green-50';
+      case 'alert': return 'border-red-500 bg-red-50';
+      default: return 'border-gray-300 bg-gray-50';
     }
   };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case "announcement":
-        return "📢";
-      case "maintenance":
-        return "🔧";
-      case "promotion":
-        return "⭐";
-      case "alert":
-        return "⚠️";
-      default:
-        return "📌";
+      case 'announcement': return '📢';
+      case 'maintenance': return '🔧';
+      case 'promotion': return '⭐';
+      case 'alert': return '⚠️';
+      default: return '📌';
     }
   };
 
   // Calculate membership status and information
   const membershipStatus = membership?.status || "inactive";
-  const membershipEndDate = membership
-    ? new Date(membership.endDate)
-    : new Date();
-  const formattedEndDate = membership
-    ? format(membershipEndDate, "MMMM d, yyyy")
-    : "N/A";
-  const currentPlan = membershipPlans?.find(
-    (plan) => plan.planType === membership?.planType,
-  );
+  const membershipEndDate = membership ? new Date(membership.endDate) : new Date();
+  const formattedEndDate = membership ? format(membershipEndDate, "MMMM d, yyyy") : "N/A";
+  const currentPlan = membershipPlans?.find(plan => plan.planType === membership?.planType);
+  
+
 
   // Calculate total check-ins this month
   const currentMonth = new Date().getMonth();
-  const checkInsThisMonth =
-    checkIns?.filter((checkIn) => {
-      if (!checkIn.timestamp) return false;
-      const checkInDate = new Date(checkIn.timestamp.toString());
-      return checkInDate.getMonth() === currentMonth;
-    }).length || 0;
+  const checkInsThisMonth = checkIns?.filter(checkIn => {
+    if (!checkIn.timestamp) return false;
+    const checkInDate = new Date(checkIn.timestamp.toString());
+    return checkInDate.getMonth() === currentMonth;
+  }).length || 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-
+      
       <main className="flex-grow wellness-container py-8">
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left Column (2/3) */}
@@ -342,23 +287,15 @@ export default function MemberDashboard() {
                       Welcome back, {user?.firstName || "Member"}!
                     </h1>
                     <p className="text-white/90 font-medium">
-                      Your membership is{" "}
-                      {membershipStatus === "active"
-                        ? "active until"
-                        : "expired on"}{" "}
-                      {formattedEndDate}
+                      Your membership is {membershipStatus === "active" ? "active until" : "expired on"} {formattedEndDate}
                     </p>
                   </div>
                 </div>
               </div>
               <CardContent className="p-6 flex justify-between items-center bg-card">
                 <div>
-                  <div className="text-sm text-muted-foreground">
-                    Recent Check-ins
-                  </div>
-                  <div className="text-xl font-semibold text-foreground">
-                    {checkInsThisMonth} this month
-                  </div>
+                  <div className="text-sm text-muted-foreground">Recent Check-ins</div>
+                  <div className="text-xl font-semibold text-foreground">{checkInsThisMonth} this month</div>
                 </div>
                 <div>
                   <Link href="/qr-code">
@@ -371,7 +308,7 @@ export default function MemberDashboard() {
             </Card>
 
             {/* Plans and Packages Link - Show if no active membership */}
-            {(!membership || membership.status !== "active") && (
+            {(!membership || membership.status !== 'active') && (
               <Card className="wellness-card">
                 <CardHeader className="text-center">
                   <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center justify-center">
@@ -380,9 +317,8 @@ export default function MemberDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
-                  <p className="text-muted-foreground pb-4">
-                    Explore our monthly memberships and day pass packages
-                    designed for your wellness journey.
+                  <p className="text-muted-foreground">
+                    Explore our monthly memberships and day pass packages designed for your wellness journey.
                   </p>
                   <Link href="/packages">
                     <Button className="wellness-button-primary px-8 py-3 text-lg">
@@ -397,9 +333,7 @@ export default function MemberDashboard() {
             {/* Facilities */}
             <Card className="wellness-card">
               <CardContent className="p-6">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-heading mb-6 text-foreground">
-                  Our Thermal Facilities
-                </h2>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-heading mb-6 text-foreground">Our Thermal Facilities</h2>
                 <div className="wellness-grid">
                   {/* Facility Item 1 */}
                   <div className="wellness-card overflow-hidden">
@@ -410,18 +344,12 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                     <div className="p-4">
-                      <h4 className="font-semibold text-foreground">
-                        Finnish Saunas
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Open 24/7 • Traditional dry heat therapy
-                      </p>
-                      <Badge className="thermal-badge-primary mt-2">
-                        Available
-                      </Badge>
+                      <h4 className="font-semibold text-foreground">Finnish Saunas</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Open 24/7 • Traditional dry heat therapy</p>
+                      <Badge className="thermal-badge-primary mt-2">Available</Badge>
                     </div>
                   </div>
-
+                  
                   {/* Facility Item 2 */}
                   <div className="wellness-card overflow-hidden">
                     <div className="h-32 cold-gradient relative">
@@ -431,70 +359,47 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                     <div className="p-4">
-                      <h4 className="font-semibold text-foreground">
-                        Cold Plunge Pools
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Invigorating cold therapy • Health benefits
-                      </p>
-                      <Badge className="thermal-badge-info mt-2">
-                        Available
-                      </Badge>
+                      <h4 className="font-semibold text-foreground">Cold Plunge Pools</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Invigorating cold therapy • Health benefits</p>
+                      <Badge className="thermal-badge-info mt-2">Available</Badge>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
+            
             {/* Thermal Wellness Benefits */}
             <Card className="wellness-card">
               <CardContent className="p-6">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-heading mb-6 text-foreground">
-                  Thermal Wellness Benefits
-                </h2>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-heading mb-6 text-foreground">Thermal Wellness Benefits</h2>
                 <div className="space-y-4">
                   <div className="flex items-start space-x-4">
                     <div className="bg-primary/10 p-3 rounded-xl">
                       <Heart className="h-6 w-6 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground">
-                        Improved Circulation
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Regular sauna sessions can improve cardiovascular health
-                        and blood flow
-                      </p>
+                      <h4 className="font-semibold text-foreground">Improved Circulation</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Regular sauna sessions can improve cardiovascular health and blood flow</p>
                     </div>
                   </div>
-
+                  
                   <div className="flex items-start space-x-4">
                     <div className="bg-secondary/10 p-3 rounded-xl">
                       <Sparkles className="h-6 w-6 text-secondary" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground">
-                        Stress Reduction
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Thermal therapy helps reduce cortisol levels and
-                        promotes relaxation
-                      </p>
+                      <h4 className="font-semibold text-foreground">Stress Reduction</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Thermal therapy helps reduce cortisol levels and promotes relaxation</p>
                     </div>
                   </div>
-
+                  
                   <div className="flex items-start space-x-4">
                     <div className="bg-accent/10 p-3 rounded-xl">
                       <CheckCircle className="h-6 w-6 text-accent" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-foreground">
-                        Immune System Support
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Hot and cold contrast therapy can help strengthen your
-                        immune response
-                      </p>
+                      <h4 className="font-semibold text-foreground">Immune System Support</h4>
+                      <p className="text-sm text-muted-foreground mt-1">Hot and cold contrast therapy can help strengthen your immune response</p>
                     </div>
                   </div>
                 </div>
@@ -505,8 +410,8 @@ export default function MemberDashboard() {
           {/* Right Column (1/3) */}
           <div className="md:w-1/3 space-y-6">
             {/* Membership Card */}
-            <MemberCard
-              user={user}
+            <MemberCard 
+              user={user} 
               membership={membership}
               membershipEndDate={formattedEndDate}
               planName={currentPlan?.name || "Basic Membership"}
@@ -526,26 +431,18 @@ export default function MemberDashboard() {
                 {userPunchCards && userPunchCards.length > 0 ? (
                   <div className="space-y-3">
                     {userPunchCards.map((card) => (
-                      <div
-                        key={card.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
+                      <div key={card.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex-1">
                           <p className="font-medium text-sm">{card.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {card.remainingPunches} of {card.totalPunches}{" "}
-                            visits remaining
+                            {card.remainingPunches} of {card.totalPunches} visits remaining
                           </p>
                           <p className="text-xs text-muted-foreground">
                             ${(card.pricePerPunch / 100).toFixed(2)} per visit
                           </p>
                         </div>
                         <div className="text-right">
-                          <Badge
-                            variant={
-                              card.status === "active" ? "default" : "secondary"
-                            }
-                          >
+                          <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
                             {card.status}
                           </Badge>
                         </div>
@@ -555,16 +452,14 @@ export default function MemberDashboard() {
                 ) : (
                   <div className="text-center py-6">
                     <Ticket className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-2">
-                      No day pass packages yet
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Purchase packages to see them here
-                    </p>
+                    <p className="text-muted-foreground mb-2">No day pass packages yet</p>
+                    <p className="text-xs text-muted-foreground">Purchase packages to see them here</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+
 
             {/* Recent Transactions */}
             <Card>
@@ -578,30 +473,18 @@ export default function MemberDashboard() {
                 {payments && payments.length > 0 ? (
                   <div className="space-y-3">
                     {payments.slice(0, 5).map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
+                      <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex-1">
-                          <p className="font-medium text-sm">
-                            {payment.description}
-                          </p>
+                          <p className="font-medium text-sm">{payment.description}</p>
                           <p className="text-xs text-muted-foreground">
-                            {payment.transactionDate
-                              ? format(
-                                  new Date(payment.transactionDate),
-                                  "MMM d, yyyy 'at' h:mm a",
-                                )
-                              : "Date not available"}
+                            {payment.transactionDate ? format(new Date(payment.transactionDate), "MMM d, yyyy 'at' h:mm a") : 'Date not available'}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="font-semibold">
                             ${(payment.amount / 100).toFixed(2)}
                           </p>
-                          <p
-                            className={`text-xs ${payment.status === "successful" ? "text-green-600" : "text-red-600"}`}
-                          >
+                          <p className={`text-xs ${payment.status === 'successful' ? 'text-green-600' : 'text-red-600'}`}>
                             {payment.status}
                           </p>
                         </div>
@@ -617,42 +500,29 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
+
+
             {/* External Links Section */}
             <Card>
               <CardContent className="p-6">
-                <a
-                  href="https://www.wolfmothertulsa.com/"
-                  target="_blank"
+                <a 
+                  href="https://www.wolfmothertulsa.com/" 
+                  target="_blank" 
                   rel="noopener noreferrer"
                   className="block"
                 >
-                  <Button
-                    variant="outline"
-                    className="w-full flex items-center justify-center bg-primary/5 hover:bg-primary/10 py-3 border-primary/20"
-                  >
-                    <svg
-                      className="h-5 w-5 text-primary mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9"
-                      />
+                  <Button variant="outline" className="w-full flex items-center justify-center bg-primary/5 hover:bg-primary/10 py-3 border-primary/20">
+                    <svg className="h-5 w-5 text-primary mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
                     </svg>
-                    <span className="text-sm text-primary font-medium">
-                      Visit Our Website
-                    </span>
+                    <span className="text-sm text-primary font-medium">Visit Our Website</span>
                   </Button>
                 </a>
               </CardContent>
             </Card>
 
             {/* Conditional Plans & Packages for Active Members */}
-            {membership && membership.status === "active" && (
+            {membership && membership.status === 'active' && (
               <Card className="wellness-card">
                 <CardHeader className="text-center">
                   <CardTitle className="text-lg sm:text-xl md:text-2xl font-heading text-foreground flex items-center justify-center">
@@ -662,8 +532,7 @@ export default function MemberDashboard() {
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
                   <p className="text-muted-foreground">
-                    Discover additional wellness packages to enhance your
-                    journey.
+                    Discover additional wellness packages to enhance your journey.
                   </p>
                   <Link href="/packages">
                     <Button className="wellness-button-primary px-8 py-3 text-lg">
@@ -687,26 +556,17 @@ export default function MemberDashboard() {
                 <div className="space-y-3">
                   {activeNotifications && activeNotifications.length > 0 ? (
                     activeNotifications.slice(0, 3).map((notification) => (
-                      <div
-                        key={notification.id}
+                      <div 
+                        key={notification.id} 
                         className={`border-l-4 p-3 rounded-r-lg ${getNotificationColor(notification.type)}`}
                       >
                         <div className="flex items-start gap-2">
-                          <span className="text-sm">
-                            {getNotificationIcon(notification.type)}
-                          </span>
+                          <span className="text-sm">{getNotificationIcon(notification.type)}</span>
                           <div className="flex-1">
-                            <h4 className="font-medium text-sm text-foreground">
-                              {notification.title}
-                            </h4>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {notification.message}
-                            </p>
+                            <h4 className="font-medium text-sm text-foreground">{notification.title}</h4>
+                            <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {format(
-                                new Date(notification.startDate),
-                                "MMM d, yyyy 'at' h:mm a",
-                              )}
+                              {format(new Date(notification.startDate), "MMM d, yyyy 'at' h:mm a")}
                             </p>
                           </div>
                         </div>
@@ -723,46 +583,32 @@ export default function MemberDashboard() {
           </div>
         </div>
       </main>
-
+      
       <Footer />
 
       {/* Payment Method Required Alert Dialog */}
-      <AlertDialog
-        open={showPaymentMethodAlert}
-        onOpenChange={setShowPaymentMethodAlert}
-      >
+      <AlertDialog open={showPaymentMethodAlert} onOpenChange={setShowPaymentMethodAlert}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center text-destructive">
-              <svg
-                className="h-6 w-6 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
+              <svg className="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               Payment Method Required
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base">
-              You need to add a payment method before making any purchases. This
-              helps us process your membership or day pass orders securely.
+              You need to add a payment method before making any purchases. This helps us process your membership or day pass orders securely.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               onClick={() => setShowPaymentMethodAlert(false)}
               className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <AlertDialogAction
+            <AlertDialogAction 
               onClick={handleAddPaymentMethod}
               className="w-full sm:w-auto wellness-button-primary"
             >

@@ -23,8 +23,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Mail, Lock, User } from "lucide-react";
+import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft } from "lucide-react";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
+import { SMSResetForm } from "@/components/auth/sms-reset-form";
 
 // Login schema
 const loginSchema = z.object({

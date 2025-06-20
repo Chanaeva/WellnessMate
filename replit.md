@@ -276,6 +276,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Admins can now create unlimited plans including multiple basic, premium, vip, or daily plans
   - Enhanced plan management with proper status tracking and timestamps
 
+- June 20, 2025: Implemented member-focused membership management system ✓
+  - Enforced one active membership per user policy with upgrade/downgrade capabilities
+  - Added membership deactivation functionality accessible from member dashboard
+  - Enhanced packages page to show current plan status and upgrade options
+  - Updated checkout logic to handle membership changes rather than duplicates
+  - Added membership management card to dashboard with plan change and deactivation options
+  - Members are automatically billed for new plans when upgrading or changing
+  - Clean database structure with no duplicate memberships per user
+
 ## Changelog
 
 Changelog:

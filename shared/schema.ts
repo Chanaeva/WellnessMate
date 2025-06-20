@@ -147,6 +147,8 @@ export const punchCards = pgTable("punch_cards", {
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+}).extend({
+  phoneNumber: z.string().optional(),
 });
 
 export const insertMembershipSchema = createInsertSchema(memberships).omit({

@@ -145,7 +145,7 @@ export function SMSResetForm({ onBack, onSuccess }: SMSResetFormProps) {
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="+1 (555) 123-4567"
+                        placeholder="+1 (777) WOLF-MOM"
                         {...field}
                         disabled={requestMutation.isPending}
                       />
@@ -209,7 +209,7 @@ export function SMSResetForm({ onBack, onSuccess }: SMSResetFormProps) {
                   <FormLabel>Reset Code</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="123456"
+                      placeholder="777777"
                       maxLength={6}
                       {...field}
                       disabled={verifyMutation.isPending}
@@ -230,7 +230,7 @@ export function SMSResetForm({ onBack, onSuccess }: SMSResetFormProps) {
                   <FormControl>
                     <Input
                       type="password"
-                      placeholder="Enter new password"
+                      placeholder="Wolf's protective secret"
                       {...field}
                       disabled={verifyMutation.isPending}
                     />
@@ -249,7 +249,7 @@ export function SMSResetForm({ onBack, onSuccess }: SMSResetFormProps) {
                   <FormControl>
                     <Input
                       type="password"
-                      placeholder="Confirm new password"
+                      placeholder="Confirm the sacred code"
                       {...field}
                       disabled={verifyMutation.isPending}
                     />

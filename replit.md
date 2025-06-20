@@ -225,6 +225,12 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Enhanced registration form with phone icon and proper validation
   - Users can now provide phone number during account creation for SMS features
 
+- June 21, 2025: Themed form placeholders with Romulus and Remus mythology ✓
+  - Updated registration form placeholders to reflect Wolf Mother branding
+  - Used mythological references: Romulus, Lupus, Tiber River, wolf_foundling
+  - Enhanced SMS reset form with themed placeholders
+  - Maintains brand consistency throughout authentication flow
+
 ## Changelog
 
 Changelog:

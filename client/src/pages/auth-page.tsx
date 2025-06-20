@@ -300,7 +300,7 @@ function AuthPage() {
                             <FormItem>
                               <FormLabel>First Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="John" {...field} />
+                                <Input placeholder="Romulus" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -313,7 +313,7 @@ function AuthPage() {
                             <FormItem>
                               <FormLabel>Last Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="Doe" {...field} />
+                                <Input placeholder="Lupus" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -331,7 +331,7 @@ function AuthPage() {
                               <div className="relative">
                                 <Smartphone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  placeholder="+1 (555) 123-4567"
+                                  placeholder="+1 (777) WOLF-MOM"
                                   className="pl-10"
                                   {...field}
                                 />
@@ -374,7 +374,7 @@ function AuthPage() {
                                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                   type="email"
-                                  placeholder="john@example.com"
+                                  placeholder="romulus@tiber.river"
                                   className="pl-10"
                                   {...field}
                                 />

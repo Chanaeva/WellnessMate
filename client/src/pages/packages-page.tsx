@@ -20,34 +20,34 @@ const planIcons = {
 
 const planThemes = {
   basic: {
-    gradient: "from-moss-green/20 to-neutral-500/20",
-    accentColor: "text-moss-green",
-    iconBg: "bg-moss-green/10",
-    border: "border-moss-green/20",
+    gradient: "from-primary/20 to-accent/20",
+    accentColor: "text-primary",
+    iconBg: "bg-primary/10",
+    border: "border-primary/20",
     title: "Foundling's Path",
     subtitle: "Begin your wellness journey"
   },
   premium: {
-    gradient: "from-amber-600/20 to-yellow-600/20",
-    accentColor: "text-amber-600",
-    iconBg: "bg-amber-600/10",
-    border: "border-amber-600/20",
+    gradient: "from-secondary/20 to-primary/15",
+    accentColor: "text-secondary",
+    iconBg: "bg-secondary/10",
+    border: "border-secondary/20",
     title: "Warrior's Strength",
     subtitle: "Enhanced thermal experience"
   },
   vip: {
-    gradient: "from-red-600/20 to-orange-600/20",
-    accentColor: "text-red-600",
-    iconBg: "bg-red-600/10",
-    border: "border-red-600/20",
+    gradient: "from-secondary/25 to-accent/20",
+    accentColor: "text-secondary",
+    iconBg: "bg-secondary/15",
+    border: "border-secondary/30",
     title: "Wolf Mother's Blessing",
     subtitle: "Ultimate wellness sanctuary"
   },
   daily: {
-    gradient: "from-blue-600/20 to-teal-600/20",
-    accentColor: "text-blue-600",
-    iconBg: "bg-blue-600/10",
-    border: "border-blue-600/20",
+    gradient: "from-accent/20 to-muted/15",
+    accentColor: "text-muted-foreground",
+    iconBg: "bg-accent/10",
+    border: "border-accent/20",
     title: "Tiber's Flow",
     subtitle: "Flexible wellness visits"
   },
@@ -133,9 +133,9 @@ export default function PackagesPage() {
         </div>
 
         <Tabs defaultValue="memberships" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-moss-green/10 border border-moss-green/20">
-            <TabsTrigger value="memberships" className="data-[state=active]:bg-moss-green/20 data-[state=active]:text-moss-green">Sacred Memberships</TabsTrigger>
-            <TabsTrigger value="day-passes" className="data-[state=active]:bg-blue-600/20 data-[state=active]:text-blue-600">Sacred Passages</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-8 bg-primary/10 border border-primary/20">
+            <TabsTrigger value="memberships" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200">Sacred Memberships</TabsTrigger>
+            <TabsTrigger value="day-passes" className="data-[state=active]:bg-secondary/20 data-[state=active]:text-secondary hover:bg-secondary/10 transition-colors duration-200">Sacred Passages</TabsTrigger>
           </TabsList>
 
           {/* Membership Plans Tab */}
@@ -167,7 +167,7 @@ export default function PackagesPage() {
                         </p>
                       </div>
                       {plan.planType === 'vip' && (
-                        <Badge className="absolute top-3 right-3 bg-red-600 text-white border-0">
+                        <Badge className="absolute top-3 right-3 bg-secondary text-secondary-foreground border-0">
                           Most Popular
                         </Badge>
                       )}
@@ -246,7 +246,7 @@ export default function PackagesPage() {
                     
                     <CardFooter className="pt-0">
                       <Button 
-                        className={`w-full wellness-button-primary bg-gradient-to-r ${theme.gradient} hover:opacity-90 transition-all duration-300 font-medium border-0 text-neutral-800 hover:text-neutral-900`}
+                        className="w-full wellness-button-primary"
                         onClick={() => handleAddMembershipToCart(plan)}
                       >
                         <ShoppingCart className="h-4 w-4 mr-2" />
@@ -268,18 +268,17 @@ export default function PackagesPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {punchCardOptions?.map((option, index) => (
-                <Card key={index} className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-blue-600/20 bg-gradient-to-br from-white to-blue-50/30">
-                  <div className="h-40 bg-gradient-to-br from-blue-600/20 to-teal-600/20 relative">
+                <Card key={index} className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-accent/20 bg-gradient-to-br from-card to-accent/5">
+                  <div className="h-40 bg-gradient-to-br from-accent/20 to-muted/15 relative">
                     <div className="absolute inset-0 bg-black/5"></div>
-                    <div className="absolute inset-0 bg-[url('/api/placeholder/400/160')] bg-cover bg-center opacity-5"></div>
                     <div className="relative h-full flex flex-col items-center justify-center p-4">
-                      <div className="bg-blue-600/10 p-3 rounded-full mb-2">
-                        <Waves className="h-8 w-8 text-blue-600" />
+                      <div className="bg-accent/15 p-3 rounded-full mb-2">
+                        <Waves className="h-8 w-8 text-muted-foreground" />
                       </div>
-                      <h3 className="text-lg font-heading text-blue-600 text-center">
+                      <h3 className="text-lg font-heading text-muted-foreground text-center">
                         Sacred Passage
                       </h3>
-                      <p className="text-xs text-neutral-600 text-center mt-1">
+                      <p className="text-xs text-muted-foreground/80 text-center mt-1">
                         Flexible wellness visits
                       </p>
                     </div>
@@ -289,11 +288,11 @@ export default function PackagesPage() {
                     <CardTitle className="text-xl font-heading">
                       {option.name}
                     </CardTitle>
-                    <CardDescription className="text-neutral-600">
+                    <CardDescription className="text-muted-foreground">
                       {option.totalPunches} sacred sanctuary visits
                     </CardDescription>
                     <div className="space-y-1">
-                      <div className="text-3xl font-bold text-blue-600">
+                      <div className="text-3xl font-bold text-primary">
                         {formatPrice(option.totalPrice)}
                       </div>
                       <div className="text-sm text-muted-foreground">

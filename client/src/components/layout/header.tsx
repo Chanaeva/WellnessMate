@@ -62,7 +62,7 @@ const Header = () => {
             
             <div className="hidden md:flex space-x-4">
               {navLinks.map((link) => (
-                <Link key={link.href} href={link.href} className={`text-neutral-dark hover:text-primary px-3 py-2 ${link.active ? 'font-medium text-primary' : ''}`}>
+                <Link key={link.href} href={link.href} className={`text-neutral-dark hover:text-primary px-3 py-2 rounded-md transition-colors duration-200 ${link.active ? 'font-medium text-primary bg-primary/5' : 'hover:bg-primary/5'}`}>
                   {link.label}
                 </Link>
               ))}
@@ -76,7 +76,7 @@ const Header = () => {
               {!isAdmin && <CartSidebar />}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2 focus:outline-none">
+                  <Button variant="ghost" className="flex items-center space-x-2 focus:outline-none hover:bg-primary/5 transition-colors duration-200">
                     <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center font-medium">
                       {getInitials()}
                     </div>

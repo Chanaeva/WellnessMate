@@ -159,10 +159,10 @@ export default function PackagesPage() {
                         <div className={`${theme.iconBg} p-3 rounded-full mb-2`}>
                           <Icon className={`h-8 w-8 ${theme.accentColor}`} />
                         </div>
-                        <h3 className={`text-lg font-heading ${theme.accentColor} text-center`}>
+                        <h3 className={`text-lg font-heading ${theme.accentColor} text-center font-semibold`}>
                           {theme.title}
                         </h3>
-                        <p className="text-xs text-neutral-600 text-center mt-1">
+                        <p className="text-xs text-foreground/80 text-center mt-1 font-medium">
                           {theme.subtitle}
                         </p>
                       </div>
@@ -193,7 +193,7 @@ export default function PackagesPage() {
                             <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                               <Check className={`h-3 w-3 ${theme.accentColor}`} />
                             </div>
-                            <span className="text-sm text-neutral-700">{feature}</span>
+                            <span className="text-sm text-foreground font-medium">{feature}</span>
                           </div>
                         )) || (
                           <div className="space-y-3">
@@ -201,13 +201,13 @@ export default function PackagesPage() {
                               <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                                 <Check className={`h-3 w-3 ${theme.accentColor}`} />
                               </div>
-                              <span className="text-sm text-neutral-700">Sacred waters access</span>
+                              <span className="text-sm text-foreground font-medium">Sacred waters access</span>
                             </div>
                             <div className="flex items-start gap-3">
                               <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                                 <Check className={`h-3 w-3 ${theme.accentColor}`} />
                               </div>
-                              <span className="text-sm text-neutral-700">All thermal sanctuaries</span>
+                              <span className="text-sm text-foreground font-medium">All thermal sanctuaries</span>
                             </div>
                             <div className="flex items-start gap-3">
                               <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
@@ -220,7 +220,7 @@ export default function PackagesPage() {
                                 <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                                   <Check className={`h-3 w-3 ${theme.accentColor}`} />
                                 </div>
-                                <span className="text-sm text-neutral-700">Priority reservations</span>
+                                <span className="text-sm text-foreground font-medium">Priority reservations</span>
                               </div>
                             )}
                             {plan.planType === 'vip' && (
@@ -229,13 +229,13 @@ export default function PackagesPage() {
                                   <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                                     <Check className={`h-3 w-3 ${theme.accentColor}`} />
                                   </div>
-                                  <span className="text-sm text-neutral-700">Guest privileges</span>
+                                  <span className="text-sm text-foreground font-medium">Guest privileges</span>
                                 </div>
                                 <div className="flex items-start gap-3">
                                   <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                                     <Check className={`h-3 w-3 ${theme.accentColor}`} />
                                   </div>
-                                  <span className="text-sm text-neutral-700">Exclusive sanctuary hours</span>
+                                  <span className="text-sm text-foreground font-medium">Exclusive sanctuary hours</span>
                                 </div>
                               </>
                             )}
@@ -272,23 +272,23 @@ export default function PackagesPage() {
                   <div className="h-40 bg-gradient-to-br from-accent/20 to-muted/15 relative">
                     <div className="absolute inset-0 bg-black/5"></div>
                     <div className="relative h-full flex flex-col items-center justify-center p-4">
-                      <div className="bg-accent/15 p-3 rounded-full mb-2">
-                        <Waves className="h-8 w-8 text-muted-foreground" />
+                      <div className="bg-primary/15 p-3 rounded-full mb-2">
+                        <Waves className="h-8 w-8 text-primary" />
                       </div>
-                      <h3 className="text-lg font-heading text-muted-foreground text-center">
+                      <h3 className="text-lg font-heading text-foreground text-center font-semibold">
                         Sacred Passage
                       </h3>
-                      <p className="text-xs text-muted-foreground/80 text-center mt-1">
+                      <p className="text-xs text-foreground/80 text-center mt-1 font-medium">
                         Flexible wellness visits
                       </p>
                     </div>
                   </div>
                   
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-xl font-heading">
+                    <CardTitle className="text-xl font-heading text-foreground font-semibold">
                       {option.name}
                     </CardTitle>
-                    <CardDescription className="text-muted-foreground">
+                    <CardDescription className="text-foreground/70 font-medium">
                       {option.totalPunches} sacred sanctuary visits
                     </CardDescription>
                     <div className="space-y-1">

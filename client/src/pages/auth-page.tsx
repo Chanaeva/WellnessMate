@@ -70,21 +70,6 @@ function AuthPage() {
     setActiveTab("login");
   };
 
-  if (showSMSReset) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-            <SMSResetForm 
-              onBack={() => setShowSMSReset(false)}
-              onSuccess={handleSMSResetSuccess}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Login form
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -117,6 +102,22 @@ function AuthPage() {
     const { confirmPassword, ...registerData } = data;
     registerMutation.mutate(registerData);
   };
+
+  // Show SMS reset form if requested
+  if (showSMSReset) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+            <SMSResetForm 
+              onBack={() => setShowSMSReset(false)}
+              onSuccess={handleSMSResetSuccess}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">

@@ -126,53 +126,51 @@ export default function PackagesPage() {
       <main className="flex-grow wellness-container py-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading text-foreground mb-4">
-            Membership Plans & Packages
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Choose the perfect wellness plan for your thermal therapy journey. From flexible day passes to comprehensive memberships.
+          <h1 className="text-4xl font-heading text-foreground mb-4">Sacred Paths of Wellness</h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Choose your path to wellness in the ancient tradition of Romulus and Remus, nurtured by the sacred waters.
           </p>
         </div>
 
-        <Tabs defaultValue="memberships" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
-            <TabsTrigger value="memberships" className="flex items-center gap-2">
-              <Crown className="h-4 w-4" />
-              Memberships
-            </TabsTrigger>
-            <TabsTrigger value="day-passes" className="flex items-center gap-2">
-              <Ticket className="h-4 w-4" />
-              Day Passes
-            </TabsTrigger>
+        <Tabs defaultValue="memberships" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-8 bg-moss-green/10 border border-moss-green/20">
+            <TabsTrigger value="memberships" className="data-[state=active]:bg-moss-green/20 data-[state=active]:text-moss-green">Sacred Memberships</TabsTrigger>
+            <TabsTrigger value="day-passes" className="data-[state=active]:bg-blue-600/20 data-[state=active]:text-blue-600">Sacred Passages</TabsTrigger>
           </TabsList>
 
           {/* Membership Plans Tab */}
           <TabsContent value="memberships" className="space-y-8">
             <div className="text-center">
-              <h2 className="text-2xl font-heading text-foreground mb-2">Monthly Memberships</h2>
-              <p className="text-muted-foreground">Unlimited access with exclusive member benefits</p>
+              <h2 className="text-2xl font-heading text-foreground mb-2">Sacred Memberships</h2>
+              <p className="text-muted-foreground">Unlimited access to our thermal wellness sanctuary, blessed by ancient waters</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {membershipPlans?.map((plan) => {
-                const IconComponent = planIcons[plan.planType as keyof typeof planIcons] || Star;
-                const gradientClass = planGradients[plan.planType as keyof typeof planGradients] || planGradients.basic;
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {membershipPlans?.map((plan, index) => {
+                const Icon = planIcons[plan.planType as keyof typeof planIcons] || Shield;
+                const theme = planThemes[plan.planType as keyof typeof planThemes] || planThemes.basic;
                 
                 return (
-                  <Card key={plan.id} className={`wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 ${plan.planType === 'vip' ? 'border-amber-500/50 shadow-amber-500/20' : ''}`}>
-                    {plan.planType === 'vip' && (
-                      <div className="absolute top-4 right-4">
-                        <Badge className="bg-amber-500 text-amber-50 border-amber-400">
+                  <Card key={plan.id} className={`wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 ${theme.border} border-2 bg-gradient-to-br from-white to-neutral-50/50`}>
+                    <div className={`h-40 bg-gradient-to-br ${theme.gradient} relative`}>
+                      <div className="absolute inset-0 bg-black/5"></div>
+                      <div className="absolute inset-0 bg-[url('/api/placeholder/400/160')] bg-cover bg-center opacity-5"></div>
+                      <div className="relative h-full flex flex-col items-center justify-center p-4">
+                        <div className={`${theme.iconBg} p-3 rounded-full mb-2`}>
+                          <Icon className={`h-8 w-8 ${theme.accentColor}`} />
+                        </div>
+                        <h3 className={`text-lg font-heading ${theme.accentColor} text-center`}>
+                          {theme.title}
+                        </h3>
+                        <p className="text-xs text-neutral-600 text-center mt-1">
+                          {theme.subtitle}
+                        </p>
+                      </div>
+                      {plan.planType === 'vip' && (
+                        <Badge className="absolute top-3 right-3 bg-red-600 text-white border-0">
                           Most Popular
                         </Badge>
-                      </div>
-                    )}
-                    
-                    <div className={`h-32 bg-gradient-to-br ${gradientClass} relative`}>
-                      <div className="absolute inset-0 bg-black/5"></div>
-                      <div className="relative h-full flex items-center justify-center">
-                        <IconComponent className="h-12 w-12 text-primary" />
-                      </div>
+                      )}
                     </div>
                     
                     <CardHeader className="pb-4">

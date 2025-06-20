@@ -174,15 +174,15 @@ export default function PackagesPage() {
                     </div>
                     
                     <CardHeader className="pb-4">
-                      <CardTitle className="text-xl font-heading capitalize">
+                      <CardTitle className="text-xl font-heading capitalize text-foreground font-semibold">
                         {plan.name}
                       </CardTitle>
-                      <CardDescription className="text-sm">
+                      <CardDescription className="text-sm text-foreground/70 font-medium">
                         {plan.description}
                       </CardDescription>
-                      <div className="text-3xl font-bold text-primary">
+                      <div className={`text-3xl font-bold ${theme.accentColor}`}>
                         {formatPrice(plan.monthlyPrice)}
-                        <span className="text-sm font-normal text-muted-foreground">/month</span>
+                        <span className="text-sm font-normal text-foreground/60">/month</span>
                       </div>
                     </CardHeader>
                     
@@ -213,7 +213,7 @@ export default function PackagesPage() {
                               <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
                                 <Check className={`h-3 w-3 ${theme.accentColor}`} />
                               </div>
-                              <span className="text-sm text-neutral-700">Digital check-in</span>
+                              <span className="text-sm text-foreground font-medium">Digital check-in</span>
                             </div>
                             {plan.planType !== 'basic' && (
                               <div className="flex items-start gap-3">
@@ -303,21 +303,23 @@ export default function PackagesPage() {
                   
                   <CardContent className="pb-6">
                     <div className="space-y-3">
-                      <div className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-success mt-0.5" />
-                        <span className="text-sm text-foreground">Full facility access per visit</span>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/15 p-1 rounded-full">
+                          <Check className="h-3 w-3 text-primary" />
+                        </div>
+                        <span className="text-sm text-foreground font-medium">Eternal validity</span>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-success mt-0.5" />
-                        <span className="text-sm text-foreground">All thermal therapy options</span>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/15 p-1 rounded-full">
+                          <Check className="h-3 w-3 text-primary" />
+                        </div>
+                        <span className="text-sm text-foreground font-medium">Shareable with kin</span>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-success mt-0.5" />
-                        <span className="text-sm text-foreground">6-month expiration</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-success mt-0.5" />
-                        <span className="text-sm text-foreground">Mobile check-in</span>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/15 p-1 rounded-full">
+                          <Check className="h-3 w-3 text-primary" />
+                        </div>
+                        <span className="text-sm text-foreground font-medium">All thermal sanctuaries</span>
                       </div>
                     </div>
                     

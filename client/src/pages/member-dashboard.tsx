@@ -88,6 +88,12 @@ export default function MemberDashboard() {
     
     // Listen for purchase completion events from checkout page
     const handlePurchaseComplete = () => {
+      // Show immediate feedback
+      toast({
+        title: "Updating Membership",
+        description: "Refreshing your membership details...",
+      });
+      
       // Refetch all membership-related data when a purchase is completed
       setTimeout(() => {
         refetchMembership();
@@ -124,7 +130,7 @@ export default function MemberDashboard() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [refetchMembership, refetchPunchCards, refetchPaymentMethods]);
+  }, [refetchMembership, refetchPunchCards, refetchPaymentMethods, toast]);
 
   // Fetch membership data with automatic refetching
   const { data: membership, isLoading: isMembershipLoading, refetch: refetchMembership } =
@@ -556,6 +562,7 @@ export default function MemberDashboard() {
               planName={currentPlan?.name || "Basic Membership"}
               memberSince="Jan 2023"
               currentPlan={currentPlan}
+              isLoading={isMembershipLoading}
             />
 
             {/* Your Day Pass Packages */}

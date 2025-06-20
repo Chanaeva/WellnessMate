@@ -25,6 +25,20 @@ const MemberCard = ({
   const isActive = membership?.status === 'active';
   const membershipPrice = currentPlan?.monthlyPrice ? (currentPlan.monthlyPrice / 100).toFixed(0) : '65';
   
+  if (isLoading) {
+    return (
+      <Card className="wellness-card">
+        <CardHeader className="text-center py-8">
+          <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+          </div>
+          <CardTitle className="text-xl">Updating Membership...</CardTitle>
+          <p className="text-muted-foreground">Please wait while we refresh your membership details.</p>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   if (!membership || !isActive) {
     return (
       <Card className="wellness-card">

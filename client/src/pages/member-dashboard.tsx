@@ -332,7 +332,7 @@ export default function MemberDashboard() {
             {/* Welcome Banner */}
             <Card className="wellness-card overflow-hidden">
               <div className="h-40 thermal-gradient relative">
-                <div className="absolute inset-0 bg-black/20"></div>
+                <div className="absolute inset-0 bg-black/5"></div>
                 <div className="relative h-full p-6 flex items-end">
                   <div>
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading text-white">

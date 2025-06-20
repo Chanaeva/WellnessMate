@@ -372,7 +372,7 @@ export default function PricingManagement() {
         {plans?.map((plan) => (
           <Card key={plan.id} className="relative overflow-hidden">
             <div className={`h-24 ${getPlanColor(plan.planType)} relative`}>
-              <div className="absolute inset-0 bg-black/20"></div>
+              <div className="absolute inset-0 bg-black/5"></div>
               <div className="relative h-full p-4 flex items-center justify-between text-white">
                 <div className="flex items-center space-x-2">
                   {getPlanIcon(plan.planType)}

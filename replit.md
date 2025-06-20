@@ -207,6 +207,11 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Streamlined page to focus on product selection
   - Maintained facility overview section for educational content
 
+- June 20, 2025: Lightened card header backgrounds ✓
+  - Changed bg-black/20 to bg-black/5 across all card headers
+  - Applied to member card, dashboard welcome banner, and admin pricing cards
+  - Created lighter, more subtle overlay effect
+
 ## Changelog
 
 Changelog:

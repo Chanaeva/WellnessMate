@@ -41,7 +41,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   // Initialize with thermal springs ambient sound
   useEffect(() => {
-    const audio = new Audio(AMBIENT_TRACKS.thermal_springs);
+    // Create a silent audio context for now since we don't have actual audio files
+    const audio = new Audio();
     audio.loop = true;
     audio.volume = volume;
     setAmbientAudio(audio);
@@ -63,35 +64,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const playAmbient = (track: string) => {
     if (!ambientAudio || !AMBIENT_TRACKS[track as keyof typeof AMBIENT_TRACKS]) return;
 
-    ambientAudio.pause();
-    ambientAudio.src = AMBIENT_TRACKS[track as keyof typeof AMBIENT_TRACKS];
-    ambientAudio.volume = isMuted ? 0 : volume;
-    
-    if (isPlaying) {
-      ambientAudio.play().catch(console.warn);
-    }
-    
+    // For now, just update the track without actual audio since files don't exist yet
     setCurrentTrack(track);
+    console.log(`Would play ambient track: ${track}`);
   };
 
   const playSoundEffect = (effect: string) => {
     if (isMuted || !SOUND_EFFECTS[effect as keyof typeof SOUND_EFFECTS]) return;
 
-    const audio = new Audio(SOUND_EFFECTS[effect as keyof typeof SOUND_EFFECTS]);
-    audio.volume = volume * 0.7; // Sound effects slightly quieter than ambient
-    audio.play().catch(console.warn);
+    // For now, just log the sound effect since files don't exist yet
+    console.log(`Would play sound effect: ${effect}`);
   };
 
   const togglePlayback = () => {
-    if (!ambientAudio) return;
-
-    if (isPlaying) {
-      ambientAudio.pause();
-    } else {
-      ambientAudio.play().catch(console.warn);
-    }
-    
     setIsPlaying(!isPlaying);
+    console.log(`Audio ${!isPlaying ? 'started' : 'paused'}`);
   };
 
   const toggleMute = () => {

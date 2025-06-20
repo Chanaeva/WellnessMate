@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { AudioControls } from "@/components/ui/audio-controls";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

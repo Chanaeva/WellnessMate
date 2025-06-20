@@ -77,7 +77,7 @@ export default function MemberDashboard() {
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
 
-  // Check if we should auto-open add payment form from URL params
+  // Check if we should auto-open add payment form from URL params and listen for purchase completions
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("add-payment") === "true") {
@@ -85,13 +85,55 @@ export default function MemberDashboard() {
       // Clean up URL without causing navigation
       window.history.replaceState({}, "", "/");
     }
-  }, []);
+    
+    // Listen for purchase completion events from checkout page
+    const handlePurchaseComplete = () => {
+      // Refetch all membership-related data when a purchase is completed
+      setTimeout(() => {
+        refetchMembership();
+        refetchPunchCards();
+        refetchPaymentMethods();
+        queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+      }, 2000); // Wait 2 seconds for backend to process
+    };
 
-  // Fetch membership data
-  const { data: membership, isLoading: isMembershipLoading } =
+    // Listen for storage events (when checkout page sets completion flag)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'purchase_completed' && e.newValue === 'true') {
+        handlePurchaseComplete();
+        // Clear the flag
+        localStorage.removeItem('purchase_completed');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check on focus in case we missed the storage event
+    const handleFocus = () => {
+      if (localStorage.getItem('purchase_completed') === 'true') {
+        handlePurchaseComplete();
+        localStorage.removeItem('purchase_completed');
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [refetchMembership, refetchPunchCards, refetchPaymentMethods]);
+
+  // Fetch membership data with automatic refetching
+  const { data: membership, isLoading: isMembershipLoading, refetch: refetchMembership } =
     useQuery<Membership>({
       queryKey: ["/api/membership"],
       enabled: !!user,
+      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchOnWindowFocus: true, // Refetch when window gains focus
+      refetchOnMount: true, // Always refetch on mount
     });
 
   // Fetch check-ins data
@@ -105,10 +147,13 @@ export default function MemberDashboard() {
     queryKey: ["/api/membership-plans"],
   });
 
-  // Fetch user's punch cards
-  const { data: userPunchCards } = useQuery<PunchCard[]>({
+  // Fetch user's punch cards with automatic refetching
+  const { data: userPunchCards, refetch: refetchPunchCards } = useQuery<PunchCard[]>({
     queryKey: ["/api/punch-cards"],
     enabled: !!user,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnMount: true, // Always refetch on mount
   });
 
   // Fetch punch card options
@@ -128,10 +173,12 @@ export default function MemberDashboard() {
     queryKey: ["/api/notifications/active"],
   });
 
-  // Fetch payment methods
-  const { data: paymentMethods } = useQuery<PaymentMethod[]>({
+  // Fetch payment methods with automatic refetching
+  const { data: paymentMethods, refetch: refetchPaymentMethods } = useQuery<PaymentMethod[]>({
     queryKey: ["/api/payment-methods"],
     enabled: !!user,
+    refetchInterval: 60000, // Refetch every minute
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   // Fetch payment history

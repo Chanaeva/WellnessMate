@@ -67,9 +67,16 @@ export default function CheckoutPage() {
         description: "Your purchase has been processed successfully.",
       });
       clearCart();
+      
+      // Set flag for dashboard to listen for changes
+      localStorage.setItem('purchase_completed', 'true');
+      
+      // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
       queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      
+      // Navigate back to dashboard
       setLocation("/");
     },
     onError: (error: any) => {

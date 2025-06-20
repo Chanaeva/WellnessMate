@@ -19,8 +19,9 @@ const MemberCard = ({
   membershipEndDate,
   planName,
   memberSince,
-  currentPlan
-}: MemberCardProps) => {
+  currentPlan,
+  isLoading = false
+}: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
   const membershipPrice = currentPlan?.monthlyPrice ? (currentPlan.monthlyPrice / 100).toFixed(0) : '65';
   

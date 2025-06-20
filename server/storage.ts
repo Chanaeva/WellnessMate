@@ -65,6 +65,7 @@ export interface IStorage {
 
   // Membership plan methods
   getAllMembershipPlans(): Promise<MembershipPlan[]>;
+  createMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
   createOrUpdateMembershipPlan(plan: InsertMembershipPlan): Promise<MembershipPlan>;
   updateMembershipPlan(id: number, plan: Partial<InsertMembershipPlan>): Promise<MembershipPlan>;
   deleteMembershipPlan(id: number): Promise<void>;
@@ -395,14 +396,19 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(membershipPlans);
   }
 
-  async createOrUpdateMembershipPlan(insertPlan: InsertMembershipPlan): Promise<MembershipPlan> {
+  async createMembershipPlan(insertPlan: InsertMembershipPlan): Promise<MembershipPlan> {
     const [plan] = await db
       .insert(membershipPlans)
       .values(insertPlan)
-      .onConflictDoUpdate({
-        target: membershipPlans.planType,
-        set: insertPlan
-      })
+      .returning();
+    return plan;
+  }
+
+  async createOrUpdateMembershipPlan(insertPlan: InsertMembershipPlan): Promise<MembershipPlan> {
+    // Since we removed the unique constraint on planType, this method now just creates new plans
+    const [plan] = await db
+      .insert(membershipPlans)
+      .values(insertPlan)
       .returning();
     return plan;
   }

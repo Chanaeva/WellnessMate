@@ -107,11 +107,13 @@ export const paymentMethods = pgTable("payment_methods", {
 // Plan pricing table
 export const membershipPlans = pgTable("membership_plans", {
   id: serial("id").primaryKey(),
-  planType: planTypeEnum("plan_type").notNull().unique(),
+  planType: planTypeEnum("plan_type").notNull(),
   name: text("name").notNull(),
   monthlyPrice: integer("monthly_price").notNull(), // Stored in cents
   description: text("description").notNull(),
   features: text("features").array().notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // Punch card templates for admin management
@@ -168,6 +170,7 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 
 export const insertMembershipPlanSchema = createInsertSchema(membershipPlans).omit({
   id: true,
+  createdAt: true,
 });
 
 export const insertPunchCardTemplateSchema = createInsertSchema(punchCardTemplates).omit({

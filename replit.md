@@ -268,6 +268,14 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Added backend API endpoints for member updates, status changes, and deletion
   - Password updates optional for existing members with secure handling
 
+- June 21, 2025: Fixed membership plan creation to allow multiple plans per type ✓
+  - Removed unique constraint on planType to enable multiple plans of same type
+  - Added isActive and createdAt fields to membership plans table
+  - Updated schema migration to support multiple plans per plan type
+  - Fixed createMembershipPlan method to always create new plans instead of updating
+  - Admins can now create unlimited plans including multiple basic, premium, vip, or daily plans
+  - Enhanced plan management with proper status tracking and timestamps
+
 ## Changelog
 
 Changelog:

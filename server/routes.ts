@@ -126,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/membership-plans", isAdmin, async (req, res) => {
     try {
       const validatedData = insertMembershipPlanSchema.parse(req.body);
-      const plan = await storage.createOrUpdateMembershipPlan(validatedData);
+      const plan = await storage.createMembershipPlan(validatedData);
       res.status(201).json(plan);
     } catch (error) {
       if (error instanceof z.ZodError) {

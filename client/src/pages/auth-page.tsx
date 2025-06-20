@@ -51,6 +51,7 @@ function AuthPage() {
   const [location, navigate] = useLocation();
   const isAdminLogin = location === "/admin-login";
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [showSMSReset, setShowSMSReset] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -62,6 +63,27 @@ function AuthPage() {
       }
     }
   }, [user, navigate, isAdminLogin]);
+
+  // Handle SMS reset success
+  const handleSMSResetSuccess = () => {
+    setShowSMSReset(false);
+    setActiveTab("login");
+  };
+
+  if (showSMSReset) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
+            <SMSResetForm 
+              onBack={() => setShowSMSReset(false)}
+              onSuccess={handleSMSResetSuccess}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Login form
   const loginForm = useForm<LoginFormValues>({

@@ -6,23 +6,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart } from "lucide-react";
+import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart, Shield, Flame, Waves } from "lucide-react";
 import { Link } from "wouter";
 import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/hooks/use-toast";
 
 const planIcons = {
-  basic: Star,
+  basic: Shield,
   premium: Crown,
-  vip: Zap,
-  daily: Ticket,
+  vip: Flame,
+  daily: Waves,
 };
 
-const planGradients = {
-  basic: "from-blue-500/10 to-cyan-500/10",
-  premium: "from-purple-500/10 to-pink-500/10", 
-  vip: "from-amber-500/10 to-orange-500/10",
-  daily: "from-green-500/10 to-emerald-500/10",
+const planThemes = {
+  basic: {
+    gradient: "from-moss-green/20 to-neutral-500/20",
+    accentColor: "text-moss-green",
+    iconBg: "bg-moss-green/10",
+    border: "border-moss-green/20",
+    title: "Foundling's Path",
+    subtitle: "Begin your wellness journey"
+  },
+  premium: {
+    gradient: "from-amber-600/20 to-yellow-600/20",
+    accentColor: "text-amber-600",
+    iconBg: "bg-amber-600/10",
+    border: "border-amber-600/20",
+    title: "Warrior's Strength",
+    subtitle: "Enhanced thermal experience"
+  },
+  vip: {
+    gradient: "from-red-600/20 to-orange-600/20",
+    accentColor: "text-red-600",
+    iconBg: "bg-red-600/10",
+    border: "border-red-600/20",
+    title: "Wolf Mother's Blessing",
+    subtitle: "Ultimate wellness sanctuary"
+  },
+  daily: {
+    gradient: "from-blue-600/20 to-teal-600/20",
+    accentColor: "text-blue-600",
+    iconBg: "bg-blue-600/10",
+    border: "border-blue-600/20",
+    title: "Tiber's Flow",
+    subtitle: "Flexible wellness visits"
+  },
 };
 
 export default function PackagesPage() {
@@ -163,39 +191,53 @@ export default function PackagesPage() {
                     <CardContent className="pb-6">
                       <div className="space-y-3">
                         {plan.features?.map((feature, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <Check className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
-                            <span className="text-sm text-foreground">{feature}</span>
+                          <div key={index} className="flex items-start gap-3">
+                            <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                              <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                            </div>
+                            <span className="text-sm text-neutral-700">{feature}</span>
                           </div>
                         )) || (
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <Check className="h-4 w-4 text-success mt-0.5" />
-                              <span className="text-sm text-foreground">Unlimited facility access</span>
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                                <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                              </div>
+                              <span className="text-sm text-neutral-700">Sacred waters access</span>
                             </div>
-                            <div className="flex items-start gap-2">
-                              <Check className="h-4 w-4 text-success mt-0.5" />
-                              <span className="text-sm text-foreground">All thermal therapy options</span>
+                            <div className="flex items-start gap-3">
+                              <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                                <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                              </div>
+                              <span className="text-sm text-neutral-700">All thermal sanctuaries</span>
                             </div>
-                            <div className="flex items-start gap-2">
-                              <Check className="h-4 w-4 text-success mt-0.5" />
-                              <span className="text-sm text-foreground">Mobile check-in</span>
+                            <div className="flex items-start gap-3">
+                              <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                                <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                              </div>
+                              <span className="text-sm text-neutral-700">Digital check-in</span>
                             </div>
                             {plan.planType !== 'basic' && (
-                              <div className="flex items-start gap-2">
-                                <Check className="h-4 w-4 text-success mt-0.5" />
-                                <span className="text-sm text-foreground">Priority booking</span>
+                              <div className="flex items-start gap-3">
+                                <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                                  <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                                </div>
+                                <span className="text-sm text-neutral-700">Priority reservations</span>
                               </div>
                             )}
                             {plan.planType === 'vip' && (
                               <>
-                                <div className="flex items-start gap-2">
-                                  <Check className="h-4 w-4 text-success mt-0.5" />
-                                  <span className="text-sm text-foreground">Guest passes included</span>
+                                <div className="flex items-start gap-3">
+                                  <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                                    <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                                  </div>
+                                  <span className="text-sm text-neutral-700">Guest privileges</span>
                                 </div>
-                                <div className="flex items-start gap-2">
-                                  <Check className="h-4 w-4 text-success mt-0.5" />
-                                  <span className="text-sm text-foreground">Exclusive VIP hours</span>
+                                <div className="flex items-start gap-3">
+                                  <div className={`${theme.iconBg} p-1 rounded-full mt-0.5`}>
+                                    <Check className={`h-3 w-3 ${theme.accentColor}`} />
+                                  </div>
+                                  <span className="text-sm text-neutral-700">Exclusive sanctuary hours</span>
                                 </div>
                               </>
                             )}
@@ -206,11 +248,11 @@ export default function PackagesPage() {
                     
                     <CardFooter className="pt-0">
                       <Button 
-                        className="w-full wellness-button-primary"
+                        className={`w-full wellness-button-primary bg-gradient-to-r ${theme.gradient} hover:opacity-90 transition-all duration-300 font-medium border-0 text-neutral-800 hover:text-neutral-900`}
                         onClick={() => handleAddMembershipToCart(plan)}
                       >
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        Add to Cart
+                        Begin Journey
                       </Button>
                     </CardFooter>
                   </Card>
@@ -222,17 +264,26 @@ export default function PackagesPage() {
           {/* Day Passes Tab */}
           <TabsContent value="day-passes" className="space-y-8">
             <div className="text-center">
-              <h2 className="text-2xl font-heading text-foreground mb-2">Day Pass Packages</h2>
-              <p className="text-muted-foreground">Flexible visits for occasional wellness sessions</p>
+              <h2 className="text-2xl font-heading text-foreground mb-2">Sacred Passages</h2>
+              <p className="text-muted-foreground">Flexible visits to the thermal sanctuaries when your spirit calls</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {punchCardOptions?.map((option, index) => (
-                <Card key={index} className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105">
-                  <div className="h-32 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 relative">
+                <Card key={index} className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-blue-600/20 bg-gradient-to-br from-white to-blue-50/30">
+                  <div className="h-40 bg-gradient-to-br from-blue-600/20 to-teal-600/20 relative">
                     <div className="absolute inset-0 bg-black/5"></div>
-                    <div className="relative h-full flex items-center justify-center">
-                      <Ticket className="h-12 w-12 text-emerald-600" />
+                    <div className="absolute inset-0 bg-[url('/api/placeholder/400/160')] bg-cover bg-center opacity-5"></div>
+                    <div className="relative h-full flex flex-col items-center justify-center p-4">
+                      <div className="bg-blue-600/10 p-3 rounded-full mb-2">
+                        <Waves className="h-8 w-8 text-blue-600" />
+                      </div>
+                      <h3 className="text-lg font-heading text-blue-600 text-center">
+                        Sacred Passage
+                      </h3>
+                      <p className="text-xs text-neutral-600 text-center mt-1">
+                        Flexible wellness visits
+                      </p>
                     </div>
                   </div>
                   
@@ -240,11 +291,11 @@ export default function PackagesPage() {
                     <CardTitle className="text-xl font-heading">
                       {option.name}
                     </CardTitle>
-                    <CardDescription>
-                      {option.totalPunches} individual day passes
+                    <CardDescription className="text-neutral-600">
+                      {option.totalPunches} sacred sanctuary visits
                     </CardDescription>
                     <div className="space-y-1">
-                      <div className="text-3xl font-bold text-primary">
+                      <div className="text-3xl font-bold text-blue-600">
                         {formatPrice(option.totalPrice)}
                       </div>
                       <div className="text-sm text-muted-foreground">

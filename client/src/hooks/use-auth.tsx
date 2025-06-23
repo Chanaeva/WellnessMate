@@ -42,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Login successful",
         description: `Welcome back, ${user.firstName}!`,
       });
+      // Return user data for redirect handling
+      return { user };
     },
     onError: (error: Error) => {
       toast({

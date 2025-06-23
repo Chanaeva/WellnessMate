@@ -311,6 +311,7 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Enhanced user schema to store agreement completion and member emergency information
   - Updated registration flow to redirect to agreement form before dashboard access
   - Implemented two-step registration process: account creation → membership agreement
+  - Fixed authentication redirect logic to keep members on dashboard after login
 
 ## Changelog
 

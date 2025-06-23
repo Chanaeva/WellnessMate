@@ -112,8 +112,19 @@ function AuthPage() {
 
   const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data, {
-      onSuccess: () => {
+      onSuccess: (response) => {
         playLoginSuccess();
+        // Handle redirect based on user status
+        const user = response?.user || response;
+        if (user) {
+          if (isAdminLogin || user.role === "admin") {
+            navigate("/admin");
+          } else if (!user.membershipAgreementCompleted) {
+            navigate("/membership-agreement");
+          } else {
+            navigate("/dashboard");
+          }
+        }
       },
       onError: () => {
         playError();

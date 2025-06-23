@@ -53,6 +53,15 @@ function AuthPage() {
   const [location, navigate] = useLocation();
   const isAdminLogin = location === "/admin-login";
   const [activeTab, setActiveTab] = useState<string>("login");
+
+  // Check URL parameters to set default tab
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'register' || tab === 'login') {
+      setActiveTab(tab);
+    }
+  }, []);
   const [showSMSReset, setShowSMSReset] = useState(false);
 
   // Set ambient sound for auth page

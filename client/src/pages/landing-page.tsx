@@ -94,16 +94,16 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Link href="/register">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-10 py-6 text-xl font-bold shadow-2xl border-2 border-primary hover:shadow-3xl transform hover:scale-105 transition-all duration-300">
+            <Link href="/auth-page?tab=register">
+              <Button size="lg" className="bg-neutral-900 hover:bg-neutral-800 text-white px-10 py-6 text-xl font-bold shadow-2xl border-2 border-neutral-900 hover:border-neutral-800 hover:shadow-3xl transform hover:scale-105 transition-all duration-300">
                 <Crown className="h-6 w-6 mr-3" />
                 Join the Pack
                 <ArrowRight className="h-6 w-6 ml-3" />
               </Button>
             </Link>
             
-            <Link href="/login">
-              <Button variant="outline" size="lg" className="border-3 border-primary text-primary bg-white hover:bg-primary hover:text-white px-10 py-6 text-xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
+            <Link href="/auth-page?tab=login">
+              <Button variant="outline" size="lg" className="border-4 border-neutral-900 text-neutral-900 bg-white hover:bg-neutral-900 hover:text-white px-10 py-6 text-xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
                 <Users className="h-6 w-6 mr-3" />
                 Member Login
               </Button>

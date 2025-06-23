@@ -8,6 +8,7 @@ import { AudioProvider } from "@/hooks/use-audio";
 import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
+import LandingPage from "@/pages/landing-page";
 import AuthPage from "@/pages/auth-page";
 import ForgotPasswordPage from "@/pages/forgot-password-page";
 import ResetPasswordPage from "@/pages/reset-password-page";
@@ -34,7 +35,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPasswordPage} />
       
       {/* Member routes */}
-      <ProtectedRoute path="/" component={MemberDashboard} />
+      <ProtectedRoute path="/dashboard" component={MemberDashboard} />
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
 
 
@@ -52,6 +53,9 @@ function Router() {
       <ProtectedRoute path="/admin/members" component={AdminMembers} />
       <ProtectedRoute path="/admin/notifications" component={AdminNotifications} />
       <ProtectedRoute path="/admin/membership-plans" component={AdminMembershipPlans} />
+      
+      {/* Landing page as default */}
+      <Route path="/" component={LandingPage} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />

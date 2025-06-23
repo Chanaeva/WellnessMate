@@ -78,7 +78,9 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Hero Section */}
       <section className="relative py-20 px-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
+        <div className="absolute inset-0 opacity-20">
+          <div className="w-full h-full bg-gradient-to-br from-amber-500/10 to-orange-500/10"></div>
+        </div>
         
         <div className="max-w-7xl mx-auto text-center relative z-10">
           <Badge className="mb-6 bg-amber-500/20 text-amber-200 border-amber-400/30">
@@ -96,7 +98,7 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link to="/register">
+            <Link to="/auth">
               <Button size="lg" className="bg-amber-600 hover:bg-amber-700 text-white px-8 py-4 text-lg">
                 <Crown className="h-5 w-5 mr-2" />
                 Join the Pack
@@ -104,7 +106,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             
-            <Link to="/login">
+            <Link to="/auth">
               <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg">
                 Member Login
               </Button>
@@ -176,16 +178,16 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register">
+            <Link to="/auth">
               <Button size="lg" className="bg-amber-600 hover:bg-amber-700 px-8 py-4 text-lg">
                 <CheckCircle className="h-5 w-5 mr-2" />
                 Start Your Journey
               </Button>
             </Link>
             
-            <Link to="/packages">
+            <Link to="/auth">
               <Button variant="outline" size="lg" className="border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg">
-                View Membership Plans
+                Login to View Plans
               </Button>
             </Link>
           </div>

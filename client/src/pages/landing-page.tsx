@@ -93,18 +93,18 @@ export default function LandingPage() {
             that nurtured Romulus and Remus, and discover your inner strength.
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link href="/auth-page?tab=register">
-              <Button size="lg" className="bg-neutral-900 hover:bg-neutral-800 text-white px-10 py-6 text-xl font-bold shadow-2xl border-2 border-neutral-900 hover:border-neutral-800 hover:shadow-3xl transform hover:scale-105 transition-all duration-300">
-                <Crown className="h-6 w-6 mr-3" />
+              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-4 text-lg font-medium">
+                <Crown className="h-5 w-5 mr-2" />
                 Join the Pack
-                <ArrowRight className="h-6 w-6 ml-3" />
+                <ArrowRight className="h-5 w-5 ml-2" />
               </Button>
             </Link>
             
             <Link href="/auth-page?tab=login">
-              <Button variant="outline" size="lg" className="border-4 border-neutral-900 text-neutral-900 bg-white hover:bg-neutral-900 hover:text-white px-10 py-6 text-xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
-                <Users className="h-6 w-6 mr-3" />
+              <Button variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 px-8 py-4 text-lg font-medium">
+                <Users className="h-5 w-5 mr-2" />
                 Member Login
               </Button>
             </Link>

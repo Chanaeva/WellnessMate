@@ -294,6 +294,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Set landing page as default route (/) for new visitors
   - Enhanced user journey from promotion discovery to membership signup
 
+- June 23, 2025: Implemented day pass confirmation system for QR check-ins ✓
+  - Enhanced kiosk check-in flow to prompt day pass users before using visits
+  - Added confirmation screen showing remaining days on all day pass packages
+  - Users with both membership and day passes can choose which to use
+  - Day pass users see remaining visits count after check-in
+  - Updated backend API to handle day pass confirmation and usage tracking
+  - Added visual feedback showing package details and remaining balance
+  - Integrated proper state management for confirmation workflow
+
 ## Changelog
 
 Changelog:

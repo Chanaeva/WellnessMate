@@ -33,7 +33,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <Route path="/membership-agreement" component={MembershipAgreement} />
+      <ProtectedRoute path="/membership-agreement" component={MembershipAgreement} />
       <Route path="/admin-login" component={AuthPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />

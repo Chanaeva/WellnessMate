@@ -168,6 +168,12 @@ export default function MembershipAgreement() {
     return null;
   }
 
+  // Redirect if already completed agreement
+  if (user.membershipAgreementCompleted) {
+    setLocation("/dashboard");
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 py-8">
       <div className="container mx-auto px-4 max-w-4xl">

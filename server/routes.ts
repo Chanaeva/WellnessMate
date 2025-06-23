@@ -180,7 +180,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check in using QR code
+  // Kiosk check-in using membership ID from QR code
+  app.post("/api/kiosk-check-in", async (req, res) => {
+    try {
+      const { membershipId } = req.body;
+      
+      if (!membershipId) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Membership ID is required" 
+        });
+      }
+
+      // Find user by membership ID
+      const user = await storage.getUserByMembershipId(membershipId);
+      if (!user) {
+        return res.status(404).json({ 
+          success: false,
+          message: "Member not found. Please see staff for assistance." 
+        });
+      }
+
+      // Check if user has active membership
+      const membership = await storage.getMembershipByUserId(user.id);
+      
+      // Check if user has day pass packages (punch cards)
+      const userPunchCards = await storage.getPunchCardsByUserId(user.id);
+      const activeDayPasses = userPunchCards.filter(card => 
+        card.status === 'active' && card.remainingPunches > 0
+      );
+      
+      // User needs either active monthly membership or day passes
+      if ((!membership || membership.status !== 'active') && activeDayPasses.length === 0) {
+        return res.status(400).json({ 
+          success: false,
+          message: "No active membership or day passes found. Please purchase a membership or day pass package." 
+        });
+      }
+      
+      // If user has day passes, use those first (they're more expensive per visit)
+      if (activeDayPasses.length > 0) {
+        const oldestDayPass = activeDayPasses.sort((a, b) => 
+          new Date(a.purchasedAt || '1970-01-01').getTime() - new Date(b.purchasedAt || '1970-01-01').getTime()
+        )[0];
+        
+        // Use one visit from the day pass
+        await storage.usePunchCardEntry(oldestDayPass.id);
+      }
+      
+      // Create check-in record
+      const checkIn = await storage.createCheckIn({
+        userId: user.id,
+        location: "Kiosk Check-in"
+      });
+
+      res.json({
+        success: true,
+        member: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          membershipType: membership?.planType || 'Day Pass',
+          membershipStatus: membership?.status || 'day-pass'
+        },
+        message: `Welcome back, ${user.firstName}! Enjoy your session ✨`
+      });
+      
+    } catch (error: any) {
+      console.error("Kiosk check-in error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "System error. Please see staff for assistance." 
+      });
+    }
+  });
+
+  // Check in using QR code (authenticated users)
   app.post("/api/check-in", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertCheckInSchema.parse(req.body);

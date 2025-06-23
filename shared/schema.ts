@@ -374,7 +374,29 @@ export const notifications = pgTable("notifications", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertNotificationSchema = createInsertSchema(notifications);
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLandingPageContentSchema = createInsertSchema(landingPageContent).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPromotionSchema = createInsertSchema(promotions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+export type LandingPageContent = typeof landingPageContent.$inferSelect;
+export type InsertLandingPageContent = z.infer<typeof insertLandingPageContentSchema>;
+
+export type Promotion = typeof promotions.$inferSelect;
+export type InsertPromotion = z.infer<typeof insertPromotionSchema>;

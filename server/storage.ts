@@ -839,6 +839,97 @@ export class DatabaseStorage implements IStorage {
       .delete(notifications)
       .where(eq(notifications.id, id));
   }
+
+  async updateUser(userId: number, data: Partial<User>): Promise<User> {
+    const [updated] = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    // Delete related data first due to foreign key constraints
+    await db.delete(memberships).where(eq(memberships.userId, userId));
+    await db.delete(checkIns).where(eq(checkIns.userId, userId));
+    await db.delete(payments).where(eq(payments.userId, userId));
+    await db.delete(punchCards).where(eq(punchCards.userId, userId));
+    await db.delete(memberPreferences).where(eq(memberPreferences.userId, userId));
+    await db.delete(therapySessions).where(eq(therapySessions.userId, userId));
+    await db.delete(healthMetrics).where(eq(healthMetrics.userId, userId));
+    await db.delete(stravaIntegrations).where(eq(stravaIntegrations.userId, userId));
+    
+    // Finally delete the user
+    await db.delete(users).where(eq(users.id, userId));
+  }
+
+  // Landing page content methods
+  async getAllLandingPageContent(): Promise<LandingPageContent[]> {
+    return await db.select().from(landingPageContent).orderBy(landingPageContent.section, landingPageContent.key);
+  }
+
+  async getLandingPageContentBySection(section: string): Promise<LandingPageContent[]> {
+    return await db.select().from(landingPageContent).where(eq(landingPageContent.section, section));
+  }
+
+  async updateLandingPageContent(id: number, content: Partial<LandingPageContent>): Promise<LandingPageContent> {
+    const [updated] = await db
+      .update(landingPageContent)
+      .set(content)
+      .where(eq(landingPageContent.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createLandingPageContent(content: InsertLandingPageContent): Promise<LandingPageContent> {
+    const [created] = await db
+      .insert(landingPageContent)
+      .values(content)
+      .returning();
+    return created;
+  }
+
+  async deleteLandingPageContent(id: number): Promise<void> {
+    await db.delete(landingPageContent).where(eq(landingPageContent.id, id));
+  }
+
+  // Promotion methods
+  async getAllPromotions(): Promise<Promotion[]> {
+    return await db.select().from(promotions).orderBy(promotions.sortOrder, promotions.createdAt);
+  }
+
+  async getActivePromotions(): Promise<Promotion[]> {
+    return await db.select().from(promotions)
+      .where(eq(promotions.isActive, true))
+      .orderBy(promotions.sortOrder, promotions.createdAt);
+  }
+
+  async getPromotionById(id: number): Promise<Promotion | undefined> {
+    const [promotion] = await db.select().from(promotions).where(eq(promotions.id, id));
+    return promotion || undefined;
+  }
+
+  async createPromotion(promotion: InsertPromotion): Promise<Promotion> {
+    const [created] = await db
+      .insert(promotions)
+      .values(promotion)
+      .returning();
+    return created;
+  }
+
+  async updatePromotion(id: number, data: Partial<Promotion>): Promise<Promotion> {
+    const [updated] = await db
+      .update(promotions)
+      .set(data)
+      .where(eq(promotions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePromotion(id: number): Promise<void> {
+    await db.delete(promotions).where(eq(promotions.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();

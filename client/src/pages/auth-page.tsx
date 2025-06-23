@@ -72,8 +72,10 @@ function AuthPage() {
     if (user) {
       if (isAdminLogin || user.role === "admin") {
         navigate("/admin");
+      } else if (!user.membershipAgreementCompleted) {
+        navigate("/membership-agreement");
       } else {
-        navigate("/");
+        navigate("/dashboard");
       }
     }
   }, [user, navigate, isAdminLogin]);

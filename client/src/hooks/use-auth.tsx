@@ -57,11 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await apiRequest("POST", "/api/register", credentials);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (response: any) => {
+      queryClient.setQueryData(["/api/user"], response.user);
       toast({
         title: "Registration successful",
-        description: `Welcome to Wolf Mother Wellness, ${user.firstName}!`,
+        description: "Please complete your membership agreement",
       });
     },
     onError: (error: Error) => {

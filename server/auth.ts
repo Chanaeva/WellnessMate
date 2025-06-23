@@ -83,6 +83,11 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
+      const existingEmail = await storage.getUserByEmail(userInput.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
       // Hash password before storing
       const hashedPassword = await hashPassword(userInput.password);
       
@@ -97,7 +102,11 @@ export function setupAuth(app: Express) {
       // Login the user after registration
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(userWithoutPassword);
+        res.status(201).json({
+          message: "Registration successful",
+          user: userWithoutPassword,
+          redirectTo: "/membership-agreement"
+        });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -135,6 +144,36 @@ export function setupAuth(app: Express) {
     // Remove password from response
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
+  });
+
+  // Submit membership agreement
+  app.post("/api/membership-agreement", async (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const userId = req.user!.id;
+      const agreementData = req.body;
+      
+      // Update the user with agreement completion and data
+      await storage.updateUser(userId, {
+        membershipAgreementCompleted: true,
+        membershipAgreementDate: new Date(),
+        emergencyContact: agreementData.emergencyContact,
+        emergencyPhone: agreementData.emergencyPhone,
+        dateOfBirth: agreementData.dateOfBirth,
+        address: agreementData.address,
+        preferredMembershipType: agreementData.membershipType
+      });
+
+      res.json({ 
+        message: "Membership agreement completed successfully"
+      });
+    } catch (error: any) {
+      console.log(`Membership agreement error: ${error.message}`);
+      res.status(500).json({ message: "Failed to complete membership agreement" });
+    }
   });
 
   // Password reset request endpoint

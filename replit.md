@@ -285,6 +285,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Members are automatically billed for new plans when upgrading or changing
   - Clean database structure with no duplicate memberships per user
 
+- June 23, 2025: Created promotional landing page with registration/login links ✓
+  - Built comprehensive landing page showcasing Wolf Mother Wellness branding
+  - Added promotional carousel with special offers and promo codes
+  - Integrated hero section with Roman mythology theme and clear call-to-action buttons
+  - Featured testimonials, facility highlights, and contact information
+  - Created direct navigation links to registration and login pages
+  - Set landing page as default route (/) for new visitors
+  - Enhanced user journey from promotion discovery to membership signup
+
 ## Changelog
 
 Changelog:

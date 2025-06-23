@@ -123,8 +123,11 @@ function AuthPage() {
     // Remove confirmPassword before submitting
     const { confirmPassword, ...registerData } = data;
     registerMutation.mutate(registerData, {
-      onSuccess: () => {
+      onSuccess: (response) => {
         playLoginSuccess();
+        if (response.redirectTo) {
+          navigate(response.redirectTo);
+        }
       },
       onError: () => {
         playError();

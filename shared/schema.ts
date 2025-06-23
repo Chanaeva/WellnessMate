@@ -16,6 +16,16 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number"),
   role: roleEnum("role").notNull().default('member'),
   stripeCustomerId: text("stripe_customer_id"),
+  
+  // Membership Agreement fields
+  membershipAgreementCompleted: boolean("membership_agreement_completed").default(false),
+  membershipAgreementDate: timestamp("membership_agreement_date"),
+  emergencyContact: text("emergency_contact"),
+  emergencyPhone: text("emergency_phone"),
+  dateOfBirth: date("date_of_birth"),
+  address: text("address"),
+  preferredMembershipType: text("preferred_membership_type"),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 

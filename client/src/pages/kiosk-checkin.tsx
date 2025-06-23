@@ -19,43 +19,72 @@ import {
 } from "lucide-react";
 
 interface CheckInResponse {
-  success: boolean;
+  success?: boolean;
+  requiresConfirmation?: boolean;
   member?: {
     firstName: string;
     lastName: string;
     membershipType?: string;
     membershipStatus?: string;
   };
+  dayPasses?: {
+    available: boolean;
+    totalRemaining: number;
+    packages: Array<{
+      id: number;
+      name: string;
+      remaining: number;
+      total: number;
+    }>;
+  };
+  dayPassInfo?: {
+    used: boolean;
+    totalRemaining: number;
+    packages: Array<{
+      id: number;
+      name: string;
+      remaining: number;
+      total: number;
+    }>;
+  };
   message: string;
 }
 
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'success' | 'error'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'confirmation' | 'success' | 'error'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
+  const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const { toast } = useToast();
   const scannerRef = useRef<HTMLDivElement>(null);
 
   const checkInMutation = useMutation({
-    mutationFn: async (qrData: string) => {
-      // Extract membership ID from QR code data
-      let membershipId = qrData;
-      if (qrData.includes('membership:')) {
-        membershipId = qrData.split('membership:')[1];
-      }
-      
-      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId });
+    mutationFn: async ({ membershipId, useDayPass }: { membershipId: string; useDayPass?: boolean }) => {
+      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId, useDayPass });
       return await res.json() as CheckInResponse;
     },
     onSuccess: (data) => {
       setScanResult(data);
-      setScannerMode(data.success ? 'success' : 'error');
-      queryClient.invalidateQueries({ queryKey: ["/api/check-ins"] });
       
-      // Auto-reset after 5 seconds
-      setTimeout(() => {
-        resetScanner();
-      }, 5000);
+      if (data.requiresConfirmation) {
+        setScannerMode('confirmation');
+        // Don't auto-reset on confirmation
+      } else if (data.success) {
+        setScannerMode('success');
+        queryClient.invalidateQueries({ queryKey: ["/api/check-ins"] });
+        
+        // Auto-reset after 7 seconds to show day pass info
+        setTimeout(() => {
+          resetScanner();
+        }, 7000);
+      } else {
+        setScannerMode('error');
+        
+        // Auto-reset after 3 seconds on error
+        setTimeout(() => {
+          resetScanner();
+        }, 3000);
+      }
     },
     onError: (error: any) => {
       setScanResult({
@@ -70,6 +99,12 @@ export default function KioskCheckIn() {
       }, 3000);
     },
   });
+
+  const confirmCheckIn = (useDayPass: boolean) => {
+    if (pendingMembershipId) {
+      checkInMutation.mutate({ membershipId: pendingMembershipId, useDayPass });
+    }
+  };
 
   const initializeScanner = () => {
     if (scannerRef.current && !scanner) {
@@ -91,7 +126,15 @@ export default function KioskCheckIn() {
           // QR code successfully scanned
           html5QrcodeScanner.clear();
           setScanner(null);
-          checkInMutation.mutate(decodedText);
+          
+          // Extract membership ID from QR code data
+          let membershipId = decodedText;
+          if (decodedText.includes('membership:')) {
+            membershipId = decodedText.split('membership:')[1];
+          }
+          
+          setPendingMembershipId(membershipId);
+          checkInMutation.mutate({ membershipId });
         },
         (error) => {
           // Scanning failed or no QR code found - this is normal, don't show error
@@ -111,6 +154,7 @@ export default function KioskCheckIn() {
     }
     setScannerMode('waiting');
     setScanResult(null);
+    setPendingMembershipId(null);
   };
 
   // Cleanup scanner on component unmount
@@ -148,12 +192,14 @@ export default function KioskCheckIn() {
             <div className="flex justify-center mb-4">
               {scannerMode === 'waiting' && <QrCode className="h-16 w-16 text-primary" />}
               {scannerMode === 'scanning' && <Camera className="h-16 w-16 text-primary animate-pulse" />}
+              {scannerMode === 'confirmation' && <User className="h-16 w-16 text-blue-500" />}
               {scannerMode === 'success' && <CheckCircle className="h-16 w-16 text-green-500" />}
               {scannerMode === 'error' && <User className="h-16 w-16 text-red-500" />}
             </div>
             <CardTitle className="text-3xl font-heading font-bold">
               {scannerMode === 'waiting' && 'Ready to Check In'}
               {scannerMode === 'scanning' && 'Scanning QR Code...'}
+              {scannerMode === 'confirmation' && 'Choose Check-In Method'}
               {scannerMode === 'success' && 'Welcome Back!'}
               {scannerMode === 'error' && 'Check-In Issue'}
             </CardTitle>
@@ -209,6 +255,83 @@ export default function KioskCheckIn() {
               </div>
             )}
 
+            {/* Confirmation State */}
+            {scannerMode === 'confirmation' && scanResult && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+                    <h3 className="text-xl font-bold text-blue-800 mb-2">
+                      Hi {scanResult.member?.firstName}!
+                    </h3>
+                    <p className="text-blue-700 mb-4">
+                      {scanResult.message}
+                    </p>
+                    
+                    {scanResult.dayPasses && (
+                      <div className="bg-white rounded-lg p-4 mb-4">
+                        <p className="font-semibold text-blue-800 mb-2">Day Passes Available:</p>
+                        <div className="text-2xl font-bold text-blue-600 mb-2">
+                          {scanResult.dayPasses.totalRemaining} days remaining
+                        </div>
+                        <div className="space-y-1 text-sm text-blue-600">
+                          {scanResult.dayPasses.packages.map(pkg => (
+                            <div key={pkg.id} className="flex justify-between">
+                              <span>{pkg.name}</span>
+                              <span>{pkg.remaining}/{pkg.total} remaining</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    {(scanResult.member?.membershipStatus === 'active') && (
+                      <Button 
+                        size="lg"
+                        onClick={() => confirmCheckIn(false)}
+                        className="bg-primary hover:bg-primary/90 text-white py-6 text-xl font-bold"
+                        disabled={checkInMutation.isPending}
+                      >
+                        {checkInMutation.isPending ? (
+                          <div className="animate-spin w-6 h-6 border-4 border-white border-t-transparent rounded-full mr-3" />
+                        ) : (
+                          <User className="h-6 w-6 mr-3" />
+                        )}
+                        Use Monthly Membership
+                      </Button>
+                    )}
+                    
+                    {scanResult.dayPasses && scanResult.dayPasses.totalRemaining > 0 && (
+                      <Button 
+                        size="lg"
+                        variant="outline"
+                        onClick={() => confirmCheckIn(true)}
+                        className="border-2 border-primary text-primary hover:bg-primary/10 py-6 text-xl font-bold"
+                        disabled={checkInMutation.isPending}
+                      >
+                        {checkInMutation.isPending ? (
+                          <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full mr-3" />
+                        ) : (
+                          <Sparkles className="h-6 w-6 mr-3" />
+                        )}
+                        Use Day Pass ({scanResult.dayPasses.totalRemaining} left)
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    variant="ghost" 
+                    onClick={resetScanner}
+                    className="mt-4 text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Success State */}
             {scannerMode === 'success' && scanResult?.success && (
               <div className="text-center space-y-6">
@@ -223,9 +346,30 @@ export default function KioskCheckIn() {
                   </div>
                   
                   {scanResult.member?.membershipType && (
-                    <Badge className="bg-green-100 text-green-800 border-green-300 text-base px-4 py-1">
-                      {scanResult.member.membershipType} Member
+                    <Badge className="bg-green-100 text-green-800 border-green-300 text-base px-4 py-1 mb-4">
+                      {scanResult.member.membershipType} Check-in
                     </Badge>
+                  )}
+
+                  {/* Show day pass info if used */}
+                  {scanResult.dayPassInfo?.used && (
+                    <div className="bg-white rounded-lg p-4 border border-green-200 mt-4">
+                      <div className="flex items-center justify-center mb-2">
+                        <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                        <span className="font-semibold text-green-800">Day Pass Used</span>
+                      </div>
+                      <div className="text-lg font-bold text-green-700 mb-2">
+                        {scanResult.dayPassInfo.totalRemaining} days remaining
+                      </div>
+                      <div className="space-y-1 text-sm text-green-600">
+                        {scanResult.dayPassInfo.packages.map(pkg => (
+                          <div key={pkg.id} className="flex justify-between">
+                            <span>{pkg.name}</span>
+                            <span>{pkg.remaining}/{pkg.total} left</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
                 

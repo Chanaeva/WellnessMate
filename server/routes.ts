@@ -183,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kiosk check-in using membership ID from QR code
   app.post("/api/kiosk-check-in", async (req, res) => {
     try {
-      const { membershipId } = req.body;
+      const { membershipId, useDayPass } = req.body;
       
       if (!membershipId) {
         return res.status(400).json({ 
@@ -218,14 +218,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // If user has day passes, use those first (they're more expensive per visit)
-      if (activeDayPasses.length > 0) {
+      // If user has both membership and day passes, ask which to use
+      if ((membership && membership.status === 'active') && activeDayPasses.length > 0 && useDayPass === undefined) {
+        const totalDaysRemaining = activeDayPasses.reduce((sum, card) => sum + card.remainingPunches, 0);
+        return res.json({
+          requiresConfirmation: true,
+          member: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            membershipType: membership.planType,
+            membershipStatus: membership.status
+          },
+          dayPasses: {
+            available: true,
+            totalRemaining: totalDaysRemaining,
+            packages: activeDayPasses.map(card => ({
+              id: card.id,
+              name: card.templateName || 'Day Pass Package',
+              remaining: card.remainingPunches,
+              total: card.totalPunches
+            }))
+          },
+          message: `Hi ${user.firstName}! Would you like to use your membership or a day pass?`
+        });
+      }
+      
+      // If user only has day passes, ask for confirmation
+      if ((!membership || membership.status !== 'active') && activeDayPasses.length > 0 && useDayPass === undefined) {
+        const totalDaysRemaining = activeDayPasses.reduce((sum, card) => sum + card.remainingPunches, 0);
+        return res.json({
+          requiresConfirmation: true,
+          member: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            membershipType: 'Day Pass',
+            membershipStatus: 'day-pass'
+          },
+          dayPasses: {
+            available: true,
+            totalRemaining: totalDaysRemaining,
+            packages: activeDayPasses.map(card => ({
+              id: card.id,
+              name: card.templateName || 'Day Pass Package',
+              remaining: card.remainingPunches,
+              total: card.totalPunches
+            }))
+          },
+          message: `Hi ${user.firstName}! Use a day from your pass? (${totalDaysRemaining} remaining)`
+        });
+      }
+      
+      let membershipType = membership?.planType || 'Day Pass';
+      let usedDayPass = false;
+      
+      // Process day pass usage if requested or if only option
+      if ((useDayPass === true) || ((!membership || membership.status !== 'active') && activeDayPasses.length > 0)) {
         const oldestDayPass = activeDayPasses.sort((a, b) => 
           new Date(a.purchasedAt || '1970-01-01').getTime() - new Date(b.purchasedAt || '1970-01-01').getTime()
         )[0];
         
         // Use one visit from the day pass
-        await storage.usePunchCardEntry(oldestDayPass.id);
+        const updatedCard = await storage.usePunchCardEntry(oldestDayPass.id);
+        membershipType = 'Day Pass';
+        usedDayPass = true;
       }
       
       // Create check-in record
@@ -234,14 +289,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: "Kiosk Check-in"
       });
 
+      // Get updated day pass info if used
+      let dayPassInfo = null;
+      if (usedDayPass) {
+        const updatedPunchCards = await storage.getPunchCardsByUserId(user.id);
+        const updatedActiveDayPasses = updatedPunchCards.filter(card => 
+          card.status === 'active' && card.remainingPunches >= 0
+        );
+        const totalRemaining = updatedActiveDayPasses.reduce((sum, card) => sum + card.remainingPunches, 0);
+        
+        dayPassInfo = {
+          used: true,
+          totalRemaining: totalRemaining,
+          packages: updatedActiveDayPasses.map(card => ({
+            id: card.id,
+            name: card.templateName || 'Day Pass Package',
+            remaining: card.remainingPunches,
+            total: card.totalPunches
+          }))
+        };
+      }
+
       res.json({
         success: true,
         member: {
           firstName: user.firstName,
           lastName: user.lastName,
-          membershipType: membership?.planType || 'Day Pass',
+          membershipType: membershipType,
           membershipStatus: membership?.status || 'day-pass'
         },
+        dayPassInfo: dayPassInfo,
         message: `Welcome back, ${user.firstName}! Enjoy your session ✨`
       });
       

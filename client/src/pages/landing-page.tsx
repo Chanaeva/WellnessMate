@@ -119,13 +119,13 @@ export default function LandingPage() {
           
           <div className="grid md:grid-cols-3 gap-6">
             {promotions?.map((promo, index) => (
-              <Card key={index} className={`${promo.bgColor} ${promo.textColor} border-0 shadow-lg transform hover:scale-105 transition-transform duration-300`}>
+              <Card key={index} className="border-0 shadow-lg transform hover:scale-105 transition-transform duration-300 bg-primary text-white">
                 <CardHeader>
                   <CardTitle className="text-2xl font-heading font-bold">{promo.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-lg mb-4 opacity-90 font-body">{promo.description}</p>
-                  <div className="bg-black/20 rounded-lg p-3 mb-4">
+                  <div className="bg-white/20 rounded-lg p-3 mb-4">
                     <p className="text-sm font-medium font-body">Promo Code:</p>
                     <p className="text-xl font-bold font-mono">{promo.code}</p>
                   </div>
@@ -196,7 +196,7 @@ export default function LandingPage() {
             <div className="flex flex-col items-center">
               <MapPin className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">Visit Us</h3>
-              <p className="text-muted-foreground font-body">Ancient Lupus Valley<br />Sacred Waters District</p>
+              <p className="text-muted-foreground font-body">2124 E Admiral<br />Tulsa, OK</p>
             </div>
             
             <div className="flex flex-col items-center">

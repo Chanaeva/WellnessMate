@@ -1166,6 +1166,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Landing page content routes (Admin only)
+  app.get("/api/admin/landing-content", isAdmin, async (req, res) => {
+    try {
+      const content = await storage.getAllLandingPageContent();
+      res.json(content);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/landing-content", isAdmin, async (req, res) => {
+    try {
+      const content = await storage.createLandingPageContent(req.body);
+      res.status(201).json(content);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/admin/landing-content/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const content = await storage.updateLandingPageContent(id, req.body);
+      res.json(content);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/landing-content/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteLandingPageContent(id);
+      res.json({ message: "Content deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Promotion routes (Admin only)
+  app.get("/api/admin/promotions", isAdmin, async (req, res) => {
+    try {
+      const promotions = await storage.getAllPromotions();
+      res.json(promotions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/promotions", isAdmin, async (req, res) => {
+    try {
+      const promotion = await storage.createPromotion(req.body);
+      res.status(201).json(promotion);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/admin/promotions/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const promotion = await storage.updatePromotion(id, req.body);
+      res.json(promotion);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/promotions/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePromotion(id);
+      res.json({ message: "Promotion deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public routes for landing page
+  app.get("/api/promotions", async (req, res) => {
+    try {
+      const promotions = await storage.getActivePromotions();
+      res.json(promotions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/landing-content/:section", async (req, res) => {
+    try {
+      const section = req.params.section;
+      const content = await storage.getLandingPageContentBySection(section);
+      res.json(content);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

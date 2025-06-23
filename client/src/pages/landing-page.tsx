@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,32 +25,14 @@ import {
 export default function LandingPage() {
   const [currentPromo, setCurrentPromo] = useState(0);
 
-  const promotions = [
-    {
-      title: "New Member Special",
-      description: "50% off your first month",
-      code: "WOLFPACK50",
-      validUntil: "End of June 2025",
-      bgColor: "bg-gradient-to-r from-amber-500 to-orange-600",
-      textColor: "text-white"
+  // Fetch promotions from API
+  const { data: promotions } = useQuery({
+    queryKey: ["/api/promotions"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/promotions");
+      return await res.json();
     },
-    {
-      title: "Student Discount",
-      description: "25% off all memberships",
-      code: "STUDENT25",
-      validUntil: "Valid with student ID",
-      bgColor: "bg-gradient-to-r from-blue-500 to-purple-600",
-      textColor: "text-white"
-    },
-    {
-      title: "Family Package",
-      description: "Add family members for just $30/month",
-      code: "FAMILY30",
-      validUntil: "Up to 4 additional members",
-      bgColor: "bg-gradient-to-r from-green-500 to-teal-600",
-      textColor: "text-white"
-    }
-  ];
+  });
 
   const features = [
     {
@@ -134,7 +118,7 @@ export default function LandingPage() {
           </h2>
           
           <div className="grid md:grid-cols-3 gap-6">
-            {promotions.map((promo, index) => (
+            {promotions?.map((promo, index) => (
               <Card key={index} className={`${promo.bgColor} ${promo.textColor} border-0 shadow-lg transform hover:scale-105 transition-transform duration-300`}>
                 <CardHeader>
                   <CardTitle className="text-2xl font-heading font-bold">{promo.title}</CardTitle>

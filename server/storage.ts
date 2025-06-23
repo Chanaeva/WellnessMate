@@ -13,6 +13,8 @@ import {
   healthMetrics, type HealthMetrics, type InsertHealthMetrics,
   stravaIntegrations, type StravaIntegration, type InsertStravaIntegration,
   notifications, type Notification, type InsertNotification,
+  landingPageContent, type LandingPageContent, type InsertLandingPageContent,
+  promotions, type Promotion, type InsertPromotion,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -115,6 +117,21 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   updateNotification(id: number, data: Partial<Notification>): Promise<Notification>;
   deleteNotification(id: number): Promise<void>;
+
+  // Landing page content methods
+  getAllLandingPageContent(): Promise<LandingPageContent[]>;
+  getLandingPageContentBySection(section: string): Promise<LandingPageContent[]>;
+  updateLandingPageContent(id: number, content: Partial<LandingPageContent>): Promise<LandingPageContent>;
+  createLandingPageContent(content: InsertLandingPageContent): Promise<LandingPageContent>;
+  deleteLandingPageContent(id: number): Promise<void>;
+
+  // Promotion methods
+  getAllPromotions(): Promise<Promotion[]>;
+  getActivePromotions(): Promise<Promotion[]>;
+  getPromotionById(id: number): Promise<Promotion | undefined>;
+  createPromotion(promotion: InsertPromotion): Promise<Promotion>;
+  updatePromotion(id: number, data: Partial<Promotion>): Promise<Promotion>;
+  deletePromotion(id: number): Promise<void>;
   
   // Session store
   sessionStore: any;

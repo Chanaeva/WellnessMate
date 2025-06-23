@@ -145,6 +145,31 @@ export const punchCards = pgTable("punch_cards", {
   expiresAt: timestamp("expires_at"), // Optional expiration date
 });
 
+// Landing page content tables
+export const landingPageContent = pgTable("landing_page_content", {
+  id: serial("id").primaryKey(),
+  section: text("section").notNull(), // 'hero', 'promotions', 'features', 'contact'
+  key: text("key").notNull(), // specific field identifier
+  value: text("value").notNull(), // content value
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const promotions = pgTable("promotions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  code: text("code").notNull(),
+  validUntil: text("valid_until").notNull(),
+  bgColor: text("bg_color").notNull().default("bg-gradient-to-r from-amber-500 to-orange-600"),
+  textColor: text("text_color").notNull().default("text-white"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,

@@ -303,6 +303,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Added visual feedback showing package details and remaining balance
   - Integrated proper state management for confirmation workflow
 
+- June 23, 2025: Added comprehensive membership agreement form after registration ✓
+  - Created detailed membership agreement page with all legal terms and conditions
+  - Integrated health and safety acknowledgments with medical clearance requirements
+  - Added assumption of risk and liability waiver with clear legal language
+  - Included facility rules, privacy policies, and emergency medical consent
+  - Enhanced user schema to store agreement completion and member emergency information
+  - Updated registration flow to redirect to agreement form before dashboard access
+  - Implemented two-step registration process: account creation → membership agreement
+
 ## Changelog
 
 Changelog:

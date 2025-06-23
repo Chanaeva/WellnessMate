@@ -24,6 +24,7 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminMembershipPlans from "@/pages/admin-membership-plans";
 import AdminLandingPageManager from "@/pages/admin/landing-page-manager";
 import KioskCheckIn from "@/pages/kiosk-checkin";
+import MembershipAgreement from "@/pages/membership-agreement";
 import StaffCheckIn from "@/pages/staff-checkin";
 import TestPayment from "@/pages/test-payment";
 
@@ -32,6 +33,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/membership-agreement" component={MembershipAgreement} />
       <Route path="/admin-login" component={AuthPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />

@@ -19,7 +19,8 @@ import {
   CheckCircle,
   Sparkles,
   Shield,
-  Clock
+  Clock,
+  Copy
 } from "lucide-react";
 
 export default function LandingPage() {

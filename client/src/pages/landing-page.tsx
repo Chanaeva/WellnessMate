@@ -8,7 +8,6 @@ import {
   Crown, 
   Heart, 
   Users, 
-  Star, 
   Calendar, 
   MapPin, 
   Phone, 
@@ -73,26 +72,7 @@ export default function LandingPage() {
     }
   ];
 
-  const testimonials = [
-    {
-      name: "Marcus Aurelius",
-      role: "Wellness Enthusiast",
-      content: "Wolf Mother has transformed my daily routine. The thermal waters remind me of ancient Roman grandeur.",
-      rating: 5
-    },
-    {
-      name: "Julia Lupina",
-      role: "Regular Member",
-      content: "The mythological atmosphere and healing waters create an escape from modern stress.",
-      rating: 5
-    },
-    {
-      name: "Romulus Thorne",
-      role: "VIP Member", 
-      content: "Exceptional facilities and service. This is more than a wellness center - it's a sanctuary.",
-      rating: 5
-    }
-  ];
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -183,33 +163,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-slate-800">
-            Pack Members Speak
-          </h2>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="border-0 shadow-md">
-                <CardContent className="pt-6">
-                  <div className="flex mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="h-5 w-5 text-amber-500 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-slate-600 mb-4 italic">"{testimonial.content}"</p>
-                  <div>
-                    <p className="font-semibold text-slate-800">{testimonial.name}</p>
-                    <p className="text-sm text-slate-500">{testimonial.role}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* Call to Action */}
       <section className="py-20 px-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white">

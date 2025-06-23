@@ -44,7 +44,7 @@ export default function KioskCheckIn() {
         membershipId = qrData.split('membership:')[1];
       }
       
-      const res = await apiRequest("POST", "/api/check-in", { membershipId });
+      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId });
       return await res.json() as CheckInResponse;
     },
     onSuccess: (data) => {

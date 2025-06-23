@@ -94,7 +94,7 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/auth-page?tab=register">
+            <Link href="/auth?tab=register">
               <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8 py-4 text-lg font-medium">
                 <Crown className="h-5 w-5 mr-2" />
                 Join the Pack
@@ -102,7 +102,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             
-            <Link href="/auth-page?tab=login">
+            <Link href="/auth?tab=login">
               <Button variant="outline" size="lg" className="border-primary text-primary hover:bg-primary/10 px-8 py-4 text-lg font-medium">
                 <Users className="h-5 w-5 mr-2" />
                 Member Login
@@ -175,14 +175,14 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <Link href="/auth-page?tab=register">
+            <Link href="/auth?tab=register">
               <Button size="lg" className="bg-white text-neutral-900 hover:bg-gray-100 px-10 py-6 text-xl font-bold shadow-2xl border-3 border-white hover:shadow-3xl transform hover:scale-105 transition-all duration-300">
                 <CheckCircle className="h-6 w-6 mr-3" />
                 Start Your Journey
               </Button>
             </Link>
             
-            <Link href="/auth-page?tab=login">
+            <Link href="/auth?tab=login">
               <Button variant="outline" size="lg" className="border-4 border-white text-white bg-transparent hover:bg-white hover:text-neutral-900 px-10 py-6 text-xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
                 Login to View Plans
               </Button>

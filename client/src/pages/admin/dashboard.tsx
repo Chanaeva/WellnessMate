@@ -25,7 +25,9 @@ import {
   CheckCircle,
   Download,
   Printer,
-  DollarSign
+  DollarSign,
+  Monitor,
+  ExternalLink
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,6 +36,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import Header from "@/components/layout/header";
+import { Link } from "wouter";
 import QRCode from "qrcode";
 import PackagesManagement from "./packages";
 import AdminMembers from "./members";
@@ -301,7 +304,7 @@ export default function AdminDashboard() {
               </Card>
             </div>
 
-            {/* Daily QR Code Section */}
+            {/* Check-in Management Section */}
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -338,6 +341,39 @@ export default function AdminDashboard() {
                       <p className="text-muted-foreground">Generating QR code...</p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    iPad Kiosk Interface
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Self-service check-in for members
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-center">
+                    <div className="bg-muted rounded-lg p-4 mb-4">
+                      <Monitor className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Open this on your iPad at the front desk
+                      </p>
+                    </div>
+                    <Link href="/kiosk" target="_blank">
+                      <Button className="w-full">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Launch Kiosk Mode
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>• Members scan QR codes to check in</p>
+                    <p>• Automatic session welcome messages</p>
+                    <p>• No staff assistance required</p>
+                  </div>
                 </CardContent>
               </Card>
 

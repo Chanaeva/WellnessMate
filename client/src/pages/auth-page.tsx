@@ -114,16 +114,15 @@ function AuthPage() {
     loginMutation.mutate(data, {
       onSuccess: (response) => {
         playLoginSuccess();
-        // Handle redirect based on user status
-        const user = response?.user || response;
-        if (user) {
-          if (isAdminLogin || user.role === "admin") {
-            navigate("/admin");
-          } else if (!user.membershipAgreementCompleted) {
-            navigate("/membership-agreement");
-          } else {
-            navigate("/dashboard");
-          }
+        // Use redirectTo from response or fallback to user status check
+        if (response.redirectTo) {
+          navigate(response.redirectTo);
+        } else if (response.role === "admin") {
+          navigate("/admin");
+        } else if (!response.membershipAgreementCompleted) {
+          navigate("/membership-agreement");
+        } else {
+          navigate("/dashboard");
         }
       },
       onError: () => {

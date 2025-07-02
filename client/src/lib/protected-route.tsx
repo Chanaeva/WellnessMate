@@ -38,5 +38,14 @@ export function ProtectedRoute({
     );
   }
 
+  // Redirect users who already completed membership agreement away from the agreement page
+  if (path === "/membership-agreement" && user.membershipAgreementCompleted) {
+    return (
+      <Route path={path}>
+        <Redirect to="/dashboard" />
+      </Route>
+    );
+  }
+
   return <Route path={path} component={Component} />;
 }

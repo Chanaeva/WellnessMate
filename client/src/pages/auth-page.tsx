@@ -112,7 +112,7 @@ function AuthPage() {
 
   const onLoginSubmit = (data: LoginFormValues) => {
     loginMutation.mutate(data, {
-      onSuccess: (response) => {
+      onSuccess: (response: any) => {
         playLoginSuccess();
         // Use redirectTo from response or fallback to user status check
         if (response.redirectTo) {
@@ -135,7 +135,7 @@ function AuthPage() {
     // Remove confirmPassword before submitting
     const { confirmPassword, ...registerData } = data;
     registerMutation.mutate(registerData, {
-      onSuccess: (response) => {
+      onSuccess: (response: any) => {
         playLoginSuccess();
         if (response.redirectTo) {
           navigate(response.redirectTo);

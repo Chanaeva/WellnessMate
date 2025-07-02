@@ -127,7 +127,19 @@ export function setupAuth(app: Express) {
         if (err) return next(err);
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
-        res.status(200).json(userWithoutPassword);
+        
+        // Determine redirect based on user status
+        let redirectTo = "/dashboard";
+        if (userWithoutPassword.role === "admin") {
+          redirectTo = "/admin";
+        } else if (!userWithoutPassword.membershipAgreementCompleted) {
+          redirectTo = "/membership-agreement";
+        }
+        
+        res.status(200).json({
+          ...userWithoutPassword,
+          redirectTo
+        });
       });
     })(req, res, next);
   });

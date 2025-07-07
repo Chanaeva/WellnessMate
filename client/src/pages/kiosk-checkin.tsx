@@ -5,7 +5,16 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { z } from "zod";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import { 
   QrCode, 
@@ -15,8 +24,10 @@ import {
   User, 
   Clock,
   ArrowLeft,
-  Waves
+  Waves,
+  UserPlus
 } from "lucide-react";
+import KioskMemberCreation from "./kiosk-member-creation";
 
 interface CheckInResponse {
   success?: boolean;
@@ -50,8 +61,23 @@ interface CheckInResponse {
   message: string;
 }
 
+// Stripe setup
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
+
+// Form schemas
+const memberFormSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Valid email is required"),
+  phoneNumber: z.string().optional(),
+  packageType: z.enum(["membership", "daypass"]),
+  packageId: z.string().min(1, "Please select a package"),
+});
+
+type MemberFormData = z.infer<typeof memberFormSchema>;
+
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'confirmation' | 'success' | 'error'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'confirmation' | 'success' | 'error' | 'create-member'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
@@ -157,6 +183,16 @@ export default function KioskCheckIn() {
     setPendingMembershipId(null);
   };
 
+  // Show member creation form
+  if (scannerMode === 'create-member') {
+    return (
+      <KioskMemberCreation
+        onBack={() => setScannerMode('waiting')}
+        onSuccess={() => setScannerMode('waiting')}
+      />
+    );
+  }
+
   // Cleanup scanner on component unmount
   useEffect(() => {
     return () => {
@@ -220,6 +256,22 @@ export default function KioskCheckIn() {
                   <QrCode className="h-8 w-8 mr-4" />
                   Check In
                 </Button>
+                
+                <div className="mt-8">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    New to Wolf Mother Wellness?
+                  </p>
+                  <Button 
+                    onClick={() => setScannerMode('create-member')}
+                    variant="outline"
+                    size="lg"
+                    className="border-2 border-primary text-primary hover:bg-primary/10 text-lg font-semibold py-4 px-8"
+                  >
+                    <UserPlus className="h-5 w-5 mr-3" />
+                    Create New Member
+                  </Button>
+                </div>
+                
                 <div className="flex items-center justify-center text-sm text-muted-foreground mt-8">
                   <Waves className="h-4 w-4 mr-2" />
                   <span>Sacred waters await your arrival</span>

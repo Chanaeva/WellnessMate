@@ -14,7 +14,8 @@ import {
   insertMembershipPlanSchema,
   insertPunchCardTemplateSchema,
   insertPunchCardSchema,
-  insertNotificationSchema
+  insertNotificationSchema,
+  insertUserSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1412,6 +1413,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(content);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Kiosk member creation endpoint
+  app.post("/api/kiosk/create-member-payment", async (req, res) => {
+    try {
+      const { memberData, packageData } = req.body;
+      
+      // Validate the request data
+      const memberFormSchema = z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+        phoneNumber: z.string().optional(),
+        packageType: z.enum(["membership", "daypass"]),
+        packageId: z.string().min(1),
+      });
+      
+      const validatedMemberData = memberFormSchema.parse(memberData);
+      
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(validatedMemberData.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      
+      // Create payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(packageData.price * 100), // Convert to cents
+        currency: 'usd',
+        description: `${packageData.name} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: {
+          memberFirstName: validatedMemberData.firstName,
+          memberLastName: validatedMemberData.lastName,
+          memberEmail: validatedMemberData.email,
+          memberPhone: validatedMemberData.phoneNumber || '',
+          packageType: validatedMemberData.packageType,
+          packageId: validatedMemberData.packageId,
+          packageName: packageData.name,
+        },
+      });
+      
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id 
+      });
+    } catch (error: any) {
+      console.error("Kiosk member creation error:", error);
+      res.status(500).json({ message: "Failed to create member payment: " + error.message });
+    }
+  });
+
+  // Confirm member creation after successful payment
+  app.post("/api/kiosk/confirm-member-creation", async (req, res) => {
+    try {
+      const { paymentIntentId, memberData, packageData } = req.body;
+      
+      // Verify payment was successful
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+      
+      // Create the member account
+      const salt = randomBytes(16).toString('hex');
+      const tempPassword = Math.random().toString(36).slice(-8);
+      const key = await scryptAsync(tempPassword, salt, 64) as Buffer;
+      
+      const newUser = await storage.createUser({
+        username: memberData.email,
+        email: memberData.email,
+        password: `${key.toString('hex')}:${salt}`,
+        firstName: memberData.firstName,
+        lastName: memberData.lastName,
+        phoneNumber: memberData.phoneNumber || undefined,
+        role: 'member',
+        isAgreementComplete: false, // They'll need to complete agreement on first login
+      });
+      
+      // Create membership or punch card based on package type
+      if (memberData.packageType === 'membership') {
+        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+        const membershipId = `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+        
+        await storage.createMembership({
+          id: membershipId,
+          userId: newUser.id,
+          planType: packageData.planType || 'basic',
+          status: 'active',
+          startDate: new Date(),
+          endDate: endDate,
+          autoRenew: true,
+        });
+      } else if (memberData.packageType === 'daypass') {
+        await storage.createPunchCard({
+          userId: newUser.id,
+          templateId: parseInt(memberData.packageId),
+          totalPunches: packageData.totalPunches || 5,
+          remainingPunches: packageData.totalPunches || 5,
+          isActive: true,
+        });
+      }
+      
+      // Record the payment
+      await storage.createPayment({
+        userId: newUser.id,
+        membershipId: memberData.packageType === 'membership' ? `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}` : 'punch-card',
+        amount: packageData.price,
+        description: `${packageData.name} - Kiosk Purchase`,
+        status: 'successful',
+        method: 'credit_card',
+        stripePaymentIntentId: paymentIntent.id,
+        stripePaymentMethodId: paymentIntent.payment_method as string,
+      });
+      
+      console.log(`Successfully created member: ${memberData.firstName} ${memberData.lastName}`);
+      
+      res.json({ 
+        message: "Member created successfully",
+        user: {
+          id: newUser.id,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: newUser.email
+        }
+      });
+    } catch (error: any) {
+      console.error("Member creation confirmation error:", error);
+      res.status(500).json({ message: "Failed to create member: " + error.message });
     }
   });
 

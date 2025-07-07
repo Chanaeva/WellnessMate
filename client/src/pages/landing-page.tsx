@@ -198,7 +198,7 @@ export default function LandingPage() {
             <div className="flex flex-col items-center">
               <MapPin className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">Visit Us</h3>
-              <p className="text-muted-foreground font-body">2124 E Admiral<br />Tulsa, OK</p>
+              <p className="text-muted-foreground font-body">2124 E Admiral<br />Kendall Witter Neighborhood<br />Tulsa, OK</p>
             </div>
             
             <div className="flex flex-col items-center">

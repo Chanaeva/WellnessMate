@@ -59,6 +59,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel membership endpoint
+  app.delete("/api/membership/cancel", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const membership = await storage.getMembershipByUserId(userId);
+      
+      if (!membership || membership.status !== 'active') {
+        return res.status(400).json({ 
+          error: "No active membership found to cancel" 
+        });
+      }
+
+      // Update membership status to cancelled
+      await storage.updateMembership(membership.id, { 
+        status: 'cancelled',
+        endDate: new Date() // Set end date to now for immediate cancellation
+      });
+
+      res.json({ 
+        message: "Membership cancelled successfully",
+        membership: await storage.getMembershipByUserId(userId)
+      });
+    } catch (error: any) {
+      console.error("Error cancelling membership:", error);
+      res.status(500).json({ 
+        error: "Failed to cancel membership",
+        details: error.message 
+      });
+    }
+  });
+
   // Update membership for current user
   app.patch("/api/membership", isAuthenticated, async (req, res) => {
     try {

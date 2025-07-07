@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -57,6 +58,7 @@ import {
   Trash2,
   Shield,
   DollarSign,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";
@@ -76,6 +78,7 @@ export default function MemberDashboard() {
   const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
+  const [showCancelMembershipDialog, setShowCancelMembershipDialog] = useState(false);
 
   // Check if we should auto-open add payment form from URL params
   useEffect(() => {
@@ -325,6 +328,32 @@ export default function MemberDashboard() {
     },
   });
 
+  // Cancel membership mutation
+  const cancelMembershipMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", "/api/membership/cancel");
+      if (!response.ok) {
+        throw new Error("Failed to cancel membership");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+      setShowCancelMembershipDialog(false);
+      toast({
+        title: "Membership Cancelled",
+        description: "Your membership has been cancelled effective immediately. No prorated refund will be issued.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel membership",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Helper functions for notification styling
   const getNotificationColor = (type: string) => {
     switch (type) {
@@ -567,6 +596,7 @@ export default function MemberDashboard() {
               currentPlan={currentPlan}
               userPunchCards={userPunchCards}
               payments={payments}
+              onCancelMembership={() => setShowCancelMembershipDialog(true)}
               isLoading={isMembershipLoading}
             />
 
@@ -823,6 +853,50 @@ export default function MemberDashboard() {
               className="w-full sm:w-auto wellness-button-primary"
             >
               Add Payment Method
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Membership Dialog */}
+      <AlertDialog
+        open={showCancelMembershipDialog}
+        onOpenChange={setShowCancelMembershipDialog}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="bg-destructive/10 p-2 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-xl">Cancel Membership</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base leading-relaxed">
+              Are you sure you want to cancel your membership? This action cannot be undone.
+              <br/><br/>
+              <strong>Important:</strong> Your membership will be cancelled immediately and no prorated refund will be issued for the remaining time on your current billing cycle.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel 
+              onClick={() => setShowCancelMembershipDialog(false)}
+              className="px-8 py-3"
+            >
+              Keep Membership
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => cancelMembershipMutation.mutate()}
+              className="bg-destructive hover:bg-destructive/90 text-white font-semibold px-8 py-3"
+              disabled={cancelMembershipMutation.isPending}
+            >
+              {cancelMembershipMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                "Cancel Membership"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

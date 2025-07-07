@@ -61,10 +61,17 @@ export default function PackagesPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [showMembershipAlert, setShowMembershipAlert] = useState(false);
+  const [showMembershipExistsAlert, setShowMembershipExistsAlert] = useState(false);
 
   // Fetch membership plans
   const { data: membershipPlans, isLoading: isPlansLoading } = useQuery<MembershipPlan[]>({
     queryKey: ["/api/membership-plans"],
+  });
+
+  // Fetch user's current membership
+  const { data: userMembership } = useQuery<Membership>({
+    queryKey: ["/api/membership"],
+    enabled: !!user,
   });
 
   // Fetch punch card options
@@ -86,14 +93,16 @@ export default function PackagesPage() {
   };
 
   const handleAddMembershipToCart = (plan: MembershipPlan) => {
-    // Check if user is selecting the same plan they already have
-    if (currentMembership && currentMembership.status === 'active' && currentMembership.planType === plan.planType) {
+    if (!user) {
       setShowMembershipAlert(true);
       return;
     }
 
-    // For upgrades, allow the purchase and show upgrade messaging
-    const isUpgrade = currentMembership && currentMembership.status === 'active';
+    // Check if user already has an active membership
+    if (userMembership && userMembership.status === 'active') {
+      setShowMembershipExistsAlert(true);
+      return;
+    }
 
     addItem({
       id: `membership-${plan.id}`,
@@ -101,18 +110,21 @@ export default function PackagesPage() {
       name: plan.name,
       price: plan.monthlyPrice,
       description: plan.description,
-      data: { ...plan, isUpgrade }
+      data: plan
     });
     
     toast({
-      title: isUpgrade ? "Upgrade Added to Cart" : "Added to Cart",
-      description: isUpgrade 
-        ? `${plan.name} upgrade will replace your current membership.`
-        : `${plan.name} has been added to your cart.`,
+      title: "Added to Cart",
+      description: `${plan.name} has been added to your cart.`,
     });
   };
 
   const handleAddPunchCardToCart = (option: any) => {
+    if (!user) {
+      setShowMembershipAlert(true);
+      return;
+    }
+
     addItem({
       id: `punch-card-${option.name.replace(/\s+/g, '-').toLowerCase()}`,
       type: 'punch_card',
@@ -421,7 +433,7 @@ export default function PackagesPage() {
       
       <Footer />
 
-      {/* Membership Restriction Alert */}
+      {/* Login Required Alert */}
       <AlertDialog open={showMembershipAlert} onOpenChange={setShowMembershipAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -429,16 +441,42 @@ export default function PackagesPage() {
               <div className="bg-amber-100 p-2 rounded-full">
                 <AlertTriangle className="h-5 w-5 text-amber-600" />
               </div>
-              <AlertDialogTitle>Current Plan Selected</AlertDialogTitle>
+              <AlertDialogTitle>Login Required</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="pt-2">
-              You are already subscribed to this membership plan. To upgrade or downgrade to a different plan, 
-              please select one of the other available membership options.
+              Please log in to add items to your cart and make purchases.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowMembershipAlert(false)}>
               Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Membership Already Exists Alert */}
+      <AlertDialog open={showMembershipExistsAlert} onOpenChange={setShowMembershipExistsAlert}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="bg-destructive/10 p-2 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-xl">Membership Already Active</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base leading-relaxed">
+              You already have an active membership. Only one membership is allowed at a time.
+              <br/><br/>
+              To change your membership plan, please cancel your current membership first. Note that membership cancellations are effective immediately with no prorated refund for remaining time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogAction 
+              onClick={() => setShowMembershipExistsAlert(false)}
+              className="bg-primary hover:bg-primary/90 text-white font-semibold px-8 py-3"
+            >
+              Got It
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

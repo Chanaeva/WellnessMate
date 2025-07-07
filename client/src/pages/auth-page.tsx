@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import { SMSResetForm } from "@/components/auth/sms-reset-form";
 
@@ -34,14 +35,32 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-// Registration schema (extends insertUserSchema with password confirmation)
+// Registration schema (extends insertUserSchema with password confirmation and age verification)
 const registerSchema = insertUserSchema
   .extend({
     confirmPassword: z.string().min(1, "Please confirm your password"),
+    dateOfBirth: z.string().min(1, "Date of birth is required"),
+    ageConfirmation: z.boolean().refine(val => val === true, {
+      message: "You must be 18 years or older to register",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
+  })
+  .refine((data) => {
+    if (data.dateOfBirth) {
+      const birthDate = new Date(data.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
+      return actualAge >= 18;
+    }
+    return true;
+  }, {
+    message: "You must be 18 years or older to register",
+    path: ["dateOfBirth"],
   });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -423,6 +442,49 @@ function AuthPage() {
                                 />
                               </div>
                             </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={registerForm.control}
+                        name="dateOfBirth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date of Birth</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={registerForm.control}
+                        name="ageConfirmation"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="mt-1"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>
+                                I confirm that I am 18 years of age or older
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Wolf Mother Wellness is an adult-only facility. Membership is restricted to individuals 18 years and older.
+                              </p>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}

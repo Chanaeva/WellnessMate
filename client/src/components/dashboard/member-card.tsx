@@ -1,7 +1,8 @@
 import { User, Membership, MembershipPlan, PunchCard, Payment } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Crown, Calendar, CreditCard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, Crown, Calendar, CreditCard, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
 interface MemberCardProps {
@@ -13,6 +14,7 @@ interface MemberCardProps {
   currentPlan?: MembershipPlan;
   userPunchCards?: PunchCard[];
   payments?: Payment[];
+  onCancelMembership?: () => void;
 }
 
 const MemberCard = ({
@@ -24,6 +26,7 @@ const MemberCard = ({
   currentPlan,
   userPunchCards = [],
   payments = [],
+  onCancelMembership,
   isLoading = false
 }: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
@@ -130,6 +133,21 @@ const MemberCard = ({
                 </div>
               )}
             </div>
+          </div>
+        )}
+        
+        {/* Cancel Membership Button */}
+        {onCancelMembership && (
+          <div className="border-t pt-4 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCancelMembership}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Cancel Membership
+            </Button>
           </div>
         )}
       </CardContent>

@@ -220,119 +220,171 @@
   }
 }
 
-/* Steam Animation Effects */
-.steam-container {
+/* Water Animation Effects */
+.water-container {
   position: relative;
   width: 100%;
   height: 100%;
 }
 
-.steam-particle {
+.water-ripple {
   position: absolute;
-  bottom: -20px;
-  width: 3px;
-  height: 20px;
-  background: linear-gradient(to top, 
-    rgba(255, 255, 255, 0.6) 0%,
-    rgba(255, 255, 255, 0.4) 30%,
-    rgba(255, 255, 255, 0.2) 60%,
-    transparent 100%
-  );
-  border-radius: 50px;
-  animation: steam-rise infinite ease-out;
-  filter: blur(1px);
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(76, 103, 65, 0.3);
+  border-radius: 50%;
+  animation: water-ripple-expand infinite ease-out;
 }
 
-.steam-particle:nth-child(odd) {
-  background: linear-gradient(to top, 
-    rgba(76, 103, 65, 0.3) 0%,
-    rgba(76, 103, 65, 0.2) 30%,
-    rgba(76, 103, 65, 0.1) 60%,
-    transparent 100%
-  );
+.water-ripple::before,
+.water-ripple::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  animation: water-ripple-expand infinite ease-out;
 }
 
-@keyframes steam-rise {
+.water-ripple::before {
+  animation-delay: 0.5s;
+}
+
+.water-ripple::after {
+  animation-delay: 1s;
+}
+
+@keyframes water-ripple-expand {
   0% {
-    transform: translateY(0) translateX(0) scaleX(1);
-    opacity: 0.8;
-  }
-  25% {
-    transform: translateY(-25vh) translateX(-5px) scaleX(1.2);
-    opacity: 0.6;
+    transform: scale(0);
+    opacity: 1;
   }
   50% {
-    transform: translateY(-50vh) translateX(8px) scaleX(0.8);
-    opacity: 0.4;
-  }
-  75% {
-    transform: translateY(-75vh) translateX(-3px) scaleX(1.1);
-    opacity: 0.2;
+    opacity: 0.6;
   }
   100% {
-    transform: translateY(-100vh) translateX(10px) scaleX(0.6);
+    transform: scale(4);
     opacity: 0;
   }
 }
 
-/* Floating Mist Layers */
-.mist-layer {
+/* Flowing Water Waves */
+.water-wave {
   position: absolute;
-  width: 120%;
-  height: 120%;
-  background: radial-gradient(circle at center, 
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.05) 40%,
-    transparent 70%
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(135deg, 
+    transparent 0%,
+    rgba(76, 103, 65, 0.1) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(76, 103, 65, 0.1) 75%,
+    transparent 100%
   );
-  border-radius: 50%;
-  animation: float-mist infinite ease-in-out;
+  animation: water-flow infinite linear;
 }
 
-.mist-1 {
-  top: -10%;
-  left: -10%;
+.wave-1 {
+  top: 0;
+  left: -100%;
   animation-duration: 20s;
   animation-delay: 0s;
 }
 
-.mist-2 {
-  top: -15%;
-  right: -10%;
+.wave-2 {
+  top: 10%;
+  left: -100%;
   animation-duration: 25s;
   animation-delay: -8s;
-  background: radial-gradient(circle at center, 
-    rgba(76, 103, 65, 0.08) 0%,
-    rgba(76, 103, 65, 0.04) 40%,
-    transparent 70%
+  background: linear-gradient(135deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 25%,
+    rgba(76, 103, 65, 0.08) 50%,
+    rgba(255, 255, 255, 0.08) 75%,
+    transparent 100%
   );
 }
 
-.mist-3 {
-  bottom: -10%;
-  left: 50%;
-  transform: translateX(-50%);
+.wave-3 {
+  top: 20%;
+  left: -100%;
   animation-duration: 30s;
   animation-delay: -15s;
 }
 
-@keyframes float-mist {
-  0%, 100% {
-    transform: translateX(-50%) translateY(0) scale(1);
-    opacity: 0.3;
+@keyframes water-flow {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Floating Bubbles */
+.bubbles-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.water-bubble {
+  position: absolute;
+  bottom: -10px;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle at 30% 30%, 
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    rgba(76, 103, 65, 0.2) 100%
+  );
+  border-radius: 50%;
+  animation: bubble-float infinite ease-in-out;
+  filter: blur(0.5px);
+}
+
+.water-bubble::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 3px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  filter: blur(0.5px);
+}
+
+@keyframes bubble-float {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.5);
+    opacity: 0.8;
   }
   25% {
-    transform: translateX(-45%) translateY(-10px) scale(1.1);
-    opacity: 0.4;
+    transform: translateY(-20vh) translateX(-10px) scale(0.8);
+    opacity: 0.9;
   }
   50% {
-    transform: translateX(-55%) translateY(-5px) scale(0.9);
-    opacity: 0.2;
+    transform: translateY(-40vh) translateX(15px) scale(1);
+    opacity: 0.7;
   }
   75% {
-    transform: translateX(-48%) translateY(-15px) scale(1.05);
-    opacity: 0.35;
+    transform: translateY(-60vh) translateX(-5px) scale(0.9);
+    opacity: 0.5;
   }
+  100% {
+    transform: translateY(-80vh) translateX(8px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* Water-themed thermal glow effect for logo */
+.thermal-glow {
+  filter: drop-shadow(0 0 20px rgba(76, 103, 65, 0.4)) 
+          drop-shadow(0 0 40px rgba(173, 216, 230, 0.2))
+          drop-shadow(0 0 60px rgba(255, 255, 255, 0.1));
 }
 
 /* Thermal glow effect for logo */

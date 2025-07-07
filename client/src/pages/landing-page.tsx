@@ -65,28 +65,44 @@ export default function LandingPage() {
       <section className="relative py-20 px-4 bg-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
         
-        {/* Animated Steam Effects */}
+        {/* Animated Water Effects */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Steam particles */}
-          <div className="steam-container">
-            {[...Array(12)].map((_, i) => (
+          {/* Water ripples */}
+          <div className="water-container">
+            {[...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="steam-particle"
+                className="water-ripple"
                 style={{
-                  left: `${10 + (i * 7)}%`,
-                  animationDelay: `${i * 0.8}s`,
-                  animationDuration: `${8 + (i % 3)}s`
+                  left: `${15 + (i * 12)}%`,
+                  top: `${20 + (i * 8)}%`,
+                  animationDelay: `${i * 2}s`,
+                  animationDuration: `${6 + (i % 2)}s`
                 }}
               />
             ))}
           </div>
           
-          {/* Floating mist overlay */}
-          <div className="absolute inset-0 opacity-30">
-            <div className="mist-layer mist-1"></div>
-            <div className="mist-layer mist-2"></div>
-            <div className="mist-layer mist-3"></div>
+          {/* Flowing water waves */}
+          <div className="absolute inset-0 opacity-40">
+            <div className="water-wave wave-1"></div>
+            <div className="water-wave wave-2"></div>
+            <div className="water-wave wave-3"></div>
+          </div>
+          
+          {/* Floating bubbles */}
+          <div className="bubbles-container">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="water-bubble"
+                style={{
+                  left: `${20 + (i * 15)}%`,
+                  animationDelay: `${i * 1.5}s`,
+                  animationDuration: `${12 + (i % 3)}s`
+                }}
+              />
+            ))}
           </div>
         </div>
 

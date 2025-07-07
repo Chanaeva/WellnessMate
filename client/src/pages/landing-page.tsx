@@ -5,7 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import logoBlack from "@assets/WM Emblem Black.png";
+import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png";
 import { 
   Waves, 
   Crown, 
@@ -69,9 +69,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto text-center relative z-10">
           <div className="flex justify-center mb-8">
             <img 
-              src={logoBlack} 
+              src={logoTransparent} 
               alt="Wolf Mother Wellness" 
-              className="h-24 w-24 object-contain"
+              className="h-32 w-32 object-contain drop-shadow-lg"
             />
           </div>
           

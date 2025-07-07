@@ -314,6 +314,11 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Fixed authentication redirect logic to keep members on dashboard after login
   - Added protection to prevent completed members from accessing agreement page again
 
+- July 2, 2025: Updated landing page with new transparent logo design ✓
+  - Replaced solid black logo with transparent moss green version
+  - Increased logo size and added drop shadow for better visual impact
+  - Enhanced brand consistency with transparent background design
+
 ## Changelog
 
 Changelog:

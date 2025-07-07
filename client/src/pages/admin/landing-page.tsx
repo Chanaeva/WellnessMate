@@ -53,18 +53,18 @@ export default function LandingPageManagement() {
 
   // Fetch landing page content
   const { data: landingPageContent = [], isLoading: isContentLoading } = useQuery<LandingPageContent[]>({
-    queryKey: ["/api/landing-page-content"],
+    queryKey: ["/api/admin/landing-content"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/landing-page-content");
+      const res = await apiRequest("GET", "/api/admin/landing-content");
       return await res.json();
     },
   });
 
   // Fetch promotions
   const { data: promotions = [], isLoading: isPromotionsLoading } = useQuery<Promotion[]>({
-    queryKey: ["/api/promotions"],
+    queryKey: ["/api/admin/promotions"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/promotions");
+      const res = await apiRequest("GET", "/api/admin/promotions");
       return await res.json();
     },
   });
@@ -98,11 +98,11 @@ export default function LandingPageManagement() {
   // Content mutations
   const createContentMutation = useMutation({
     mutationFn: async (data: LandingPageContentFormData) => {
-      const res = await apiRequest("POST", "/api/landing-page-content", data);
+      const res = await apiRequest("POST", "/api/admin/landing-content", data);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/landing-page-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/landing-content"] });
       setIsContentDialogOpen(false);
       contentForm.reset();
       toast({
@@ -121,11 +121,11 @@ export default function LandingPageManagement() {
 
   const updateContentMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<LandingPageContentFormData> }) => {
-      const res = await apiRequest("PUT", `/api/landing-page-content/${id}`, data);
+      const res = await apiRequest("PUT", `/api/admin/landing-content/${id}`, data);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/landing-page-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/landing-content"] });
       setIsContentDialogOpen(false);
       setEditingContent(null);
       contentForm.reset();
@@ -145,10 +145,10 @@ export default function LandingPageManagement() {
 
   const deleteContentMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/landing-page-content/${id}`);
+      await apiRequest("DELETE", `/api/admin/landing-content/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/landing-page-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/landing-content"] });
       toast({
         title: "Success",
         description: "Landing page content deleted successfully",
@@ -166,11 +166,11 @@ export default function LandingPageManagement() {
   // Promotion mutations
   const createPromotionMutation = useMutation({
     mutationFn: async (data: PromotionFormData) => {
-      const res = await apiRequest("POST", "/api/promotions", data);
+      const res = await apiRequest("POST", "/api/admin/promotions", data);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/promotions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promotions"] });
       setIsPromotionDialogOpen(false);
       promotionForm.reset();
       toast({
@@ -189,11 +189,11 @@ export default function LandingPageManagement() {
 
   const updatePromotionMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<PromotionFormData> }) => {
-      const res = await apiRequest("PUT", `/api/promotions/${id}`, data);
+      const res = await apiRequest("PUT", `/api/admin/promotions/${id}`, data);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/promotions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promotions"] });
       setIsPromotionDialogOpen(false);
       setEditingPromotion(null);
       promotionForm.reset();
@@ -213,10 +213,10 @@ export default function LandingPageManagement() {
 
   const deletePromotionMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/promotions/${id}`);
+      await apiRequest("DELETE", `/api/admin/promotions/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/promotions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promotions"] });
       toast({
         title: "Success",
         description: "Promotion deleted successfully",

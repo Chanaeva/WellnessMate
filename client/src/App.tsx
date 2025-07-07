@@ -59,6 +59,7 @@ function Router() {
       <ProtectedRoute path="/admin/membership-plans" component={AdminMembershipPlans} />
 
       <Route path="/kiosk" component={KioskCheckIn} />
+      <Route path="/kiosk-checkin" component={KioskCheckIn} />
       
       {/* Landing page as default */}
       <Route path="/" component={LandingPage} />

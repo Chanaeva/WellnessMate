@@ -13,18 +13,18 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { 
-  Shield, 
-  Heart, 
-  AlertTriangle, 
-  FileText, 
-  Camera, 
+import {
+  Shield,
+  Heart,
+  AlertTriangle,
+  FileText,
+  Camera,
   Scale,
   CheckCircle,
   ArrowRight,
   Calendar,
   Phone,
-  MapPin
+  MapPin,
 } from "lucide-react";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 
@@ -34,33 +34,33 @@ interface MembershipAgreementData {
   emergencyPhone: string;
   dateOfBirth: string;
   address: string;
-  
+
   // Membership Type
-  membershipType: 'essential' | 'celestial';
-  
+  membershipType: "essential" | "celestial";
+
   // Health Acknowledgments
   medicalClearance: boolean;
   consultedProvider: boolean;
   understandsRisks: boolean;
   notPregnant: boolean;
   noHealthConditions: boolean;
-  
+
   // Legal Agreements
   voluntaryParticipation: boolean;
   assumptionOfRisk: boolean;
   releaseOfClaims: boolean;
-  
+
   // Facility Rules
   followRules: boolean;
   respectfulBehavior: boolean;
-  
+
   // Privacy and Photography
   marketingConsent: boolean;
   privacyAcknowledgment: boolean;
-  
+
   // Emergency Consent
   emergencyMedicalConsent: boolean;
-  
+
   // Final Agreement
   readAndUnderstood: boolean;
   voluntarySignature: boolean;
@@ -71,13 +71,13 @@ export default function MembershipAgreement() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState<MembershipAgreementData>({
-    emergencyContact: '',
-    emergencyPhone: '',
-    dateOfBirth: '',
-    address: '',
-    membershipType: 'essential',
+    emergencyContact: "",
+    emergencyPhone: "",
+    dateOfBirth: "",
+    address: "",
+    membershipType: "essential",
     medicalClearance: false,
     consultedProvider: false,
     understandsRisks: false,
@@ -104,7 +104,8 @@ export default function MembershipAgreement() {
     onSuccess: () => {
       toast({
         title: "Membership Agreement Completed",
-        description: "Welcome to Wolf Mother Wellness! You can now explore our packages.",
+        description:
+          "Welcome to Wolf Mother Wellness! You can now explore our packages.",
       });
       setLocation("/dashboard");
     },
@@ -117,48 +118,66 @@ export default function MembershipAgreement() {
     },
   });
 
-  const handleInputChange = (field: keyof MembershipAgreementData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof MembershipAgreementData,
+    value: any,
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate required fields
     const requiredFields = [
-      'emergencyContact', 'emergencyPhone', 'dateOfBirth', 'address'
+      "emergencyContact",
+      "emergencyPhone",
+      "dateOfBirth",
+      "address",
     ];
-    
+
     for (const field of requiredFields) {
       if (!formData[field as keyof MembershipAgreementData]) {
         toast({
           title: "Missing Information",
-          description: `Please fill in ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`,
+          description: `Please fill in ${field.replace(/([A-Z])/g, " $1").toLowerCase()}`,
           variant: "destructive",
         });
         return;
       }
     }
-    
+
     // Validate all acknowledgments are checked
     const requiredAcknowledgments = [
-      'medicalClearance', 'consultedProvider', 'understandsRisks', 'notPregnant',
-      'noHealthConditions', 'voluntaryParticipation', 'assumptionOfRisk',
-      'releaseOfClaims', 'followRules', 'respectfulBehavior', 'privacyAcknowledgment',
-      'emergencyMedicalConsent', 'readAndUnderstood', 'voluntarySignature', 'ageConfirmation'
+      "medicalClearance",
+      "consultedProvider",
+      "understandsRisks",
+      "notPregnant",
+      "noHealthConditions",
+      "voluntaryParticipation",
+      "assumptionOfRisk",
+      "releaseOfClaims",
+      "followRules",
+      "respectfulBehavior",
+      "privacyAcknowledgment",
+      "emergencyMedicalConsent",
+      "readAndUnderstood",
+      "voluntarySignature",
+      "ageConfirmation",
     ];
-    
+
     for (const field of requiredAcknowledgments) {
       if (!formData[field as keyof MembershipAgreementData]) {
         toast({
           title: "Agreement Required",
-          description: "You must acknowledge all terms to complete your membership",
+          description:
+            "You must acknowledge all terms to complete your membership",
           variant: "destructive",
         });
         return;
       }
     }
-    
+
     agreementMutation.mutate(formData);
   };
 
@@ -180,9 +199,9 @@ export default function MembershipAgreement() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <img 
-              src={logoMossGreen} 
-              alt="Wolf Mother Wellness" 
+            <img
+              src={logoMossGreen}
+              alt="Wolf Mother Wellness"
               className="h-16 w-16 drop-shadow-lg"
             />
           </div>
@@ -218,7 +237,7 @@ export default function MembershipAgreement() {
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
-                    value={user.email || ''}
+                    value={user.email || ""}
                     disabled
                     className="bg-muted"
                   />
@@ -227,7 +246,7 @@ export default function MembershipAgreement() {
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
-                    value={user.phoneNumber || ''}
+                    value={user.phoneNumber || ""}
                     disabled
                     className="bg-muted"
                   />
@@ -238,7 +257,9 @@ export default function MembershipAgreement() {
                     id="dateOfBirth"
                     type="date"
                     value={formData.dateOfBirth}
-                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("dateOfBirth", e.target.value)
+                    }
                     required
                   />
                 </div>
@@ -248,7 +269,9 @@ export default function MembershipAgreement() {
                     id="emergencyContact"
                     placeholder="Lupus the Wise"
                     value={formData.emergencyContact}
-                    onChange={(e) => handleInputChange('emergencyContact', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("emergencyContact", e.target.value)
+                    }
                     required
                   />
                 </div>
@@ -258,7 +281,9 @@ export default function MembershipAgreement() {
                     id="emergencyPhone"
                     placeholder="(918) 555-WOLF"
                     value={formData.emergencyPhone}
-                    onChange={(e) => handleInputChange('emergencyPhone', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("emergencyPhone", e.target.value)
+                    }
                     required
                   />
                 </div>
@@ -269,7 +294,7 @@ export default function MembershipAgreement() {
                   id="address"
                   placeholder="123 Tiber River Way, Rome"
                   value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  onChange={(e) => handleInputChange("address", e.target.value)}
                   required
                 />
               </div>
@@ -277,7 +302,7 @@ export default function MembershipAgreement() {
           </Card>
 
           {/* Membership Type */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <CheckCircle className="h-5 w-5 mr-2" />
@@ -310,7 +335,7 @@ export default function MembershipAgreement() {
               </RadioGroup>
             </CardContent>
           </Card>
-
+ */}
           {/* Health and Safety */}
           <Card>
             <CardHeader>
@@ -324,65 +349,87 @@ export default function MembershipAgreement() {
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
                   <div className="text-sm text-yellow-800">
-                    <p className="font-semibold mb-2">Medical Clearance Required</p>
-                    <p>Thermal therapy activities can be physically demanding. Individuals with heart conditions, diabetes, pregnancy, recent surgeries, or chronic medical conditions should consult a physician before participation.</p>
+                    <p className="font-semibold mb-2">
+                      Medical Clearance Required
+                    </p>
+                    <p>
+                      Thermal therapy activities can be physically demanding.
+                      Individuals with heart conditions, diabetes, pregnancy,
+                      recent surgeries, or chronic medical conditions should
+                      consult a physician before participation.
+                    </p>
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="medicalClearance"
                     checked={formData.medicalClearance}
-                    onCheckedChange={(checked) => handleInputChange('medicalClearance', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("medicalClearance", checked)
+                    }
                   />
                   <Label htmlFor="medicalClearance" className="text-sm">
-                    I am in good physical health and have no medical conditions that would prevent safe participation
+                    I am in good physical health and have no medical conditions
+                    that would prevent safe participation
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="consultedProvider"
                     checked={formData.consultedProvider}
-                    onCheckedChange={(checked) => handleInputChange('consultedProvider', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("consultedProvider", checked)
+                    }
                   />
                   <Label htmlFor="consultedProvider" className="text-sm">
-                    I have consulted with a healthcare provider about thermal therapy (if applicable)
+                    I have consulted with a healthcare provider about thermal
+                    therapy (if applicable)
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="understandsRisks"
                     checked={formData.understandsRisks}
-                    onCheckedChange={(checked) => handleInputChange('understandsRisks', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("understandsRisks", checked)
+                    }
                   />
                   <Label htmlFor="understandsRisks" className="text-sm">
-                    I understand the risks associated with heat exposure and cold water immersion
+                    I understand the risks associated with heat exposure and
+                    cold water immersion
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="notPregnant"
                     checked={formData.notPregnant}
-                    onCheckedChange={(checked) => handleInputChange('notPregnant', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("notPregnant", checked)
+                    }
                   />
                   <Label htmlFor="notPregnant" className="text-sm">
                     I am not currently pregnant (if applicable)
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="noHealthConditions"
                     checked={formData.noHealthConditions}
-                    onCheckedChange={(checked) => handleInputChange('noHealthConditions', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("noHealthConditions", checked)
+                    }
                   />
                   <Label htmlFor="noHealthConditions" className="text-sm">
-                    I certify that I do not have any medical conditions requiring clearance, OR I have received medical clearance to participate
+                    I certify that I do not have any medical conditions
+                    requiring clearance, OR I have received medical clearance to
+                    participate
                   </Label>
                 </div>
               </div>
@@ -403,42 +450,56 @@ export default function MembershipAgreement() {
                   <AlertTriangle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
                   <div className="text-sm text-red-800">
                     <p className="font-semibold mb-2">Important Legal Notice</p>
-                    <p>By participating, you assume all risks and release Wolf Mother Wellness from liability for injuries or damages that may occur.</p>
+                    <p>
+                      By participating, you assume all risks and release Wolf
+                      Mother Wellness from liability for injuries or damages
+                      that may occur.
+                    </p>
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="voluntaryParticipation"
                     checked={formData.voluntaryParticipation}
-                    onCheckedChange={(checked) => handleInputChange('voluntaryParticipation', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("voluntaryParticipation", checked)
+                    }
                   />
                   <Label htmlFor="voluntaryParticipation" className="text-sm">
-                    I understand that my participation is entirely voluntary and at my own risk
+                    I understand that my participation is entirely voluntary and
+                    at my own risk
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="assumptionOfRisk"
                     checked={formData.assumptionOfRisk}
-                    onCheckedChange={(checked) => handleInputChange('assumptionOfRisk', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("assumptionOfRisk", checked)
+                    }
                   />
                   <Label htmlFor="assumptionOfRisk" className="text-sm">
-                    I acknowledge and assume all risks including overheating, dehydration, slips, falls, and equipment malfunctions
+                    I acknowledge and assume all risks including overheating,
+                    dehydration, slips, falls, and equipment malfunctions
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="releaseOfClaims"
                     checked={formData.releaseOfClaims}
-                    onCheckedChange={(checked) => handleInputChange('releaseOfClaims', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("releaseOfClaims", checked)
+                    }
                   />
                   <Label htmlFor="releaseOfClaims" className="text-sm">
-                    I release Wolf Mother Wellness and SPHRSERVICES LLC from any claims, demands, or causes of action arising from my participation
+                    I release Wolf Mother Wellness and SPHRSERVICES LLC from any
+                    claims, demands, or causes of action arising from my
+                    participation
                   </Label>
                 </div>
               </div>
@@ -458,35 +519,50 @@ export default function MembershipAgreement() {
                 <div className="text-sm text-blue-800">
                   <p className="font-semibold mb-2">Key Rules:</p>
                   <ul className="space-y-1 text-xs">
-                    <li>• Shower before entering saunas or cold plunge pools</li>
-                    <li>• Maximum 20 minutes in saunas, 5 minutes in cold plunge</li>
-                    <li>• No glass containers, electronics, or photography in wet areas</li>
-                    <li>• Maintain respectful behavior and appropriate noise levels</li>
-                    <li>• Children under 16 must be accompanied by an adult</li>
+                    <li>
+                      • Shower before entering saunas or cold plunge pools
+                    </li>
+                    <li>
+                      • Maximum 20 minutes in saunas, 5 minutes in cold plunge
+                    </li>
+                    <li>
+                      • No glass containers, electronics, or photography in wet
+                      areas
+                    </li>
+                    <li>
+                      • Maintain respectful behavior and appropriate noise
+                      levels
+                    </li>
                   </ul>
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="followRules"
                     checked={formData.followRules}
-                    onCheckedChange={(checked) => handleInputChange('followRules', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("followRules", checked)
+                    }
                   />
                   <Label htmlFor="followRules" className="text-sm">
-                    I agree to follow all posted safety guidelines and staff instructions
+                    I agree to follow all posted safety guidelines and staff
+                    instructions
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="respectfulBehavior"
                     checked={formData.respectfulBehavior}
-                    onCheckedChange={(checked) => handleInputChange('respectfulBehavior', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("respectfulBehavior", checked)
+                    }
                   />
                   <Label htmlFor="respectfulBehavior" className="text-sm">
-                    I will maintain respectful behavior and understand that violations may result in membership termination
+                    I will maintain respectful behavior and understand that
+                    violations may result in membership termination
                   </Label>
                 </div>
               </div>
@@ -504,24 +580,30 @@ export default function MembershipAgreement() {
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="privacyAcknowledgment"
                     checked={formData.privacyAcknowledgment}
-                    onCheckedChange={(checked) => handleInputChange('privacyAcknowledgment', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("privacyAcknowledgment", checked)
+                    }
                   />
                   <Label htmlFor="privacyAcknowledgment" className="text-sm">
-                    I understand Wolf Mother's privacy policy and consent to personal information use for legitimate business purposes
+                    I understand Wolf Mother's privacy policy and consent to
+                    personal information use for legitimate business purposes
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="marketingConsent"
                     checked={formData.marketingConsent}
-                    onCheckedChange={(checked) => handleInputChange('marketingConsent', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("marketingConsent", checked)
+                    }
                   />
                   <Label htmlFor="marketingConsent" className="text-sm">
-                    I consent to Wolf Mother using my likeness in promotional materials (optional)
+                    I consent to Wolf Mother using my likeness in promotional
+                    materials (optional)
                   </Label>
                 </div>
               </div>
@@ -538,13 +620,17 @@ export default function MembershipAgreement() {
             </CardHeader>
             <CardContent>
               <div className="flex items-start space-x-2">
-                <Checkbox 
+                <Checkbox
                   id="emergencyMedicalConsent"
                   checked={formData.emergencyMedicalConsent}
-                  onCheckedChange={(checked) => handleInputChange('emergencyMedicalConsent', checked)}
+                  onCheckedChange={(checked) =>
+                    handleInputChange("emergencyMedicalConsent", checked)
+                  }
                 />
                 <Label htmlFor="emergencyMedicalConsent" className="text-sm">
-                  I consent to Wolf Mother staff calling emergency medical services, contacting my emergency contact, and providing basic first aid in case of emergency
+                  I consent to Wolf Mother staff calling emergency medical
+                  services, contacting my emergency contact, and providing basic
+                  first aid in case of emergency
                 </Label>
               </div>
             </CardContent>
@@ -561,34 +647,49 @@ export default function MembershipAgreement() {
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="readAndUnderstood"
                     checked={formData.readAndUnderstood}
-                    onCheckedChange={(checked) => handleInputChange('readAndUnderstood', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("readAndUnderstood", checked)
+                    }
                   />
-                  <Label htmlFor="readAndUnderstood" className="text-sm font-semibold">
+                  <Label
+                    htmlFor="readAndUnderstood"
+                    className="text-sm font-semibold"
+                  >
                     I have read and understand this entire agreement
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="voluntarySignature"
                     checked={formData.voluntarySignature}
-                    onCheckedChange={(checked) => handleInputChange('voluntarySignature', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("voluntarySignature", checked)
+                    }
                   />
-                  <Label htmlFor="voluntarySignature" className="text-sm font-semibold">
+                  <Label
+                    htmlFor="voluntarySignature"
+                    className="text-sm font-semibold"
+                  >
                     I am signing this agreement voluntarily
                   </Label>
                 </div>
-                
+
                 <div className="flex items-start space-x-2">
-                  <Checkbox 
+                  <Checkbox
                     id="ageConfirmation"
                     checked={formData.ageConfirmation}
-                    onCheckedChange={(checked) => handleInputChange('ageConfirmation', checked)}
+                    onCheckedChange={(checked) =>
+                      handleInputChange("ageConfirmation", checked)
+                    }
                   />
-                  <Label htmlFor="ageConfirmation" className="text-sm font-semibold">
+                  <Label
+                    htmlFor="ageConfirmation"
+                    className="text-sm font-semibold"
+                  >
                     I am at least 18 years of age
                   </Label>
                 </div>
@@ -598,8 +699,8 @@ export default function MembershipAgreement() {
 
           {/* Submit Button */}
           <div className="flex justify-center">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               size="lg"
               disabled={agreementMutation.isPending}
               className="bg-primary hover:bg-primary/90 text-white px-12 py-6 text-xl font-bold"

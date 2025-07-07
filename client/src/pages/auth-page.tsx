@@ -125,6 +125,8 @@ function AuthPage() {
       firstName: "",
       lastName: "",
       phoneNumber: "",
+      dateOfBirth: "",
+      ageConfirmation: false,
       role: "member",
     },
   });

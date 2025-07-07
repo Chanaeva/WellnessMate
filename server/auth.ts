@@ -78,6 +78,32 @@ export function setupAuth(app: Express) {
       // Validate user input
       const userInput = insertUserSchema.parse(req.body);
       
+      // Age verification: Check if user is 18 or older
+      if (userInput.dateOfBirth) {
+        const birthDate = new Date(userInput.dateOfBirth);
+        const today = new Date();
+        const age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        // Adjust age if birthday hasn't occurred this year
+        const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+          ? age - 1 
+          : age;
+        
+        if (actualAge < 18) {
+          return res.status(400).json({ 
+            message: "You must be 18 years or older to register. Wolf Mother Wellness is an adult-only facility." 
+          });
+        }
+      }
+      
+      // Age confirmation checkbox validation
+      if (!userInput.ageConfirmation) {
+        return res.status(400).json({ 
+          message: "You must confirm that you are 18 years or older to register." 
+        });
+      }
+      
       const existingUser = await storage.getUserByUsername(userInput.username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });

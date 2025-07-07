@@ -66,11 +66,7 @@ const Header = () => {
                   {link.label}
                 </Link>
               ))}
-              {isAdmin && (
-                <Link href="/admin/landing-page" className="text-neutral-dark hover:text-primary px-3 py-2 rounded-md transition-colors duration-200 hover:bg-primary/5">
-                  Landing Page
-                </Link>
-              )}
+
             </div>
           </div>
           

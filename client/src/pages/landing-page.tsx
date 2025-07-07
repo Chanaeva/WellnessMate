@@ -83,23 +83,16 @@ export default function LandingPage() {
             ))}
           </div>
           
-          {/* Flowing water waves */}
-          <div className="absolute inset-0 opacity-40">
-            <div className="water-wave wave-1"></div>
-            <div className="water-wave wave-2"></div>
-            <div className="water-wave wave-3"></div>
-          </div>
-          
           {/* Floating bubbles */}
           <div className="bubbles-container">
-            {[...Array(6)].map((_, i) => (
+            {[...Array(15)].map((_, i) => (
               <div
                 key={i}
                 className="water-bubble"
                 style={{
-                  left: `${20 + (i * 15)}%`,
-                  animationDelay: `${i * 1.5}s`,
-                  animationDuration: `${12 + (i % 3)}s`
+                  left: `${5 + (i * 6)}%`,
+                  animationDelay: `${i * 0.8}s`,
+                  animationDuration: `${10 + (i % 4)}s`
                 }}
               />
             ))}

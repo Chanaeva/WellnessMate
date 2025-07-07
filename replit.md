@@ -332,6 +332,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Admin can now edit all landing page content and promotional offers
   - Preview button allows admins to view changes on live landing page
 
+- July 7, 2025: Enhanced hero section with immersive water-like effects ✓
+  - Replaced steam animations with elegant water ripple effects
+  - Added expanding concentric circle ripples with natural timing
+  - Created flowing horizontal water waves across background
+  - Implemented floating bubbles that rise with realistic movement and shine
+  - Enhanced logo with water-themed thermal glow effect
+  - Multiple animation layers with varying speeds for authentic thermal spa atmosphere
+  - Subtle effects maintain content readability while adding visual interest
+
 ## Changelog
 
 Changelog:

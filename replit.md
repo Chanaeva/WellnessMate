@@ -319,8 +319,8 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Increased logo size and added drop shadow for better visual impact
   - Enhanced brand consistency with transparent background design
 
-- July 2, 2025: Updated address copy to highlight Kendall Witter neighborhood ✓
-  - Added "Kendall Witter Neighborhood" line to address section
+- July 2, 2025: Updated address copy to highlight Kendall Whitter neighborhood ✓
+  - Added "Kendall Whitter Neighborhood" line to address section
   - Positioned Wolf Mother Wellness in Tulsa's up and coming area
   - Enhanced location marketing with neighborhood context
 

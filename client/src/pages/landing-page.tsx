@@ -64,13 +64,38 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative py-20 px-4 bg-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
+        
+        {/* Animated Steam Effects */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Steam particles */}
+          <div className="steam-container">
+            {[...Array(12)].map((_, i) => (
+              <div
+                key={i}
+                className="steam-particle"
+                style={{
+                  left: `${10 + (i * 7)}%`,
+                  animationDelay: `${i * 0.8}s`,
+                  animationDuration: `${8 + (i % 3)}s`
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Floating mist overlay */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="mist-layer mist-1"></div>
+            <div className="mist-layer mist-2"></div>
+            <div className="mist-layer mist-3"></div>
+          </div>
+        </div>
 
         <div className="max-w-7xl mx-auto text-center relative z-10">
           <div className="flex justify-center mb-8">
             <img
               src={logoTransparent}
               alt="Wolf Mother Wellness"
-              className="h-32 w-32 object-contain drop-shadow-lg"
+              className="h-32 w-32 object-contain thermal-glow"
             />
           </div>
 

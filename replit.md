@@ -341,6 +341,14 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Multiple animation layers with varying speeds for authentic thermal spa atmosphere
   - Subtle effects maintain content readability while adding visual interest
 
+- July 7, 2025: Cleaned up admin navigation and performed database cleanup ✓
+  - Removed duplicate landing page navigation link from admin header
+  - Deleted standalone landing-page-manager component and route
+  - Landing page management now only accessible through admin dashboard tabs
+  - Performed comprehensive database cleanup: removed all users except admin
+  - Cleared all memberships, payments, punch cards, check-ins, and sessions
+  - Database now contains only admin user and essential system data
+
 ## Changelog
 
 Changelog:

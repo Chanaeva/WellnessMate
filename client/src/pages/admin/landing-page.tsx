@@ -1,0 +1,729 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { LandingPageContent, insertLandingPageContentSchema, Promotion, insertPromotionSchema } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { 
+  FileText, 
+  Edit, 
+  Trash2, 
+  Plus, 
+  Eye, 
+  Star,
+  Tag,
+  Calendar,
+  DollarSign,
+  Megaphone
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+
+// Form schemas
+const landingPageContentFormSchema = insertLandingPageContentSchema.extend({
+  isActive: z.boolean().default(true),
+});
+
+const promotionFormSchema = insertPromotionSchema.extend({
+  isActive: z.boolean().default(true),
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+});
+
+type LandingPageContentFormData = z.infer<typeof landingPageContentFormSchema>;
+type PromotionFormData = z.infer<typeof promotionFormSchema>;
+
+export default function LandingPageManagement() {
+  const { toast } = useToast();
+  const [editingContent, setEditingContent] = useState<LandingPageContent | null>(null);
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
+  const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
+
+  // Fetch landing page content
+  const { data: landingPageContent = [], isLoading: isContentLoading } = useQuery<LandingPageContent[]>({
+    queryKey: ["/api/landing-page-content"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-page-content");
+      return await res.json();
+    },
+  });
+
+  // Fetch promotions
+  const { data: promotions = [], isLoading: isPromotionsLoading } = useQuery<Promotion[]>({
+    queryKey: ["/api/promotions"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/promotions");
+      return await res.json();
+    },
+  });
+
+  // Content form
+  const contentForm = useForm<LandingPageContentFormData>({
+    resolver: zodResolver(landingPageContentFormSchema),
+    defaultValues: {
+      section: "",
+      title: "",
+      content: "",
+      orderIndex: 0,
+      isActive: true,
+    },
+  });
+
+  // Promotion form
+  const promotionForm = useForm<PromotionFormData>({
+    resolver: zodResolver(promotionFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      discountPercentage: 0,
+      promoCode: "",
+      startDate: "",
+      endDate: "",
+      isActive: true,
+    },
+  });
+
+  // Content mutations
+  const createContentMutation = useMutation({
+    mutationFn: async (data: LandingPageContentFormData) => {
+      const res = await apiRequest("POST", "/api/landing-page-content", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/landing-page-content"] });
+      setIsContentDialogOpen(false);
+      contentForm.reset();
+      toast({
+        title: "Success",
+        description: "Landing page content created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create content",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateContentMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<LandingPageContentFormData> }) => {
+      const res = await apiRequest("PUT", `/api/landing-page-content/${id}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/landing-page-content"] });
+      setIsContentDialogOpen(false);
+      setEditingContent(null);
+      contentForm.reset();
+      toast({
+        title: "Success",
+        description: "Landing page content updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update content",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteContentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/landing-page-content/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/landing-page-content"] });
+      toast({
+        title: "Success",
+        description: "Landing page content deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete content",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Promotion mutations
+  const createPromotionMutation = useMutation({
+    mutationFn: async (data: PromotionFormData) => {
+      const res = await apiRequest("POST", "/api/promotions", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/promotions"] });
+      setIsPromotionDialogOpen(false);
+      promotionForm.reset();
+      toast({
+        title: "Success",
+        description: "Promotion created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create promotion",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePromotionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<PromotionFormData> }) => {
+      const res = await apiRequest("PUT", `/api/promotions/${id}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/promotions"] });
+      setIsPromotionDialogOpen(false);
+      setEditingPromotion(null);
+      promotionForm.reset();
+      toast({
+        title: "Success",
+        description: "Promotion updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update promotion",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePromotionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/promotions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/promotions"] });
+      toast({
+        title: "Success",
+        description: "Promotion deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete promotion",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Form handlers
+  const handleContentSubmit = (data: LandingPageContentFormData) => {
+    if (editingContent) {
+      updateContentMutation.mutate({ id: editingContent.id, data });
+    } else {
+      createContentMutation.mutate(data);
+    }
+  };
+
+  const handlePromotionSubmit = (data: PromotionFormData) => {
+    if (editingPromotion) {
+      updatePromotionMutation.mutate({ id: editingPromotion.id, data });
+    } else {
+      createPromotionMutation.mutate(data);
+    }
+  };
+
+  const handleEditContent = (content: LandingPageContent) => {
+    setEditingContent(content);
+    contentForm.reset({
+      section: content.section,
+      title: content.title,
+      content: content.content,
+      orderIndex: content.orderIndex,
+      isActive: content.isActive,
+    });
+    setIsContentDialogOpen(true);
+  };
+
+  const handleEditPromotion = (promotion: Promotion) => {
+    setEditingPromotion(promotion);
+    promotionForm.reset({
+      title: promotion.title,
+      description: promotion.description,
+      discountPercentage: promotion.discountPercentage || 0,
+      promoCode: promotion.promoCode || "",
+      startDate: promotion.startDate ? format(new Date(promotion.startDate), "yyyy-MM-dd") : "",
+      endDate: promotion.endDate ? format(new Date(promotion.endDate), "yyyy-MM-dd") : "",
+      isActive: promotion.isActive,
+    });
+    setIsPromotionDialogOpen(true);
+  };
+
+  const handleNewContent = () => {
+    setEditingContent(null);
+    contentForm.reset({
+      section: "",
+      title: "",
+      content: "",
+      orderIndex: 0,
+      isActive: true,
+    });
+    setIsContentDialogOpen(true);
+  };
+
+  const handleNewPromotion = () => {
+    setEditingPromotion(null);
+    promotionForm.reset({
+      title: "",
+      description: "",
+      discountPercentage: 0,
+      promoCode: "",
+      startDate: "",
+      endDate: "",
+      isActive: true,
+    });
+    setIsPromotionDialogOpen(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Landing Page Management</h2>
+          <p className="text-muted-foreground">Manage landing page content and promotions</p>
+        </div>
+        <Button onClick={() => window.open("/", "_blank")}>
+          <Eye className="h-4 w-4 mr-2" />
+          Preview Landing Page
+        </Button>
+      </div>
+
+      <Tabs defaultValue="content" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="content">Page Content</TabsTrigger>
+          <TabsTrigger value="promotions">Promotions</TabsTrigger>
+        </TabsList>
+
+        {/* Page Content Tab */}
+        <TabsContent value="content" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Page Content Sections</h3>
+            <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleNewContent}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Content Section
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingContent ? "Edit Content Section" : "Add Content Section"}
+                  </DialogTitle>
+                </DialogHeader>
+                <Form {...contentForm}>
+                  <form onSubmit={contentForm.handleSubmit(handleContentSubmit)} className="space-y-4">
+                    <FormField
+                      control={contentForm.control}
+                      name="section"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Section</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select section" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="hero">Hero Section</SelectItem>
+                              <SelectItem value="features">Features</SelectItem>
+                              <SelectItem value="testimonials">Testimonials</SelectItem>
+                              <SelectItem value="contact">Contact</SelectItem>
+                              <SelectItem value="about">About</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={contentForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Content title" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={contentForm.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Content</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Content text" 
+                              rows={4}
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex gap-4">
+                      <FormField
+                        control={contentForm.control}
+                        name="orderIndex"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>Order Index</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="0" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={contentForm.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                            <div className="space-y-0.5">
+                              <FormLabel>Active</FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => setIsContentDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit"
+                        disabled={createContentMutation.isPending || updateContentMutation.isPending}
+                      >
+                        {editingContent ? "Update" : "Create"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Content Sections */}
+          <div className="grid gap-4">
+            {isContentLoading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading content...</p>
+              </div>
+            ) : landingPageContent.length > 0 ? (
+              landingPageContent.map((content) => (
+                <Card key={content.id}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        {content.title}
+                        <Badge variant={content.isActive ? "default" : "secondary"}>
+                          {content.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Section: {content.section} • Order: {content.orderIndex}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditContent(content)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteContentMutation.mutate(content.id)}
+                        disabled={deleteContentMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm">{content.content}</p>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No content sections yet. Create your first one!</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Promotions Tab */}
+        <TabsContent value="promotions" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Promotional Offers</h3>
+            <Dialog open={isPromotionDialogOpen} onOpenChange={setIsPromotionDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleNewPromotion}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Promotion
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingPromotion ? "Edit Promotion" : "Create Promotion"}
+                  </DialogTitle>
+                </DialogHeader>
+                <Form {...promotionForm}>
+                  <form onSubmit={promotionForm.handleSubmit(handlePromotionSubmit)} className="space-y-4">
+                    <FormField
+                      control={promotionForm.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Promotion title" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={promotionForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Promotion description" 
+                              rows={3}
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={promotionForm.control}
+                        name="discountPercentage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Discount Percentage</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                placeholder="0" 
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={promotionForm.control}
+                        name="promoCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Promo Code</FormLabel>
+                            <FormControl>
+                              <Input placeholder="PROMO2025" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={promotionForm.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={promotionForm.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={promotionForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Active Promotion</FormLabel>
+                            <p className="text-sm text-muted-foreground">
+                              Enable this promotion to show on landing page
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => setIsPromotionDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit"
+                        disabled={createPromotionMutation.isPending || updatePromotionMutation.isPending}
+                      >
+                        {editingPromotion ? "Update" : "Create"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Promotions */}
+          <div className="grid gap-4">
+            {isPromotionsLoading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading promotions...</p>
+              </div>
+            ) : promotions.length > 0 ? (
+              promotions.map((promotion) => (
+                <Card key={promotion.id}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Megaphone className="h-4 w-4" />
+                        {promotion.title}
+                        <Badge variant={promotion.isActive ? "default" : "secondary"}>
+                          {promotion.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {promotion.discountPercentage && (
+                          <Badge variant="outline">
+                            <Tag className="h-3 w-3 mr-1" />
+                            {promotion.discountPercentage}% OFF
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {promotion.startDate && promotion.endDate && (
+                          <>
+                            <Calendar className="h-3 w-3 inline mr-1" />
+                            {format(new Date(promotion.startDate), "MMM d")} - {format(new Date(promotion.endDate), "MMM d, yyyy")}
+                          </>
+                        )}
+                        {promotion.promoCode && (
+                          <>
+                            {" • "}
+                            Code: <span className="font-mono">{promotion.promoCode}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditPromotion(promotion)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deletePromotionMutation.mutate(promotion.id)}
+                        disabled={deletePromotionMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm">{promotion.description}</p>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No promotions yet. Create your first one!</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

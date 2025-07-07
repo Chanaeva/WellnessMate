@@ -324,6 +324,14 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Positioned Wolf Mother Wellness in Tulsa's up and coming area
   - Enhanced location marketing with neighborhood context
 
+- July 2, 2025: Added landing page management to admin navigation ✓
+  - Created comprehensive landing page management component
+  - Added tab in admin dashboard alongside other membership management tools
+  - Includes content sections management (hero, features, testimonials, contact, about)
+  - Includes promotions management with promo codes and date ranges
+  - Admin can now edit all landing page content and promotional offers
+  - Preview button allows admins to view changes on live landing page
+
 ## Changelog
 
 Changelog:

@@ -41,6 +41,7 @@ import QRCode from "qrcode";
 import PackagesManagement from "./packages";
 import AdminMembers from "./members";
 import AdminNotifications from "./notifications";
+import LandingPageManagement from "./landing-page";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -239,10 +240,11 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="packages">Packages</TabsTrigger>
+            <TabsTrigger value="landing-page">Landing Page</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
@@ -418,6 +420,11 @@ export default function AdminDashboard() {
           {/* Package Management Tab */}
           <TabsContent value="packages" className="space-y-6">
             <PackagesManagement />
+          </TabsContent>
+
+          {/* Landing Page Management Tab */}
+          <TabsContent value="landing-page" className="space-y-6">
+            <LandingPageManagement />
           </TabsContent>
 
           {/* Notifications Tab */}

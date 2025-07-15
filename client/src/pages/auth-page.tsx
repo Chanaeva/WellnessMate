@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft } from "lucide-react";
+import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft, Calendar } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import { SMSResetForm } from "@/components/auth/sms-reset-form";
@@ -51,7 +51,27 @@ const registerSchema = insertUserSchema
   })
   .refine((data) => {
     if (data.dateOfBirth) {
-      const birthDate = new Date(data.dateOfBirth);
+      // Parse date from MM/DD/YYYY format
+      const dateRegex = /^(0[1-9]|1[0-2]|[1-9])\/(0[1-9]|[12][0-9]|3[01]|[1-9])\/(\d{4})$/;
+      const match = data.dateOfBirth.match(dateRegex);
+      
+      if (!match) {
+        return false; // Invalid format
+      }
+      
+      const month = parseInt(match[1], 10);
+      const day = parseInt(match[2], 10);
+      const year = parseInt(match[3], 10);
+      
+      // Create date object and validate it's a real date
+      const birthDate = new Date(year, month - 1, day);
+      if (birthDate.getFullYear() !== year || 
+          birthDate.getMonth() !== month - 1 || 
+          birthDate.getDate() !== day) {
+        return false; // Invalid date
+      }
+      
+      // Check if 18 or older
       const today = new Date();
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -60,7 +80,7 @@ const registerSchema = insertUserSchema
     }
     return true;
   }, {
-    message: "You must be 18 years or older to register",
+    message: "Please enter a valid date in MM/DD/YYYY format and ensure you are 18 or older",
     path: ["dateOfBirth"],
   });
 
@@ -440,10 +460,15 @@ function AuthPage() {
                           <FormItem>
                             <FormLabel>Date of Birth</FormLabel>
                             <FormControl>
-                              <Input
-                                type="date"
-                                {...field}
-                              />
+                              <div className="relative">
+                                <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  type="text"
+                                  placeholder="MM/DD/YYYY"
+                                  className="pl-10"
+                                  {...field}
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>

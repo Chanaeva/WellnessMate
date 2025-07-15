@@ -87,7 +87,36 @@ export function setupAuth(app: Express) {
       
       // Age verification: Check if user is 18 or older
       if (userInput.dateOfBirth) {
-        const birthDate = new Date(userInput.dateOfBirth);
+        let birthDate: Date;
+        
+        // Parse date from MM/DD/YYYY format
+        const dateRegex = /^(0[1-9]|1[0-2]|[1-9])\/(0[1-9]|[12][0-9]|3[01]|[1-9])\/(\d{4})$/;
+        const match = userInput.dateOfBirth.match(dateRegex);
+        
+        if (match) {
+          const month = parseInt(match[1], 10);
+          const day = parseInt(match[2], 10);
+          const year = parseInt(match[3], 10);
+          birthDate = new Date(year, month - 1, day);
+          
+          // Validate it's a real date
+          if (birthDate.getFullYear() !== year || 
+              birthDate.getMonth() !== month - 1 || 
+              birthDate.getDate() !== day) {
+            return res.status(400).json({ 
+              message: "Please enter a valid date in MM/DD/YYYY format." 
+            });
+          }
+        } else {
+          // Try to parse as standard date format for backwards compatibility
+          birthDate = new Date(userInput.dateOfBirth);
+          if (isNaN(birthDate.getTime())) {
+            return res.status(400).json({ 
+              message: "Please enter a valid date in MM/DD/YYYY format." 
+            });
+          }
+        }
+        
         const today = new Date();
         const age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();

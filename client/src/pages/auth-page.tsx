@@ -31,12 +31,13 @@ import { SMSResetForm } from "@/components/auth/sms-reset-form";
 
 // Login schema
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
-// Registration schema (extends insertUserSchema with password confirmation and age verification)
+// Registration schema (extends insertUserSchema with password confirmation and age verification, removes username)
 const registerSchema = insertUserSchema
+  .omit({ username: true })
   .extend({
     confirmPassword: z.string().min(1, "Please confirm your password"),
     dateOfBirth: z.string().min(1, "Date of birth is required"),
@@ -109,7 +110,7 @@ function AuthPage() {
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -118,7 +119,6 @@ function AuthPage() {
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      username: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -153,9 +153,13 @@ function AuthPage() {
   };
 
   const onRegisterSubmit = (data: RegisterFormValues) => {
-    // Remove confirmPassword before submitting
+    // Remove confirmPassword and use email as username
     const { confirmPassword, ...registerData } = data;
-    registerMutation.mutate(registerData, {
+    const submitData = {
+      ...registerData,
+      username: registerData.email // Use email as username
+    };
+    registerMutation.mutate(submitData, {
       onSuccess: (response: any) => {
         playLoginSuccess();
         if (response.redirectTo) {
@@ -237,15 +241,16 @@ function AuthPage() {
                     >
                       <FormField
                         control={loginForm.control}
-                        name="username"
+                        name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Username</FormLabel>
+                            <FormLabel>Email</FormLabel>
                             <FormControl>
                               <div className="relative">
-                                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  placeholder="wolf_foundling"
+                                  type="email"
+                                  placeholder="romulus@tiber.river"
                                   className="pl-10"
                                   {...field}
                                 />
@@ -396,27 +401,6 @@ function AuthPage() {
                                 <Smartphone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
                                   placeholder="+1 (777) WOLF-MOM"
-                                  className="pl-10"
-                                  {...field}
-                                />
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={registerForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  placeholder="remus_warrior"
                                   className="pl-10"
                                   {...field}
                                 />

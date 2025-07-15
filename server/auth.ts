@@ -49,18 +49,25 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      try {
-        const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
-        } else {
-          return done(null, user);
+    new LocalStrategy(
+      { usernameField: 'email' }, // Use email field instead of username
+      async (email, password, done) => {
+        try {
+          // First try to find by email, then fallback to username for existing users
+          let user = await storage.getUserByEmail(email);
+          if (!user) {
+            user = await storage.getUserByUsername(email);
+          }
+          if (!user || !(await comparePasswords(password, user.password))) {
+            return done(null, false);
+          } else {
+            return done(null, user);
+          }
+        } catch (error) {
+          return done(error);
         }
-      } catch (error) {
-        return done(error);
       }
-    }),
+    ),
   );
 
   passport.serializeUser((user, done) => done(null, user.id));

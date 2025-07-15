@@ -359,6 +359,13 @@ This is a full-stack web application for managing a thermal wellness center's me
   - All age verification, membership restrictions, and cancellation policies now fully enforced
   - Wolf Mother Wellness adult-only facility requirements successfully implemented
 
+- July 15, 2025: Enhanced shopping cart with auto-open functionality ✓
+  - Cart sidebar now opens automatically when items are added
+  - Enhanced cart context with programmatic opening capability using callback system
+  - Updated cart sidebar to support controlled open state with useState and useEffect
+  - Improved user experience with immediate visual feedback when adding memberships or day passes
+  - Users no longer need to manually click cart button to see added items
+
 ## Changelog
 
 Changelog:

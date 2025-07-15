@@ -19,12 +19,15 @@ interface CartContextType {
   clearCart: () => void;
   getTotalPrice: () => number;
   getItemCount: () => number;
+  openCart: () => void;
+  setCartOpenCallback: (callback: (() => void) | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [cartOpenCallback, setCartOpenCallback] = useState<(() => void) | null>(null);
 
   const addItem = (newItem: CartItem) => {
     setItems(prevItems => {
@@ -46,6 +49,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
       
       return [...prevItems, { ...newItem, quantity: newItem.quantity || 1 }];
     });
+    
+    // Auto-open cart when item is added
+    if (cartOpenCallback) {
+      cartOpenCallback();
+    }
+  };
+
+  const openCart = () => {
+    if (cartOpenCallback) {
+      cartOpenCallback();
+    }
   };
 
   const removeItem = (id: string) => {
@@ -87,7 +101,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       updateQuantity,
       clearCart,
       getTotalPrice,
-      getItemCount
+      getItemCount,
+      openCart,
+      setCartOpenCallback
     }}>
       {children}
     </CartContext.Provider>

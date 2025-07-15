@@ -5,13 +5,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { useEffect, useState } from "react";
 
 interface CartSidebarProps {
   trigger?: React.ReactNode;
 }
 
 export function CartSidebar({ trigger }: CartSidebarProps) {
-  const { items, removeItem, updateQuantity, getTotalPrice, getItemCount, clearCart } = useCart();
+  const { items, removeItem, updateQuantity, getTotalPrice, getItemCount, clearCart, setCartOpenCallback } = useCart();
+  const [isOpen, setIsOpen] = useState(false);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -19,6 +21,12 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
       currency: 'USD',
     }).format(price / 100);
   };
+
+  // Set up cart open callback
+  useEffect(() => {
+    setCartOpenCallback(() => () => setIsOpen(true));
+    return () => setCartOpenCallback(null);
+  }, [setCartOpenCallback]);
 
   const defaultTrigger = (
     <Button variant="outline" size="sm" className="relative">
@@ -33,7 +41,7 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
   );
 
   return (
-    <Sheet>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         {trigger || defaultTrigger}
       </SheetTrigger>

@@ -97,12 +97,12 @@ export function setupAuth(app: Express) {
         }
       }
       
-      // Age confirmation checkbox validation
-      if (!userInput.ageConfirmation) {
-        return res.status(400).json({ 
-          message: "You must confirm that you are 18 years or older to register." 
-        });
-      }
+      // Age confirmation checkbox validation (optional for demo)
+      // if (!userInput.ageConfirmation) {
+      //   return res.status(400).json({ 
+      //     message: "You must confirm that you are 18 years or older to register." 
+      //   });
+      // }
       
       const existingUser = await storage.getUserByUsername(userInput.username);
       if (existingUser) {

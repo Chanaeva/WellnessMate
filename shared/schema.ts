@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   emergencyContact: text("emergency_contact"),
   emergencyPhone: text("emergency_phone"),
   dateOfBirth: date("date_of_birth"),
+  ageConfirmation: boolean("age_confirmation").default(false),
   address: text("address"),
   preferredMembershipType: text("preferred_membership_type"),
   

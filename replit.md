@@ -366,6 +366,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Improved user experience with immediate visual feedback when adding memberships or day passes
   - Users no longer need to manually click cart button to see added items
 
+- July 15, 2025: Simplified authentication by removing username requirement ✓
+  - Removed username field from registration form for streamlined user experience
+  - Email now serves as both identifier and username for authentication
+  - Updated frontend forms to use email instead of username for login
+  - Modified backend authentication strategy to accept email as login field
+  - Updated shared schemas and form validations to reflect email-based login
+  - Backwards compatible - existing users can still login with email or username
+  - Simplified registration process requires only email, password, names, and optional phone
+
 ## Changelog
 
 Changelog:

@@ -396,6 +396,7 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Added "Why Choose Wolf Mother Wellness?" benefits section with ancient wisdom, safety, and community highlights
   - Integrated real-time data fetching from membership plans and punch card APIs
   - Enhanced visual design with hover effects and call-to-action buttons directing to registration
+  - Moved marketing cards above promotions section for better user flow and prominence
 
 ## Changelog
 

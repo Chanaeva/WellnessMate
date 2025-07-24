@@ -174,70 +174,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Promotions Carousel */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
-            Exclusive Promotions
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {promotions?.map((promo, index) => (
-              <Card
-                key={index}
-                className="border-0 shadow-lg transform hover:scale-105 transition-transform duration-300 bg-primary text-white"
-              >
-                <CardHeader>
-                  <CardTitle className="text-2xl font-heading font-bold">
-                    {promo.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg mb-4 opacity-90 font-body">
-                    {promo.description}
-                  </p>
-                  <div className="bg-white/20 rounded-lg p-3 mb-4">
-                    <p className="text-sm font-medium font-body">Promo Code:</p>
-                    <p className="text-xl font-bold font-mono">{promo.code}</p>
-                  </div>
-                  <p className="text-sm opacity-75 font-body">
-                    {promo.validUntil}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 px-4 bg-muted/30">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
-            Sacred Wellness Experience
-          </h2>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
-              <Card
-                key={index}
-                className="text-center border-0 shadow-sm hover:shadow-md transition-shadow duration-300 bg-background"
-              >
-                <CardContent className="pt-8 pb-6">
-                  <div className="flex justify-center mb-4">{feature.icon}</div>
-                  <h3 className="text-xl font-heading font-semibold mb-3 text-foreground">
-                    {feature.title}
-                  </h3>
-                  <p className="text-muted-foreground leading-relaxed font-body">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Membership & Day Pass Marketing Cards */}
       <section className="py-20 px-4 bg-gradient-to-br from-background to-muted/30">
         <div className="max-w-7xl mx-auto">
@@ -427,6 +363,70 @@ export default function LandingPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Promotions Carousel */}
+      <section className="py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
+            Exclusive Promotions
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {promotions?.map((promo, index) => (
+              <Card
+                key={index}
+                className="border-0 shadow-lg transform hover:scale-105 transition-transform duration-300 bg-primary text-white"
+              >
+                <CardHeader>
+                  <CardTitle className="text-2xl font-heading font-bold">
+                    {promo.title}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg mb-4 opacity-90 font-body">
+                    {promo.description}
+                  </p>
+                  <div className="bg-white/20 rounded-lg p-3 mb-4">
+                    <p className="text-sm font-medium font-body">Promo Code:</p>
+                    <p className="text-xl font-bold font-mono">{promo.code}</p>
+                  </div>
+                  <p className="text-sm opacity-75 font-body">
+                    {promo.validUntil}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-16 px-4 bg-muted/30">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
+            Sacred Wellness Experience
+          </h2>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {features.map((feature, index) => (
+              <Card
+                key={index}
+                className="text-center border-0 shadow-sm hover:shadow-md transition-shadow duration-300 bg-background"
+              >
+                <CardContent className="pt-8 pb-6">
+                  <div className="flex justify-center mb-4">{feature.icon}</div>
+                  <h3 className="text-xl font-heading font-semibold mb-3 text-foreground">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground leading-relaxed font-body">
+                    {feature.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>

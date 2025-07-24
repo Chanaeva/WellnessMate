@@ -1,0 +1,124 @@
+import Stripe from "stripe";
+
+// Environment validation
+const requiredStripeEnvVars = {
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  VITE_STRIPE_PUBLIC_KEY: process.env.VITE_STRIPE_PUBLIC_KEY,
+} as const;
+
+// Validate required environment variables
+for (const [key, value] of Object.entries(requiredStripeEnvVars)) {
+  if (!value) {
+    throw new Error(`Missing required Stripe environment variable: ${key}`);
+  }
+}
+
+// Validate environment-specific keys
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction) {
+  // Production validation
+  if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
+    throw new Error('Production environment requires live Stripe secret key (sk_live_...)');
+  }
+  if (!process.env.VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_')) {
+    console.warn('⚠️  Warning: Production environment should use live Stripe public key (pk_live_...)');
+  }
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.warn('⚠️  Warning: Production environment should have STRIPE_WEBHOOK_SECRET configured');
+  }
+} else if (isDevelopment) {
+  // Development validation
+  if (process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
+    console.warn('⚠️  Warning: Using live Stripe keys in development environment');
+  }
+}
+
+// Initialize Stripe with production-ready configuration
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2025-05-28.basil",
+  typescript: true,
+  telemetry: false, // Disable telemetry for production
+  maxNetworkRetries: 3,
+  timeout: 30000, // 30 seconds
+  appInfo: {
+    name: "Wolf Mother Wellness",
+    version: "1.0.0",
+    url: "https://wolfmotherwellness.com",
+  },
+});
+
+// Stripe webhook configuration
+export const STRIPE_WEBHOOK_CONFIG = {
+  secret: process.env.STRIPE_WEBHOOK_SECRET,
+  tolerance: 300, // 5 minutes tolerance for webhook timestamps
+  enabledEvents: [
+    'payment_intent.succeeded',
+    'payment_intent.payment_failed',
+    'setup_intent.succeeded',
+    'customer.subscription.created',
+    'customer.subscription.updated',
+    'customer.subscription.deleted',
+    'invoice.payment_succeeded',
+    'invoice.payment_failed',
+  ] as const,
+};
+
+// Stripe configuration constants
+export const STRIPE_CONFIG = {
+  currency: 'usd',
+  paymentMethodTypes: ['card'],
+  automaticPaymentMethods: { enabled: true },
+  
+  // Payment intent configuration
+  paymentIntentConfig: {
+    capture_method: 'automatic' as const,
+    confirmation_method: 'automatic' as const,
+    payment_method_types: ['card'],
+  },
+  
+  // Setup intent configuration
+  setupIntentConfig: {
+    payment_method_types: ['card'],
+    usage: 'off_session' as const,
+  },
+  
+  // Customer configuration
+  customerConfig: {
+    metadata: {
+      source: 'wolf_mother_wellness',
+      environment: process.env.NODE_ENV || 'development',
+    },
+  },
+} as const;
+
+// Helper function to format amounts for Stripe (convert to cents)
+export const formatAmountForStripe = (amount: number): number => {
+  return Math.round(amount * 100);
+};
+
+// Helper function to format amounts from Stripe (convert from cents)
+export const formatAmountFromStripe = (amount: number): number => {
+  return amount / 100;
+};
+
+// Environment info for logging
+export const STRIPE_ENV_INFO = {
+  environment: process.env.NODE_ENV || 'development',
+  isProduction,
+  isDevelopment,
+  hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+  keyType: process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : 'test',
+  publicKeyType: process.env.VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_') ? 'live' : 'test',
+};
+
+// Log configuration on startup
+if (isDevelopment) {
+  console.log('🔧 Stripe Configuration:', {
+    environment: STRIPE_ENV_INFO.environment,
+    keyType: STRIPE_ENV_INFO.keyType,
+    publicKeyType: STRIPE_ENV_INFO.publicKeyType,
+    webhookConfigured: STRIPE_ENV_INFO.hasWebhookSecret,
+  });
+}

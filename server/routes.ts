@@ -4,7 +4,8 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import Stripe from "stripe";
+import { stripe, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe } from "./stripe-config";
+import { setupStripeWebhooks } from "./stripe-webhooks";
 
 const scryptAsync = promisify(scrypt);
 import { 
@@ -19,14 +20,10 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-05-28.basil",
-});
-
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup Stripe webhooks
+  setupStripeWebhooks(app);
+  
   // Setup authentication routes (/api/register, /api/login, /api/logout, /api/user)
   setupAuth(app);
 
@@ -728,11 +725,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ customer });
       }
       
-      // Create new Stripe customer
+      // Create new Stripe customer with production-ready config
       const customer = await stripe.customers.create({
         email: user.email,
         name: `${user.firstName} ${user.lastName}`,
-        metadata: { userId: user.id.toString() }
+        metadata: {
+          userId: user.id.toString(),
+          ...STRIPE_CONFIG.customerConfig.metadata
+        }
       });
       
       // Save customer ID to user
@@ -740,6 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ customer });
     } catch (error: any) {
+      console.error('Failed to create Stripe customer:', error);
       res.status(500).json({ message: "Failed to create customer: " + error.message });
     }
   });
@@ -766,7 +767,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const customer = await stripe.customers.create({
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
-          metadata: { userId: user.id.toString() }
+          metadata: {
+            userId: user.id.toString(),
+            ...STRIPE_CONFIG.customerConfig.metadata
+          }
         });
         customerId = customer.id;
         await storage.updateUserStripeCustomerId(user.id, customerId);
@@ -774,12 +778,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const setupIntent = await stripe.setupIntents.create({
         customer: customerId,
-        payment_method_types: ['card'],
-        usage: 'off_session'
+        ...STRIPE_CONFIG.setupIntentConfig
       });
       
       res.json({ clientSecret: setupIntent.client_secret });
     } catch (error: any) {
+      console.error('Failed to create setup intent:', error);
       res.status(500).json({ message: "Failed to create setup intent: " + error.message });
     }
   });
@@ -850,17 +854,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create payment intent for membership or day pass
-  app.post("/api/create-payment-intent", async (req, res) => {
+  app.post("/api/create-payment-intent", isAuthenticated, async (req, res) => {
     try {
-      const { amount, description } = req.body;
+      const { amount, description, customerId } = req.body;
+      const user = req.user!;
+      
+      // Ensure customer ID is available
+      let stripeCustomerId = customerId || user.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: {
+            userId: user.id.toString(),
+            ...STRIPE_CONFIG.customerConfig.metadata
+          }
+        });
+        stripeCustomerId = customer.id;
+        await storage.updateUserStripeCustomerId(user.id, stripeCustomerId);
+      }
       
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
-        currency: 'usd',
+        amount: formatAmountForStripe(amount),
+        currency: STRIPE_CONFIG.currency,
+        customer: stripeCustomerId,
         description: description || 'Wolf Mother Wellness Payment',
-        automatic_payment_methods: {
-          enabled: true,
-        },
+        ...STRIPE_CONFIG.paymentIntentConfig,
+        automatic_payment_methods: STRIPE_CONFIG.automaticPaymentMethods,
       });
       
       res.json({ 
@@ -868,6 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentIntentId: paymentIntent.id 
       });
     } catch (error: any) {
+      console.error('Failed to create payment intent:', error);
       res.status(500).json({ message: "Failed to create payment intent: " + error.message });
     }
   });

@@ -35,6 +35,29 @@ export default function LandingPage() {
     },
   });
 
+  // Fetch membership plans
+  const { data: membershipPlans } = useQuery({
+    queryKey: ["/api/membership-plans"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/membership-plans");
+      return await res.json();
+    },
+  });
+
+  // Fetch day pass options
+  const { data: dayPasses } = useQuery({
+    queryKey: ["/api/punch-cards/options"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/punch-cards/options");
+      return await res.json();
+    },
+  });
+
+  // Format price for display
+  const formatPrice = (priceInCents: number) => {
+    return `$${(priceInCents / 100).toFixed(0)}`;
+  };
+
   const features = [
     {
       icon: <Waves className="h-8 w-8 text-primary" />,
@@ -211,6 +234,199 @@ export default function LandingPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Membership & Day Pass Marketing Cards */}
+      <section className="py-20 px-4 bg-gradient-to-br from-background to-muted/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-heading font-bold text-foreground mb-4">
+              Choose Your Wellness Path
+            </h2>
+            <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
+              Select the perfect membership or day pass package to begin your thermal wellness journey
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-12 mb-16">
+            {/* Membership Plans Section */}
+            <div>
+              <div className="text-center mb-8">
+                <Crown className="h-12 w-12 text-primary mx-auto mb-4" />
+                <h3 className="text-2xl font-heading font-bold text-foreground mb-2">
+                  Monthly Memberships
+                </h3>
+                <p className="text-muted-foreground font-body">
+                  Unlimited access to our thermal wellness sanctuary
+                </p>
+              </div>
+              
+              <div className="space-y-6">
+                {membershipPlans?.map((plan: any) => (
+                  <Card key={plan.id} className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20">
+                    <CardContent className="p-8">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="text-xl font-heading font-bold text-foreground mb-2">
+                            {plan.name}
+                          </h4>
+                          <p className="text-muted-foreground font-body">
+                            {plan.description}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-primary">
+                            {formatPrice(plan.monthlyPrice)}
+                          </div>
+                          <div className="text-sm text-muted-foreground font-body">
+                            per month
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        <Badge className="bg-primary/10 text-primary">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Unlimited Access
+                        </Badge>
+                        <Badge className="bg-primary/10 text-primary">
+                          <Waves className="h-3 w-3 mr-1" />
+                          All Thermal Facilities
+                        </Badge>
+                        <Badge className="bg-primary/10 text-primary">
+                          <Shield className="h-3 w-3 mr-1" />
+                          Cancel Anytime
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-center">
+                        <Link href="/auth?tab=register">
+                          <Button className="w-full wellness-button-primary">
+                            <ArrowRight className="h-4 w-4 mr-2" />
+                            Get Started
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Day Pass Packages Section */}
+            <div>
+              <div className="text-center mb-8">
+                <Calendar className="h-12 w-12 text-primary mx-auto mb-4" />
+                <h3 className="text-2xl font-heading font-bold text-foreground mb-2">
+                  Day Pass Packages
+                </h3>
+                <p className="text-muted-foreground font-body">
+                  Perfect for trying our facilities or occasional visits
+                </p>
+              </div>
+              
+              <div className="space-y-6">
+                {dayPasses?.map((dayPass: any, index: number) => (
+                  <Card key={index} className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20">
+                    <CardContent className="p-8">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="text-xl font-heading font-bold text-foreground mb-2">
+                            {dayPass.name}
+                          </h4>
+                          <p className="text-muted-foreground font-body">
+                            {dayPass.totalPunches} individual day passes
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-primary">
+                            {formatPrice(dayPass.totalPrice)}
+                          </div>
+                          <div className="text-sm text-muted-foreground font-body">
+                            {formatPrice(dayPass.pricePerPunch)} per visit
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        <Badge className="bg-secondary/80 text-secondary-foreground">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {dayPass.totalPunches} Visits
+                        </Badge>
+                        <Badge className="bg-secondary/80 text-secondary-foreground">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          No Expiration
+                        </Badge>
+                        {dayPass.totalPunches >= 10 && (
+                          <Badge className="bg-green-100 text-green-800">
+                            <Heart className="h-3 w-3 mr-1" />
+                            Best Value
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="text-center">
+                        <Link href="/auth?tab=register">
+                          <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
+                            <ArrowRight className="h-4 w-4 mr-2" />
+                            Purchase Package
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Benefits Section */}
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-3xl p-8 lg:p-12">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-heading font-bold text-foreground mb-4">
+                Why Choose Wolf Mother Wellness?
+              </h3>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Waves className="h-8 w-8 text-primary" />
+                </div>
+                <h4 className="font-heading font-semibold text-foreground mb-2">
+                  Ancient Wisdom
+                </h4>
+                <p className="text-muted-foreground font-body text-sm">
+                  Traditional thermal healing practices rooted in Roman history
+                </p>
+              </div>
+              
+              <div className="text-center">
+                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="h-8 w-8 text-primary" />
+                </div>
+                <h4 className="font-heading font-semibold text-foreground mb-2">
+                  Safe & Clean
+                </h4>
+                <p className="text-muted-foreground font-body text-sm">
+                  Highest safety standards with pristine facilities maintained daily
+                </p>
+              </div>
+              
+              <div className="text-center">
+                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-8 w-8 text-primary" />
+                </div>
+                <h4 className="font-heading font-semibold text-foreground mb-2">
+                  Supportive Community
+                </h4>
+                <p className="text-muted-foreground font-body text-sm">
+                  Join our pack of wellness warriors on their journey to vitality
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

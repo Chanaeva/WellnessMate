@@ -388,6 +388,15 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Created web app manifest for progressive web app support
   - Enhanced brand consistency across all browser interfaces
 
+- July 24, 2025: Added marketing cards for membership and day packages on landing page ✓
+  - Created comprehensive "Choose Your Wellness Path" section showcasing all offerings
+  - Added attractive cards for monthly memberships with pricing and benefits
+  - Included day pass packages (5-Day, 10-Day, 20-Day) with per-visit pricing
+  - Featured benefit badges highlighting key features (unlimited access, no expiration, best value)
+  - Added "Why Choose Wolf Mother Wellness?" benefits section with ancient wisdom, safety, and community highlights
+  - Integrated real-time data fetching from membership plans and punch card APIs
+  - Enhanced visual design with hover effects and call-to-action buttons directing to registration
+
 ## Changelog
 
 Changelog:

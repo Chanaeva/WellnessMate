@@ -18,6 +18,8 @@ import QRCodePage from "@/pages/qr-code-page";
 
 import PackagesPage from "@/pages/packages-page";
 import CheckoutPage from "@/pages/checkout-page";
+import CheckoutSuccess from "@/pages/checkout-success";
+import CheckoutCancel from "@/pages/checkout-cancel";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminNotifications from "@/pages/admin/notifications";
@@ -45,6 +47,8 @@ function Router() {
 
       <ProtectedRoute path="/packages" component={PackagesPage} />
       <ProtectedRoute path="/checkout" component={CheckoutPage} />
+      <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/checkout/cancel" component={CheckoutCancel} />
       
       {/* Test payment - accessible to all authenticated users */}
       <ProtectedRoute path="/test-payment" component={TestPayment} />

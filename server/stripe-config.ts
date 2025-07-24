@@ -57,6 +57,8 @@ export const STRIPE_WEBHOOK_CONFIG = {
     'payment_intent.succeeded',
     'payment_intent.payment_failed',
     'setup_intent.succeeded',
+    'checkout.session.completed',
+    'checkout.session.expired',
     'customer.subscription.created',
     'customer.subscription.updated',
     'customer.subscription.deleted',
@@ -75,12 +77,12 @@ export const STRIPE_CONFIG = {
   paymentIntentConfig: {
     capture_method: 'automatic' as const,
     confirmation_method: 'automatic' as const,
-    payment_method_types: ['card'],
+    payment_method_types: ['card'] as string[],
   },
   
   // Setup intent configuration
   setupIntentConfig: {
-    payment_method_types: ['card'],
+    payment_method_types: ['card'] as string[],
     usage: 'off_session' as const,
   },
   
@@ -89,6 +91,22 @@ export const STRIPE_CONFIG = {
     metadata: {
       source: 'wolf_mother_wellness',
       environment: process.env.NODE_ENV || 'development',
+    },
+  },
+  
+  // Tax configuration for checkout sessions
+  taxConfig: {
+    automaticTax: { enabled: true },
+    // Collect billing address for tax calculation
+    billingAddressCollection: 'auto' as const,
+    // Update customer with new address information
+    customerUpdate: {
+      address: 'auto' as const,
+      shipping: 'auto' as const,
+    },
+    // Allowed countries for shipping address collection (US-focused for now)
+    shippingAddressCollection: {
+      allowed_countries: ['US'] as const,
     },
   },
 } as const;

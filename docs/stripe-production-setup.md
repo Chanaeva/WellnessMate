@@ -19,7 +19,8 @@ NODE_ENV=production
 ### Getting Your Stripe Keys
 
 1. **Login to Stripe Dashboard**: https://dashboard.stripe.com
-2. **API Keys**: Navigate to Developers > API keys
+2. **Enable Stripe Tax**: Navigate to Products > Tax and enable Stripe Tax for your account
+3. **API Keys**: Navigate to Developers > API keys
    - Copy your **Live publishable key** (starts with `pk_live_`) to `VITE_STRIPE_PUBLIC_KEY`
    - Copy your **Live secret key** (starts with `sk_live_`) to `STRIPE_SECRET_KEY`
 
@@ -56,6 +57,13 @@ NODE_ENV=production
 - Signature verification with configurable tolerance (5 minutes)
 - Event type filtering to handle only expected events
 - Comprehensive error handling and logging
+
+### Automatic Tax Collection
+- **Stripe Tax Integration**: Automatically calculates and collects sales tax based on customer location
+- **Address Collection**: Collects billing and shipping addresses for accurate tax calculation
+- **Tax-Inclusive Pricing**: Displays tax amounts separately in checkout sessions
+- **Compliance**: Handles tax compliance across different jurisdictions automatically
+- **Webhook Processing**: Automatically records tax amounts in payment records
 
 ## Production Checklist
 

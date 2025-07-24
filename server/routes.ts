@@ -853,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create payment intent for membership or day pass
+  // Create payment intent for membership or day pass (legacy)
   app.post("/api/create-payment-intent", isAuthenticated, async (req, res) => {
     try {
       const { amount, description, customerId } = req.body;
@@ -890,6 +890,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Failed to create payment intent:', error);
       res.status(500).json({ message: "Failed to create payment intent: " + error.message });
+    }
+  });
+
+  // Create checkout session with automatic tax collection
+  app.post("/api/create-checkout-session", isAuthenticated, async (req, res) => {
+    try {
+      const { items, mode = 'payment', successUrl, cancelUrl } = req.body;
+      const user = req.user!;
+      
+      // Ensure customer ID is available
+      let stripeCustomerId = user.stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: {
+            userId: user.id.toString(),
+            ...STRIPE_CONFIG.customerConfig.metadata
+          }
+        });
+        stripeCustomerId = customer.id;
+        await storage.updateUserStripeCustomerId(user.id, stripeCustomerId);
+      }
+
+      // Convert cart items to Stripe line items
+      const lineItems = items.map((item: any) => ({
+        price_data: {
+          currency: STRIPE_CONFIG.currency,
+          product_data: {
+            name: item.name,
+            description: item.description || `${item.name} - Wolf Mother Wellness`,
+            metadata: {
+              itemType: item.type, // 'membership' or 'punch_card'
+              planType: item.planType || '',
+              userId: user.id.toString(),
+            }
+          },
+          unit_amount: formatAmountForStripe(item.price),
+        },
+        quantity: item.quantity || 1,
+      }));
+
+      const sessionConfig: any = {
+        customer: stripeCustomerId,
+        line_items: lineItems,
+        mode,
+        success_url: successUrl || `${req.headers.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: cancelUrl || `${req.headers.origin}/checkout/cancel`,
+        
+        // Enable automatic tax collection
+        automatic_tax: STRIPE_CONFIG.taxConfig.automaticTax,
+        
+        // Billing address collection for tax calculation
+        billing_address_collection: STRIPE_CONFIG.taxConfig.billingAddressCollection,
+        
+        // Update customer with address information
+        customer_update: STRIPE_CONFIG.taxConfig.customerUpdate,
+        
+        // Collect shipping address for more accurate tax calculation
+        shipping_address_collection: STRIPE_CONFIG.taxConfig.shippingAddressCollection,
+        
+        // Metadata for tracking
+        metadata: {
+          userId: user.id.toString(),
+          source: 'wolf_mother_wellness_checkout',
+          environment: process.env.NODE_ENV || 'development',
+        },
+        
+        // Allow promotion codes
+        allow_promotion_codes: true,
+      };
+
+      const session = await stripe.checkout.sessions.create(sessionConfig);
+      
+      console.log('🛒 Checkout session created:', {
+        sessionId: session.id,
+        customer: stripeCustomerId,
+        automaticTax: session.automatic_tax?.enabled,
+        totalDetails: session.total_details,
+      });
+      
+      res.json({ 
+        sessionId: session.id,
+        url: session.url,
+        customer: stripeCustomerId,
+        automaticTaxEnabled: session.automatic_tax?.enabled
+      });
+    } catch (error: any) {
+      console.error('Failed to create checkout session:', error);
+      res.status(500).json({ message: "Failed to create checkout session: " + error.message });
     }
   });
 

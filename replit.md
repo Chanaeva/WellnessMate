@@ -410,6 +410,17 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Configured automatic payment recording in database through webhooks
   - Enhanced security with proper logging and environment-specific warnings
 
+- July 24, 2025: Added automatic tax collection with Stripe Tax integration ✓
+  - Implemented Stripe Checkout sessions with automatic tax calculation
+  - Added tax configuration for billing and shipping address collection
+  - Created checkout session endpoint with comprehensive tax handling
+  - Enhanced frontend with tax-enabled checkout button and redirect flow
+  - Added checkout success and cancel pages with tax amount display
+  - Configured webhook processing for checkout session completion events
+  - Updated documentation with Stripe Tax setup and configuration guide
+  - Tax amounts are automatically calculated based on customer location
+  - Full compliance with tax regulations handled by Stripe Tax service
+
 ## Changelog
 
 Changelog:

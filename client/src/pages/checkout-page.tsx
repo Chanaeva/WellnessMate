@@ -45,7 +45,54 @@ export default function CheckoutPage() {
     }).format(price / 100);
   };
 
-  // Process checkout mutation
+  // Process checkout with Stripe Tax (redirects to Stripe Checkout)
+  const checkoutWithTaxMutation = useMutation({
+    mutationFn: async () => {
+      // Check if user is trying to purchase the same membership plan they already have
+      const membershipItems = items.filter(item => item.type === 'membership');
+      if (membershipItems.length > 0) {
+        const membershipRes = await apiRequest("GET", "/api/membership");
+        if (membershipRes.ok) {
+          const currentMembership = await membershipRes.json();
+          if (currentMembership && currentMembership.status === 'active') {
+            const newPlan = membershipItems[0].data;
+            if (currentMembership.planType === newPlan.planType) {
+              throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
+            }
+          }
+        }
+      }
+
+      const cartItems = items.map(item => ({
+        name: item.data?.name || `${item.type} Item`,
+        description: item.data?.description || `${item.data?.name} - Wolf Mother Wellness`,
+        price: item.data?.price || item.data?.totalPrice || 0,
+        quantity: item.quantity || 1,
+        type: item.type,
+        planType: item.data?.planType || '',
+      }));
+
+      const res = await apiRequest("POST", "/api/create-checkout-session", {
+        items: cartItems,
+        mode: 'payment',
+      });
+      
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Checkout Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Process checkout mutation (legacy method)
   const checkoutMutation = useMutation({
     mutationFn: async () => {
       // Check if user is trying to purchase the same membership plan they already have
@@ -114,6 +161,10 @@ export default function CheckoutPage() {
       return;
     }
     checkoutMutation.mutate();
+  };
+
+  const handleCheckoutWithTax = () => {
+    checkoutWithTaxMutation.mutate();
   };
 
   const handleAddPaymentMethod = () => {
@@ -298,24 +349,46 @@ export default function CheckoutPage() {
                     <span>{formatPrice(getTotalPrice())}</span>
                   </div>
 
+                  <div className="space-y-3">
                   <Button 
                     className="w-full wellness-button-primary" 
                     size="lg"
+                    onClick={handleCheckoutWithTax}
+                    disabled={checkoutWithTaxMutation.isPending}
+                  >
+                    {checkoutWithTaxMutation.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        Redirecting to Secure Checkout...
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="h-4 w-4 mr-2" />
+                        Checkout with Tax Calculation
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    variant="outline"
                     onClick={handleCheckout}
                     disabled={checkoutMutation.isPending || !hasPaymentMethod}
                   >
                     {checkoutMutation.isPending ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
                         Processing...
                       </>
                     ) : (
                       <>
-                        <Shield className="h-4 w-4 mr-2" />
-                        Complete Order
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Quick Checkout (Legacy)
                       </>
                     )}
                   </Button>
+                </div>
 
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground">

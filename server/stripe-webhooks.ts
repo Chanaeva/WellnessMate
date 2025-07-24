@@ -93,6 +93,54 @@ const handleSetupIntentSucceeded = async (setupIntent: Stripe.SetupIntent) => {
   }
 };
 
+const handleCheckoutSessionCompleted = async (session: Stripe.Checkout.Session) => {
+  console.log('✅ Checkout session completed:', session.id);
+  
+  try {
+    const customerId = session.customer as string;
+    if (!customerId) {
+      console.warn('⚠️  Checkout session without customer ID:', session.id);
+      return;
+    }
+    
+    const user = await storage.getUserByCustomerId(customerId);
+    if (!user) {
+      console.warn('⚠️  User not found for customer:', customerId);
+      return;
+    }
+    
+    // Record successful payment with tax information
+    const totalAmount = session.amount_total || 0;
+    const taxAmount = session.total_details?.amount_tax || 0;
+    const subtotalAmount = totalAmount - taxAmount;
+    
+    await storage.createPayment({
+      userId: user.id,
+      amount: totalAmount / 100, // Convert from cents
+      status: 'successful',
+      description: `Checkout Session ${session.id}`,
+      method: 'credit_card',
+      stripePaymentIntentId: session.payment_intent as string,
+      stripePaymentMethodId: session.payment_method_details?.card?.last4 || '',
+    });
+    
+    console.log('💳 Checkout payment recorded:', {
+      user: user.email,
+      total: totalAmount / 100,
+      tax: taxAmount / 100,
+      subtotal: subtotalAmount / 100,
+    });
+    
+  } catch (error) {
+    console.error('❌ Error handling checkout session completion:', error);
+  }
+};
+
+const handleCheckoutSessionExpired = async (session: Stripe.Checkout.Session) => {
+  console.log('⏰ Checkout session expired:', session.id);
+  // Could track abandoned checkouts for analytics
+};
+
 // Main webhook handler
 export const setupStripeWebhooks = (app: Express) => {
   app.post('/api/stripe/webhook', async (req: Request, res: Response) => {
@@ -143,6 +191,14 @@ export const setupStripeWebhooks = (app: Express) => {
           
         case 'setup_intent.succeeded':
           await handleSetupIntentSucceeded(event.data.object as Stripe.SetupIntent);
+          break;
+          
+        case 'checkout.session.completed':
+          await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+          break;
+          
+        case 'checkout.session.expired':
+          await handleCheckoutSessionExpired(event.data.object as Stripe.Checkout.Session);
           break;
           
         case 'customer.subscription.created':

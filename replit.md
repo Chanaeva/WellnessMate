@@ -375,6 +375,19 @@ This is a full-stack web application for managing a thermal wellness center's me
   - Backwards compatible - existing users can still login with email or username
   - Simplified registration process requires only email, password, names, and optional phone
 
+- July 24, 2025: Updated date of birth input to allow typed entry ✓
+  - Changed date picker to text input accepting MM/DD/YYYY format
+  - Added calendar icon for visual clarity
+  - Enhanced date validation to parse typed dates properly
+  - Updated backend to handle both MM/DD/YYYY and standard date formats
+  - Maintained strict 18+ age verification with improved error messages
+
+- July 24, 2025: Updated browser favicon with Wolf Mother branding ✓
+  - Replaced default favicon with Wolf Mother Emblem in moss green
+  - Added proper favicon sizes for better browser compatibility
+  - Created web app manifest for progressive web app support
+  - Enhanced brand consistency across all browser interfaces
+
 ## Changelog
 
 Changelog:

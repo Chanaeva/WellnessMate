@@ -69,9 +69,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Update membership status to cancelled
-      await storage.updateMembership(membership.id, { 
-        status: 'cancelled',
-        endDate: new Date() // Set end date to now for immediate cancellation
+      await storage.updateMembership(membership.id.toString(), { 
+        status: 'inactive',
+        endDate: new Date().toISOString().split('T')[0] // Set end date to now for immediate cancellation
       });
 
       res.json({ 
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalRemaining: totalDaysRemaining,
             packages: activeDayPasses.map(card => ({
               id: card.id,
-              name: card.templateName || 'Day Pass Package',
+              name: card.name || 'Day Pass Package',
               remaining: card.remainingPunches,
               total: card.totalPunches
             }))
@@ -288,7 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalRemaining: totalDaysRemaining,
             packages: activeDayPasses.map(card => ({
               id: card.id,
-              name: card.templateName || 'Day Pass Package',
+              name: card.name || 'Day Pass Package',
               remaining: card.remainingPunches,
               total: card.totalPunches
             }))
@@ -315,6 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create check-in record
       const checkIn = await storage.createCheckIn({
         userId: user.id,
+        membershipId: membership?.membershipId || 'day-pass-checkin',
         location: "Kiosk Check-in"
       });
 

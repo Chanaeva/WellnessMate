@@ -1355,6 +1355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           for (let i = 0; i < quantity; i++) {
             await storage.createPunchCard({
               userId,
+              templateId: cardData.templateId || null,
               name: cardData.name,
               totalPunches: cardData.totalPunches,
               remainingPunches: cardData.totalPunches,

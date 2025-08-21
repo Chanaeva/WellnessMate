@@ -11,6 +11,9 @@ class TestRunner {
   constructor() {
     this.testResults = [];
     this.cookies = '';
+    this.adminCookies = '';
+    this.testUserId = null;
+    this.adminUserId = null;
   }
 
   async makeRequest(method, path, data = null, useCookies = true) {
@@ -73,6 +76,57 @@ class TestRunner {
     return passed;
   }
 
+  async loginUser(email, password, isAdmin = false) {
+    const loginData = { email, password };
+    const response = await this.makeRequest('POST', '/api/login', loginData, false);
+    
+    if (response.statusCode === 200 && response.headers['set-cookie']) {
+      if (isAdmin) {
+        this.adminCookies = response.headers['set-cookie'].join('; ');
+      } else {
+        this.cookies = response.headers['set-cookie'].join('; ');
+      }
+    }
+    
+    return response;
+  }
+
+  async createAdminUser() {
+    console.log('\n--- Creating Admin Test User ---');
+    
+    const adminUser = {
+      firstName: "Admin",
+      lastName: "User",
+      username: "admin_test_" + Date.now(),
+      email: `admin_test_${Date.now()}@test.com`,
+      password: "AdminPass123!",
+      confirmPassword: "AdminPass123!",
+      phoneNumber: "+1234567999",
+      dateOfBirth: "1990-01-01",
+      ageConfirmation: true,
+      role: "admin"
+    };
+
+    const response = await this.makeRequest('POST', '/api/register', adminUser, false);
+    
+    if (response.statusCode === 201) {
+      this.adminUserId = response.data.user?.id;
+      // Login as admin to get session
+      await this.loginUser(adminUser.email, adminUser.password, true);
+      return this.logTest(
+        'Admin User Creation',
+        true,
+        `Admin User ID: ${this.adminUserId}`
+      );
+    }
+    
+    return this.logTest(
+      'Admin User Creation',
+      false,
+      `Status: ${response.statusCode}, Message: ${response.data.message}`
+    );
+  }
+
   async testAgeVerificationRejectsUnderage() {
     console.log('\n--- Testing Age Verification (Underage Rejection) ---');
     
@@ -115,6 +169,12 @@ class TestRunner {
     };
 
     const response = await this.makeRequest('POST', '/api/register', validUser, false);
+    
+    if (response.statusCode === 201) {
+      this.testUserId = response.data.user?.id;
+      // Login the user to get session cookies
+      await this.loginUser(validUser.email, validUser.password);
+    }
     
     return this.logTest(
       'Age Verification - Accept Valid Adult',
@@ -159,9 +219,13 @@ class TestRunner {
         name: plan.name,
         price: plan.monthlyPrice / 100,
         type: "membership",
-        planId: plan.id
+        data: {
+          monthlyPrice: plan.monthlyPrice,
+          name: plan.name,
+          planId: plan.id
+        }
       }],
-      total: plan.monthlyPrice / 100
+      totalAmount: plan.monthlyPrice / 100
     };
 
     const checkoutResponse = await this.makeRequest('POST', '/api/checkout', checkoutData);
@@ -176,34 +240,53 @@ class TestRunner {
   async testMultipleMembershipPrevention() {
     console.log('\n--- Testing Multiple Membership Prevention ---');
     
-    // First, create a membership directly in database for testing
-    const createMembershipResponse = await this.makeRequest('POST', '/api/admin/memberships', {
-      userId: 19, // Using first test user
-      planId: 516,
-      planType: "basic",
-      status: "active",
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
-    });
-
-    if (createMembershipResponse.statusCode === 403) {
+    if (!this.testUserId || !this.adminUserId) {
       return this.logTest(
         'Multiple Membership Prevention - Setup',
         false,
-        'Cannot create test membership - not admin user'
+        'Missing test or admin user IDs'
       );
     }
 
-    // Now try to add another membership to cart
+    // Use admin cookies to create a membership directly
+    const originalCookies = this.cookies;
+    this.cookies = this.adminCookies;
+    
+    const createMembershipResponse = await this.makeRequest('POST', '/api/admin/memberships', {
+      userId: this.testUserId,
+      membershipId: `test_membership_${Date.now()}`,
+      planType: "basic",
+      status: "active",
+      startDate: new Date().toISOString().split('T')[0], // Date format YYYY-MM-DD
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      autoRenew: true
+    });
+
+    // Switch back to regular user cookies
+    this.cookies = originalCookies;
+
+    if (createMembershipResponse.statusCode !== 201) {
+      return this.logTest(
+        'Multiple Membership Prevention - Setup',
+        false,
+        `Cannot create test membership - Status: ${createMembershipResponse.statusCode}`
+      );
+    }
+
+    // Now try to add another membership to cart as regular user
     const cartData = {
       items: [{
         id: "membership_516",
         name: "Another Membership",
         price: 65.00,
         type: "membership",
-        planId: 516
+        data: {
+          monthlyPrice: 6500, // Price in cents
+          name: "Another Membership",
+          planId: 516
+        }
       }],
-      total: 65.00
+      totalAmount: 65.00
     };
 
     const cartResponse = await this.makeRequest('POST', '/api/checkout', cartData);
@@ -237,6 +320,7 @@ class TestRunner {
     const tests = [
       () => this.testAgeVerificationRejectsUnderage(),
       () => this.testAgeVerificationAcceptsValidAge(),
+      () => this.createAdminUser(),
       () => this.testMembershipAgreementRequired(),
       () => this.testFirstMembershipPurchase(),
       () => this.testMultipleMembershipPrevention(),

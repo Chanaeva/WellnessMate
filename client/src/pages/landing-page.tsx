@@ -388,7 +388,7 @@ export default function LandingPage() {
             </h2>
 
             <div className="grid md:grid-cols-3 gap-6">
-              {promotions?.map((promo, index) => (
+              {promotions?.map((promo: any, index: number) => (
                 <Card
                   key={index}
                   className="border-0 shadow-lg transform hover:scale-105 transition-transform duration-300 bg-primary text-white"

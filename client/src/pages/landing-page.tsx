@@ -87,7 +87,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative py-20 px-4 bg-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>
-        
+
         {/* Animated Water Effects */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Water ripples */}
@@ -97,15 +97,15 @@ export default function LandingPage() {
                 key={i}
                 className="water-ripple"
                 style={{
-                  left: `${15 + (i * 12)}%`,
-                  top: `${20 + (i * 8)}%`,
+                  left: `${15 + i * 12}%`,
+                  top: `${20 + i * 8}%`,
                   animationDelay: `${i * 2}s`,
-                  animationDuration: `${6 + (i % 2)}s`
+                  animationDuration: `${6 + (i % 2)}s`,
                 }}
               />
             ))}
           </div>
-          
+
           {/* Floating bubbles */}
           <div className="bubbles-container">
             {[...Array(15)].map((_, i) => (
@@ -113,9 +113,9 @@ export default function LandingPage() {
                 key={i}
                 className="water-bubble"
                 style={{
-                  left: `${5 + (i * 6)}%`,
+                  left: `${5 + i * 6}%`,
                   animationDelay: `${i * 0.8}s`,
-                  animationDuration: `${10 + (i % 4)}s`
+                  animationDuration: `${10 + (i % 4)}s`,
                 }}
               />
             ))}
@@ -141,7 +141,7 @@ export default function LandingPage() {
 
           <Badge className="mb-8 bg-primary/10 text-primary border-primary/20">
             <Sparkles className="h-4 w-4 mr-2" />
-            Now Open in Kendall-Whitter Neighborhood
+            Coming soon to Kendall-Whitter Neighborhood, Tulsa, OK
           </Badge>
 
           <p className="text-xl md:text-2xl mb-12 text-foreground/80 max-w-3xl mx-auto leading-relaxed font-body">
@@ -182,7 +182,8 @@ export default function LandingPage() {
               Choose Your Wellness Path
             </h2>
             <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
-              Select the perfect membership or day pass package to begin your thermal wellness journey
+              Select the perfect membership or day pass package to begin your
+              thermal wellness journey
             </p>
           </div>
 
@@ -198,10 +199,13 @@ export default function LandingPage() {
                   Unlimited access to our thermal wellness sanctuary
                 </p>
               </div>
-              
+
               <div className="space-y-6">
                 {membershipPlans?.map((plan: any) => (
-                  <Card key={plan.id} className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20">
+                  <Card
+                    key={plan.id}
+                    className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
+                  >
                     <CardContent className="p-8">
                       <div className="flex justify-between items-start mb-4">
                         <div>
@@ -221,7 +225,7 @@ export default function LandingPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-wrap gap-2 mb-6">
                         <Badge className="bg-primary/10 text-primary">
                           <CheckCircle className="h-3 w-3 mr-1" />
@@ -236,7 +240,7 @@ export default function LandingPage() {
                           Cancel Anytime
                         </Badge>
                       </div>
-                      
+
                       <div className="text-center">
                         <Link href="/auth?tab=register">
                           <Button className="w-full wellness-button-primary">
@@ -262,10 +266,13 @@ export default function LandingPage() {
                   Perfect for trying our facilities or occasional visits
                 </p>
               </div>
-              
+
               <div className="space-y-6">
                 {dayPasses?.map((dayPass: any, index: number) => (
-                  <Card key={index} className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20">
+                  <Card
+                    key={index}
+                    className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
+                  >
                     <CardContent className="p-8">
                       <div className="flex justify-between items-start mb-4">
                         <div>
@@ -285,7 +292,7 @@ export default function LandingPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-wrap gap-2 mb-6">
                         <Badge className="bg-secondary/80 text-secondary-foreground">
                           <Clock className="h-3 w-3 mr-1" />
@@ -302,10 +309,13 @@ export default function LandingPage() {
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="text-center">
                         <Link href="/auth?tab=register">
-                          <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-white">
+                          <Button
+                            variant="outline"
+                            className="w-full border-primary text-primary hover:bg-primary hover:text-white"
+                          >
                             <ArrowRight className="h-4 w-4 mr-2" />
                             Purchase Package
                           </Button>
@@ -325,7 +335,7 @@ export default function LandingPage() {
                 Why Choose Wolf Mother Wellness?
               </h3>
             </div>
-            
+
             <div className="grid md:grid-cols-3 gap-8">
               <div className="text-center">
                 <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -338,7 +348,7 @@ export default function LandingPage() {
                   Traditional thermal healing practices rooted in Roman history
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Shield className="h-8 w-8 text-primary" />
@@ -347,10 +357,11 @@ export default function LandingPage() {
                   Safe & Clean
                 </h4>
                 <p className="text-muted-foreground font-body text-sm">
-                  Highest safety standards with pristine facilities maintained daily
+                  Highest safety standards with pristine facilities maintained
+                  daily
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Users className="h-8 w-8 text-primary" />
@@ -359,7 +370,8 @@ export default function LandingPage() {
                   Supportive Community
                 </h4>
                 <p className="text-muted-foreground font-body text-sm">
-                  Join our pack of wellness warriors on their journey to vitality
+                  Join our pack of wellness warriors on their journey to
+                  vitality
                 </p>
               </div>
             </div>
@@ -368,41 +380,46 @@ export default function LandingPage() {
       </section>
 
       {/* Promotions Carousel */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
-            Exclusive Promotions
-          </h2>
+      {promotions?.length > 0 && (
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
+              Exclusive Promotions
+            </h2>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {promotions?.map((promo, index) => (
-              <Card
-                key={index}
-                className="border-0 shadow-lg transform hover:scale-105 transition-transform duration-300 bg-primary text-white"
-              >
-                <CardHeader>
-                  <CardTitle className="text-2xl font-heading font-bold">
-                    {promo.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg mb-4 opacity-90 font-body">
-                    {promo.description}
-                  </p>
-                  <div className="bg-white/20 rounded-lg p-3 mb-4">
-                    <p className="text-sm font-medium font-body">Promo Code:</p>
-                    <p className="text-xl font-bold font-mono">{promo.code}</p>
-                  </div>
-                  <p className="text-sm opacity-75 font-body">
-                    {promo.validUntil}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+            <div className="grid md:grid-cols-3 gap-6">
+              {promotions?.map((promo, index) => (
+                <Card
+                  key={index}
+                  className="border-0 shadow-lg transform hover:scale-105 transition-transform duration-300 bg-primary text-white"
+                >
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-heading font-bold">
+                      {promo.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg mb-4 opacity-90 font-body">
+                      {promo.description}
+                    </p>
+                    <div className="bg-white/20 rounded-lg p-3 mb-4">
+                      <p className="text-sm font-medium font-body">
+                        Promo Code:
+                      </p>
+                      <p className="text-xl font-bold font-mono">
+                        {promo.code}
+                      </p>
+                    </div>
+                    <p className="text-sm opacity-75 font-body">
+                      {promo.validUntil}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
-
+        </section>
+      )}
       {/* Features Section */}
       <section className="py-16 px-4 bg-muted/30">
         <div className="max-w-6xl mx-auto">

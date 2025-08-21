@@ -10,6 +10,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 import LandingPage from "@/pages/landing-page";
 import AuthPage from "@/pages/auth-page";
+import AdminLogin from "@/pages/admin-login";
 import ForgotPasswordPage from "@/pages/forgot-password-page";
 import ResetPasswordPage from "@/pages/reset-password-page";
 import MemberDashboard from "@/pages/member-dashboard";
@@ -36,7 +37,8 @@ function Router() {
     <Switch>
       <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/membership-agreement" component={MembershipAgreement} />
-      <Route path="/admin-login" component={AuthPage} />
+      <Route path="/admin-login" component={AdminLogin} />
+      <Route path="/admin/login" component={AdminLogin} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       

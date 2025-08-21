@@ -104,6 +104,23 @@ Once deployed, configure your webhook endpoint:
 - Check-in system operation
 - Notification management
 
+## Admin Access Instructions
+
+### Easy Admin Login
+For easy access to the admin dashboard:
+
+1. **Direct Admin Login Page**: Go to `/admin-login` or `/admin/login`
+2. **Footer Access**: Click "Admin Access" link in the footer of any page
+3. **Quick URLs**:
+   - Admin Login: `https://your-app.replit.app/admin-login`
+   - Staff Check-in: `https://your-app.replit.app/staff-checkin`
+   - Kiosk Mode: `https://your-app.replit.app/kiosk`
+
+### Admin Privileges
+- **Admin users**: Full access to all dashboard features
+- **Staff users**: Access to admin dashboard with appropriate permissions
+- **Member users**: Denied access with clear error message
+
 ## Emergency Contacts
 
 ### Technical Issues

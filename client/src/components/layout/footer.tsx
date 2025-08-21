@@ -41,6 +41,10 @@ const Footer = () => {
             <Link href="#" className="hover:text-primary">
               FAQ
             </Link>
+            <span className="text-gray-300">|</span>
+            <Link href="/admin-login" className="hover:text-primary font-medium">
+              Admin Access
+            </Link>
           </div>
         </div>
       </div>

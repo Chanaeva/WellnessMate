@@ -29,7 +29,6 @@ import AdminMembershipPlans from "@/pages/admin-membership-plans";
 import KioskCheckIn from "@/pages/kiosk-checkin";
 import MembershipAgreement from "@/pages/membership-agreement";
 import StaffCheckIn from "@/pages/staff-checkin";
-import TestPayment from "@/pages/test-payment";
 
 
 function Router() {
@@ -52,8 +51,6 @@ function Router() {
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/checkout/cancel" component={CheckoutCancel} />
       
-      {/* Test payment - accessible to all authenticated users */}
-      <ProtectedRoute path="/test-payment" component={TestPayment} />
 
       {/* Staff check-in - accessible to all authenticated users */}
       <ProtectedRoute path="/staff-checkin" component={StaffCheckIn} />

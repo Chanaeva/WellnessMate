@@ -136,7 +136,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg font-body text-muted-foreground mb-2">
-            Thermal Wellness Center
+            Social Wellness Club 
           </p>
 
           <Badge className="mb-8 bg-primary/10 text-primary border-primary/20">

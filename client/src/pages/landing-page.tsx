@@ -126,13 +126,13 @@ export default function LandingPage() {
           <div className="flex justify-center mb-8">
             <img
               src={logoTransparent}
-              alt="Wellness Social Club"
+              alt="Wolf Mother Wellness"
               className="h-32 w-32 object-contain thermal-glow"
             />
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading text-foreground mb-4">
-            Wellness Social Club
+            Wolf Mother Wellness
           </h1>
 
           <p className="text-lg font-body text-muted-foreground mb-2">
@@ -332,7 +332,7 @@ export default function LandingPage() {
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-3xl p-8 lg:p-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-heading font-bold text-foreground mb-4">
-                Why Choose Wellness Social Club?
+                Why Choose Wolf Mother Wellness?
               </h3>
             </div>
 
@@ -532,7 +532,7 @@ export default function LandingPage() {
       <footer className="py-8 px-4 bg-foreground text-background">
         <div className="max-w-6xl mx-auto text-center">
           <p className="text-muted font-body">
-            © 2025 Wellness Social Club. Where legends are born and wellness
+            © 2025 Wolf Mother Wellness. Where legends are born and wellness
             thrives.
           </p>
         </div>

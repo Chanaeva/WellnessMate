@@ -465,7 +465,7 @@ export default function LandingPage() {
             <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
               <div className="aspect-video overflow-hidden">
                 <img
-                  src="/attached_assets/Screenshot%202025-09-29%20at%202.53.42%20PM_1759175634448.png"
+                  src="/attached_assets/LIT_1759176133152.png"
                   alt="LIT Method Cold Plunge"
                   className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                 />
@@ -484,7 +484,7 @@ export default function LandingPage() {
             <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
               <div className="aspect-video overflow-hidden">
                 <img
-                  src="/attached_assets/Screenshot%202025-09-29%20at%202.51.44%20PM_1759175638828.png"
+                  src="/attached_assets/nomadsaunainside_1759176129008.png"
                   alt="Nomad Sauna"
                   className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                 />

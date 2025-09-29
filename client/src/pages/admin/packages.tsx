@@ -3,6 +3,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MembershipPlan, InsertMembershipPlan, PunchCardTemplate, InsertPunchCardTemplate } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +51,7 @@ export default function PackagesManagement() {
     isActive: true,
     sortOrder: 0
   });
+  const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
 
   // Fetch membership plans
   const { data: plans, isLoading: plansLoading } = useQuery<MembershipPlan[]>({
@@ -136,12 +147,14 @@ export default function PackagesManagement() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/punch-card-templates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/punch-cards/options"] });
+      setTemplateToDelete(null);
       toast({
         title: "Success",
         description: "Day pass deleted successfully",
       });
     },
     onError: (error: Error) => {
+      setTemplateToDelete(null);
       toast({
         title: "Error", 
         description: error.message,
@@ -149,6 +162,16 @@ export default function PackagesManagement() {
       });
     },
   });
+
+  const handleDeleteTemplate = (id: number) => {
+    setTemplateToDelete(id);
+  };
+
+  const confirmDeleteTemplate = () => {
+    if (templateToDelete !== null) {
+      deleteTemplateMutation.mutate(templateToDelete);
+    }
+  };
 
   // Form handlers
   const resetPlanForm = () => {
@@ -595,8 +618,9 @@ export default function PackagesManagement() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => deleteTemplateMutation.mutate(template.id)}
+                      onClick={() => handleDeleteTemplate(template.id)}
                       disabled={deleteTemplateMutation.isPending}
+                      data-testid={`button-delete-template-${template.id}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -716,6 +740,29 @@ export default function PackagesManagement() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={templateToDelete !== null} onOpenChange={() => setTemplateToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Day Pass Package?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this day pass package. This action cannot be undone.
+              Members who have already purchased this package will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTemplateMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTemplate}
+              disabled={deleteTemplateMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTemplateMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

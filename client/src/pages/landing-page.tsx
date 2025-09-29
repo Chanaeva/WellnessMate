@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png";
+import coldPlungeImg from "@assets/LIT_1759176133152.png";
+import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
 import {
   Waves,
   Crown,
@@ -465,7 +467,7 @@ export default function LandingPage() {
             <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
               <div className="aspect-video overflow-hidden">
                 <img
-                  src="/attached_assets/LIT_1759176133152.png"
+                  src={coldPlungeImg}
                   alt="LIT Method Cold Plunge"
                   className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                 />
@@ -484,7 +486,7 @@ export default function LandingPage() {
             <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
               <div className="aspect-video overflow-hidden">
                 <img
-                  src="/attached_assets/nomadsaunainside_1759176129008.png"
+                  src={saunaImg}
                   alt="Nomad Sauna"
                   className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                 />

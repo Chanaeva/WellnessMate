@@ -124,6 +124,7 @@ export const membershipPlans = pgTable("membership_plans", {
   description: text("description").notNull(),
   features: text("features").array().notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"), // Optional expiration date for the package
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -207,6 +208,17 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 export const insertMembershipPlanSchema = createInsertSchema(membershipPlans).omit({
   id: true,
   createdAt: true,
+}).extend({
+  expiresAt: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 });
 
 export const insertPunchCardTemplateSchema = createInsertSchema(punchCardTemplates).omit({

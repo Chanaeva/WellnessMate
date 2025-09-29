@@ -24,8 +24,10 @@ export default function PackagesManagement() {
     name: '',
     monthlyPrice: 0,
     description: '',
-    features: []
+    features: [],
+    expiresAt: undefined
   });
+  const [hasExpiration, setHasExpiration] = useState(false);
 
   // Punch card template state
   const [editingTemplate, setEditingTemplate] = useState<PunchCardTemplate | null>(null);
@@ -155,8 +157,10 @@ export default function PackagesManagement() {
       name: '',
       monthlyPrice: 0,
       description: '',
-      features: []
+      features: [],
+      expiresAt: undefined
     });
+    setHasExpiration(false);
     setEditingPlan(null);
     setIsCreatePlanOpen(false);
   };
@@ -182,8 +186,10 @@ export default function PackagesManagement() {
       name: plan.name,
       monthlyPrice: plan.monthlyPrice,
       description: plan.description,
-      features: plan.features || []
+      features: plan.features || [],
+      expiresAt: plan.expiresAt || undefined
     });
+    setHasExpiration(!!plan.expiresAt);
     setIsCreatePlanOpen(true);
   };
 
@@ -437,6 +443,42 @@ export default function PackagesManagement() {
                       placeholder="Describe what this membership includes"
                       required
                     />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="has-expiration"
+                        checked={hasExpiration}
+                        onChange={(e) => {
+                          setHasExpiration(e.target.checked);
+                          if (!e.target.checked) {
+                            setPlanFormData(prev => ({...prev, expiresAt: undefined}));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                        data-testid="checkbox-has-expiration"
+                      />
+                      <Label htmlFor="has-expiration" className="cursor-pointer">
+                        Set expiration date for this package
+                      </Label>
+                    </div>
+                    {hasExpiration && (
+                      <div>
+                        <Label htmlFor="expires-at">Expiration Date</Label>
+                        <Input
+                          id="expires-at"
+                          type="date"
+                          value={planFormData.expiresAt ? new Date(planFormData.expiresAt).toISOString().split('T')[0] : ''}
+                          onChange={(e) => setPlanFormData(prev => ({
+                            ...prev,
+                            expiresAt: e.target.value ? new Date(e.target.value) : undefined
+                          }))}
+                          min={new Date().toISOString().split('T')[0]}
+                          data-testid="input-expires-at"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label>Features</Label>

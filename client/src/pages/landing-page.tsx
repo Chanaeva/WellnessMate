@@ -132,11 +132,11 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading text-foreground mb-4">
-            Wolf Mother Wellness
+            Wolf Mother
           </h1>
 
           <p className="text-lg font-body text-muted-foreground mb-2">
-            Social Wellness Club 
+            A Social Wellness Club
           </p>
 
           <Badge className="mb-8 bg-primary/10 text-primary border-primary/20">
@@ -504,24 +504,26 @@ export default function LandingPage() {
             <div className="flex flex-col items-center">
               <Phone className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">
-                Call Us
+                Email Us
               </h3>
               <p className="text-muted-foreground font-body">
-                (555) WOLF-MOM
-                <br />
-                Available 24/7
+                <a href="mailto:info@wolfmotherwellness.com" className="hover:underline">
+                  info@wolfmotherwellness.com
+                </a>
               </p>
             </div>
 
             <div className="flex flex-col items-center">
               <Clock className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">
-                Hours
+                Daily Hours
               </h3>
               <p className="text-muted-foreground font-body">
-                Daily: 5:00 AM - 11:00 PM
+                Hours of Operation: 6:00 AM - 10:00PM
                 <br />
-                Sacred Waters Never Sleep
+                Members Only Access: 6:00 AM - 9:00 AM
+                <br />
+                Day Pass Access: 9:00AM - 10:00 PM
               </p>
             </div>
           </div>

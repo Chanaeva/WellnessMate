@@ -349,12 +349,12 @@ export default function CheckoutPage() {
                     <span>{formatPrice(getTotalPrice())}</span>
                   </div>
 
-                  <div className="space-y-3">
                   <Button 
                     className="w-full wellness-button-primary" 
                     size="lg"
                     onClick={handleCheckoutWithTax}
                     disabled={checkoutWithTaxMutation.isPending}
+                    data-testid="button-checkout"
                   >
                     {checkoutWithTaxMutation.isPending ? (
                       <>
@@ -364,31 +364,10 @@ export default function CheckoutPage() {
                     ) : (
                       <>
                         <Shield className="h-4 w-4 mr-2" />
-                        Checkout with Tax Calculation
+                        Checkout
                       </>
                     )}
                   </Button>
-                  
-                  <Button 
-                    className="w-full" 
-                    size="lg"
-                    variant="outline"
-                    onClick={handleCheckout}
-                    disabled={checkoutMutation.isPending || !hasPaymentMethod}
-                  >
-                    {checkoutMutation.isPending ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Quick Checkout (Legacy)
-                      </>
-                    )}
-                  </Button>
-                </div>
 
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground">

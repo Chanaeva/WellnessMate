@@ -647,9 +647,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/punch-card-templates/:id", isAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
+      console.log(`Attempting to delete punch card template with ID: ${id}`);
       await storage.deletePunchCardTemplate(id);
+      console.log(`Successfully deleted punch card template with ID: ${id}`);
       res.status(204).send();
     } catch (error) {
+      console.error("Error deleting punch card template:", error);
       res.status(500).json({ message: "Server error" });
     }
   });

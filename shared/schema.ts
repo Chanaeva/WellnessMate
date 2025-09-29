@@ -146,7 +146,7 @@ export const punchCardTemplates = pgTable("punch_card_templates", {
 export const punchCards = pgTable("punch_cards", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  templateId: integer("template_id").references(() => punchCardTemplates.id),
+  templateId: integer("template_id").references(() => punchCardTemplates.id, { onDelete: 'set null' }),
   name: text("name").notNull(), // e.g., "5-Day Pass Package"
   totalPunches: integer("total_punches").notNull(), // Number of day passes included
   remainingPunches: integer("remaining_punches").notNull(),

@@ -51,14 +51,22 @@ export default function CheckoutPage() {
       // Check if user is trying to purchase the same membership plan they already have
       const membershipItems = items.filter(item => item.type === 'membership');
       if (membershipItems.length > 0) {
-        const membershipRes = await apiRequest("GET", "/api/membership");
-        if (membershipRes.ok) {
-          const currentMembership = await membershipRes.json();
-          if (currentMembership && currentMembership.status === 'active') {
-            const newPlan = membershipItems[0].data;
-            if (currentMembership.planType === newPlan.planType) {
-              throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
+        try {
+          const membershipRes = await apiRequest("GET", "/api/membership");
+          if (membershipRes.ok) {
+            const currentMembership = await membershipRes.json();
+            if (currentMembership && currentMembership.status === 'active') {
+              const newPlan = membershipItems[0].data;
+              if (currentMembership.planType === newPlan.planType) {
+                throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
+              }
             }
+          }
+        } catch (error: any) {
+          // If 404, user has no membership - allow purchase
+          // If other error, allow checkout to proceed
+          if (!error.message?.includes('404')) {
+            console.warn("Error checking existing membership:", error);
           }
         }
       }
@@ -98,14 +106,22 @@ export default function CheckoutPage() {
       // Check if user is trying to purchase the same membership plan they already have
       const membershipItems = items.filter(item => item.type === 'membership');
       if (membershipItems.length > 0) {
-        const membershipRes = await apiRequest("GET", "/api/membership");
-        if (membershipRes.ok) {
-          const currentMembership = await membershipRes.json();
-          if (currentMembership && currentMembership.status === 'active') {
-            const newPlan = membershipItems[0].data;
-            if (currentMembership.planType === newPlan.planType) {
-              throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
+        try {
+          const membershipRes = await apiRequest("GET", "/api/membership");
+          if (membershipRes.ok) {
+            const currentMembership = await membershipRes.json();
+            if (currentMembership && currentMembership.status === 'active') {
+              const newPlan = membershipItems[0].data;
+              if (currentMembership.planType === newPlan.planType) {
+                throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
+              }
             }
+          }
+        } catch (error: any) {
+          // If 404, user has no membership - allow purchase
+          // If other error, allow checkout to proceed
+          if (!error.message?.includes('404')) {
+            console.warn("Error checking existing membership:", error);
           }
         }
       }

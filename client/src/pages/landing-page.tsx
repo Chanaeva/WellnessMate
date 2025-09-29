@@ -448,6 +448,60 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Partners Section */}
+      <section className="py-16 px-4 bg-gradient-to-br from-background to-muted/30">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
+              Our Partners
+            </h2>
+            <p className="text-xl text-muted-foreground font-body">
+              We are working with industry-leading wellness providers
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* LIT Method Cold Plunges */}
+            <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
+              <div className="aspect-video overflow-hidden">
+                <img
+                  src="/attached_assets/Screenshot%202025-09-29%20at%202.53.42%20PM_1759175634448.png"
+                  alt="LIT Method Cold Plunge"
+                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              <CardContent className="p-6">
+                <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
+                  LIT Method Cold Plunges
+                </h3>
+                <p className="text-muted-foreground font-body leading-relaxed">
+                  Experience the transformative power of cold therapy with premium LIT Method cold plunge pools. Designed for optimal cold exposure and recovery.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Nomad Saunas */}
+            <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
+              <div className="aspect-video overflow-hidden">
+                <img
+                  src="/attached_assets/Screenshot%202025-09-29%20at%202.51.44%20PM_1759175638828.png"
+                  alt="Nomad Sauna"
+                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              <CardContent className="p-6">
+                <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
+                  Nomad Saunas
+                </h3>
+                <p className="text-muted-foreground font-body leading-relaxed">
+                  Indulge in the ancient ritual of thermal therapy with authentic Nomad barrel saunas. Crafted for the perfect heat experience and relaxation.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Call to Action */}
       <section className="py-20 px-4 bg-primary text-white">
         <div className="max-w-4xl mx-auto text-center">

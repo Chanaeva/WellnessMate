@@ -1326,8 +1326,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cart checkout with payment processing
+  app.post("/api/checkout-with-payment", isAuthenticated, async (req, res) => {
+    try {
+      const { items, totalAmount, paymentMethodId } = req.body;
+      const userId = req.user!.id;
+
+      if (!paymentMethodId) {
+        return res.status(400).json({ message: "Payment method is required" });
+      }
+
+      // Create payment intent with Stripe
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: totalAmount,
+        currency: 'usd',
+        customer: req.user!.stripeCustomerId || undefined,
+        payment_method: paymentMethodId,
+        confirm: true,
+        automatic_payment_methods: {
+          enabled: true,
+          allow_redirects: 'never'
+        },
+        metadata: {
+          userId: userId.toString(),
+          itemCount: items.length.toString()
+        }
+      });
+
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment failed" });
+      }
+
+      // Process each item in the cart
+      for (const item of items) {
+        if (item.type === 'membership') {
+          // Create or update membership
+          const planData = item.data;
+          const existingMembership = await storage.getMembershipByUserId(userId);
+          
+          const startDate = new Date().toISOString().split('T')[0];
+          const endDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 1 year from now
+          
+          if (existingMembership) {
+            // Update existing membership
+            await storage.updateMembership(existingMembership.membershipId, {
+              planType: planData.planType,
+              status: 'active',
+              startDate: startDate,
+              endDate: endDate,
+              autoRenew: true
+            });
+          } else {
+            // Create new membership with generated ID
+            await storage.createMembership({
+              userId,
+              membershipId: `mem_${userId}_${Date.now()}`,
+              planType: planData.planType,
+              status: 'active',
+              startDate: startDate,
+              endDate: endDate,
+              autoRenew: true
+            });
+          }
+
+          // Create payment record
+          await storage.createPayment({
+            userId,
+            membershipId: "membership-purchase",
+            amount: planData.monthlyPrice || planData.price,
+            description: `${planData.name} - Monthly Membership`,
+            status: "successful",
+            method: "credit_card",
+            stripePaymentIntentId: paymentIntent.id,
+            stripePaymentMethodId: paymentMethodId
+          });
+        } else if (item.type === 'punch_card') {
+          // Create punch card
+          const cardData = item.data;
+          const quantity = item.quantity || 1;
+          
+          for (let i = 0; i < quantity; i++) {
+            await storage.createPunchCard({
+              userId,
+              templateId: cardData.templateId || null,
+              name: cardData.name,
+              totalPunches: cardData.totalPunches,
+              remainingPunches: cardData.totalPunches,
+              pricePerPunch: cardData.pricePerPunch,
+              totalPrice: cardData.totalPrice,
+              status: 'active'
+            });
+          }
+
+          // Create payment record for all punch cards
+          await storage.createPayment({
+            userId,
+            membershipId: "punchcard-purchase",
+            amount: cardData.totalPrice * quantity,
+            description: `${cardData.name} - Day Pass Package${quantity > 1 ? ` (x${quantity})` : ''}`,
+            status: "successful",
+            method: "credit_card",
+            stripePaymentIntentId: paymentIntent.id,
+            stripePaymentMethodId: paymentMethodId
+          });
+        }
+      }
+
+      res.json({ success: true, message: "Purchase completed successfully", paymentIntentId: paymentIntent.id });
+    } catch (error: any) {
+      console.error("Checkout with payment error:", error);
+      res.status(500).json({ message: error.message || "Error processing checkout" });
+    }
+  });
+
   // Create HTTP server
-  // Cart checkout endpoint
+  // Cart checkout endpoint (legacy - no payment processing)
   app.post("/api/checkout", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.sendStatus(401);

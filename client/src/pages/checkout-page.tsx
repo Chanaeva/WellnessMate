@@ -45,9 +45,13 @@ export default function CheckoutPage() {
     }).format(price / 100);
   };
 
-  // Process checkout with Stripe Tax (redirects to Stripe Checkout)
+  // Process checkout with payment intent (embedded)
   const checkoutWithTaxMutation = useMutation({
     mutationFn: async () => {
+      if (!hasPaymentMethod) {
+        throw new Error("Please add a payment method first");
+      }
+
       // Check if user is trying to purchase the same membership plan they already have
       const membershipItems = items.filter(item => item.type === 'membership');
       if (membershipItems.length > 0) {
@@ -71,25 +75,42 @@ export default function CheckoutPage() {
         }
       }
 
-      const cartItems = items.map(item => ({
-        name: item.data?.name || `${item.type} Item`,
-        description: item.data?.description || `${item.data?.name} - Wolf Mother Wellness`,
-        price: item.data?.price || item.data?.totalPrice || 0,
-        quantity: item.quantity || 1,
-        type: item.type,
-        planType: item.data?.planType || '',
-      }));
+      const cartData = {
+        items: items.map(item => ({
+          id: item.id,
+          type: item.type,
+          quantity: item.quantity || 1,
+          data: item.data
+        })),
+        totalAmount: getTotalPrice(),
+        paymentMethodId: paymentMethods?.[0]?.stripePaymentMethodId
+      };
 
-      const res = await apiRequest("POST", "/api/create-checkout-session", {
-        items: cartItems,
-        mode: 'payment',
-      });
-      
+      const res = await apiRequest("POST", "/api/checkout-with-payment", cartData);
       return await res.json();
     },
     onSuccess: (data) => {
-      // Redirect to Stripe Checkout
-      window.location.href = data.url;
+      const hasMembers = items.some(item => item.type === 'membership');
+      const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
+      
+      toast({
+        title: isUpgrade ? "Membership Upgraded!" : "Order Successful!",
+        description: isUpgrade 
+          ? "Your membership plan has been upgraded successfully."
+          : "Your purchase has been processed successfully.",
+      });
+      clearCart();
+      
+      // Set flag for dashboard to listen for changes
+      localStorage.setItem('purchase_completed', 'true');
+      
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      
+      // Navigate back to dashboard
+      setLocation("/");
     },
     onError: (error: Error) => {
       toast({
@@ -180,6 +201,10 @@ export default function CheckoutPage() {
   };
 
   const handleCheckoutWithTax = () => {
+    if (!hasPaymentMethod) {
+      setShowPaymentMethodAlert(true);
+      return;
+    }
     checkoutWithTaxMutation.mutate();
   };
 
@@ -375,7 +400,7 @@ export default function CheckoutPage() {
                     {checkoutWithTaxMutation.isPending ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Redirecting to Secure Checkout...
+                        Processing Payment...
                       </>
                     ) : (
                       <>

@@ -90,9 +90,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setIsPlaying(false);
     } else {
       if (ambientAudio.src) {
-        ambientAudio.play().catch(err => console.log('Audio play failed:', err));
+        console.log('Attempting to play:', ambientAudio.src);
+        ambientAudio.play()
+          .then(() => {
+            console.log('Audio playing successfully');
+            setIsPlaying(true);
+          })
+          .catch(err => {
+            console.error('Audio play failed:', err);
+            setIsPlaying(false);
+          });
+      } else {
+        console.error('No audio source set');
       }
-      setIsPlaying(true);
     }
   };
 

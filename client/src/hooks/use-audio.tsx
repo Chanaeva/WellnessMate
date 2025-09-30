@@ -41,9 +41,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   // Initialize with thermal springs ambient sound
   useEffect(() => {
-    const audio = new Audio();
+    const audio = new Audio('/audio/ambient/thermal-springs-bubbling.mp3');
     audio.loop = true;
     audio.volume = volume;
+    audio.load();
     setAmbientAudio(audio);
     setCurrentTrack('thermal_springs');
 

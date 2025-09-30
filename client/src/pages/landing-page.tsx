@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AudioControls } from "@/components/ui/audio-controls";
 import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png";
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
@@ -86,6 +87,11 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+      {/* Floating Audio Player */}
+      <div className="fixed top-4 right-4 z-50">
+        <AudioControls />
+      </div>
+
       {/* Hero Section */}
       <section className="relative py-20 px-4 bg-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10"></div>

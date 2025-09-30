@@ -452,7 +452,7 @@ export default function LandingPage() {
               </div>
               <CardContent className="p-6">
                 <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
-                  LIT Method Cold Plunges
+                  LIT Method Plunges
                 </h3>
                 <p className="text-muted-foreground font-body leading-relaxed">
                   Experience the transformative power of cold therapy with

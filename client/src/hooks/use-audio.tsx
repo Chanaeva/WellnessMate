@@ -41,12 +41,24 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   // Initialize with thermal springs ambient sound
   useEffect(() => {
-    const audio = new Audio('/audio/ambient/thermal-springs-bubbling.mp3');
+    const audio = new Audio();
     audio.loop = true;
     audio.volume = volume;
+    audio.preload = 'auto';
+    
+    // Set source and explicitly load
+    audio.src = '/audio/ambient/thermal-springs-bubbling.mp3';
     audio.load();
+    
     setAmbientAudio(audio);
     setCurrentTrack('thermal_springs');
+
+    // Add error handler for debugging
+    audio.addEventListener('error', (e) => {
+      console.error('Audio error event:', e);
+      console.error('Audio error code:', audio.error?.code);
+      console.error('Audio error message:', audio.error?.message);
+    });
 
     return () => {
       audio.pause();
@@ -65,14 +77,26 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     if (!ambientAudio || !AMBIENT_TRACKS[track as keyof typeof AMBIENT_TRACKS]) return;
 
     const trackUrl = AMBIENT_TRACKS[track as keyof typeof AMBIENT_TRACKS];
+    
+    // Pause current playback
+    ambientAudio.pause();
+    ambientAudio.currentTime = 0;
+    
+    // Set new source and load
     ambientAudio.src = trackUrl;
     ambientAudio.load();
     
-    if (isPlaying) {
-      ambientAudio.play().catch(err => console.log('Audio play failed:', err));
-    }
-    
     setCurrentTrack(track);
+    
+    // If we were playing, start the new track
+    if (isPlaying) {
+      ambientAudio.play()
+        .then(() => console.log('Playing new track:', track))
+        .catch(err => {
+          console.error('Audio play failed for track:', track, err);
+          setIsPlaying(false);
+        });
+    }
   };
 
   const playSoundEffect = (effect: string) => {

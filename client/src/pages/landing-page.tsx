@@ -69,7 +69,7 @@ export default function LandingPage() {
     },
     {
       icon: <Crown className="h-8 w-8 text-primary" />,
-      title: "Cold Exposure",
+      title: "Glacial Water Exposure",
       description: "Cold Plunge",
     },
     {
@@ -446,7 +446,7 @@ export default function LandingPage() {
               <div className="aspect-video overflow-hidden">
                 <img
                   src={coldPlungeImg}
-                  alt="LIT Method Cold Plunge"
+                  alt="LIT Method Glacial Plunge"
                   className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -455,7 +455,9 @@ export default function LandingPage() {
                   LIT Method Cold Plunges
                 </h3>
                 <p className="text-muted-foreground font-body leading-relaxed">
-                  Experience the transformative power of cold therapy with premium LIT Method cold plunge pools. Designed for optimal cold exposure and recovery.
+                  Experience the transformative power of cold therapy with
+                  premium LIT Method cold plunge pools. Designed for optimal
+                  cold exposure and recovery.
                 </p>
               </CardContent>
             </Card>
@@ -474,7 +476,9 @@ export default function LandingPage() {
                   Nomad Saunas
                 </h3>
                 <p className="text-muted-foreground font-body leading-relaxed">
-                  Indulge in the ancient ritual of thermal therapy with authentic Nomad barrel saunas. Crafted for the perfect heat experience and relaxation.
+                  Indulge in the ancient ritual of thermal therapy with
+                  authentic Nomad barrel saunas. Crafted for the perfect heat
+                  experience and relaxation.
                 </p>
               </CardContent>
             </Card>
@@ -569,7 +573,10 @@ export default function LandingPage() {
                 Email Us
               </h3>
               <p className="text-muted-foreground font-body">
-                <a href="mailto:info@wolfmotherwellness.com" className="hover:underline">
+                <a
+                  href="mailto:info@wolfmotherwellness.com"
+                  className="hover:underline"
+                >
                   info@wolfmotherwellness.com
                 </a>
               </p>

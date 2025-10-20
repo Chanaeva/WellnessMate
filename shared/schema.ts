@@ -124,6 +124,8 @@ export const membershipPlans = pgTable("membership_plans", {
   description: text("description").notNull(),
   features: text("features").array().notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  availableFrom: timestamp("available_from"),
+  availableUntil: timestamp("available_until"),
   expiresAt: timestamp("expires_at"), // Optional expiration date for the package
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -138,6 +140,8 @@ export const punchCardTemplates = pgTable("punch_card_templates", {
   description: text("description"),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  availableFrom: timestamp("available_from"),
+  availableUntil: timestamp("available_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -178,6 +182,8 @@ export const promotions = pgTable("promotions", {
   textColor: text("text_color").notNull().default("text-white"),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  availableFrom: timestamp("available_from"),
+  availableUntil: timestamp("available_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -219,12 +225,53 @@ export const insertMembershipPlanSchema = createInsertSchema(membershipPlans).om
     z.null(),
     z.undefined()
   ]).optional(),
+  availableFrom: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
+  availableUntil: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 });
 
 export const insertPunchCardTemplateSchema = createInsertSchema(punchCardTemplates).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  availableFrom: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
+  availableUntil: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 });
 
 export const insertPunchCardSchema = createInsertSchema(punchCards).omit({
@@ -413,6 +460,27 @@ export const insertPromotionSchema = createInsertSchema(promotions).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  availableFrom: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
+  availableUntil: z.union([
+    z.string()
+      .datetime({ offset: true })
+      .transform(v => new Date(v))
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.date()
+      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 });
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;

@@ -46,7 +46,7 @@ function Router() {
       <ProtectedRoute path="/qr-code" component={QRCodePage} />
 
 
-      <ProtectedRoute path="/packages" component={PackagesPage} />
+      <Route path="/packages" component={PackagesPage} />
       <ProtectedRoute path="/checkout" component={CheckoutPage} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/checkout/cancel" component={CheckoutCancel} />

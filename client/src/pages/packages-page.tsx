@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart, Shield, Flame, Waves, AlertTriangle } from "lucide-react";
+import { Crown, Star, Zap, Check, Ticket, Heart, Sparkles, ArrowRight, ShoppingCart, Shield, Flame, Waves, AlertTriangle, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const planIcons = {
   basic: Shield,
@@ -74,9 +75,9 @@ export default function PackagesPage() {
     enabled: !!user,
   });
 
-  // Fetch punch card options
-  const { data: punchCardOptions, isLoading: isPunchCardsLoading } = useQuery<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>({
-    queryKey: ["/api/punch-cards/options"],
+  // Fetch punch card templates
+  const { data: punchCardTemplates, isLoading: isPunchCardsLoading } = useQuery<PunchCardTemplate[]>({
+    queryKey: ["/api/punch-card-templates"],
   });
 
   // Fetch current membership status
@@ -90,6 +91,17 @@ export default function PackagesPage() {
       style: 'currency',
       currency: 'USD',
     }).format(price / 100);
+  };
+
+  const formatAvailabilityDates = (availableFrom?: Date | null, availableUntil?: Date | null) => {
+    if (!availableFrom) return null;
+    
+    const fromDate = format(new Date(availableFrom), 'MMM d, yyyy');
+    if (!availableUntil) {
+      return `Available ${fromDate} onwards`;
+    }
+    const untilDate = format(new Date(availableUntil), 'MMM d, yyyy');
+    return `${fromDate} - ${untilDate}`;
   };
 
   const handleAddMembershipToCart = (plan: MembershipPlan) => {
@@ -119,23 +131,23 @@ export default function PackagesPage() {
     });
   };
 
-  const handleAddPunchCardToCart = (option: any) => {
+  const handleAddPunchCardToCart = (template: PunchCardTemplate) => {
     if (!user) {
       setShowMembershipAlert(true);
       return;
     }
 
     addItem({
-      id: `punch-card-${option.name.replace(/\s+/g, '-').toLowerCase()}`,
+      id: `punch-card-${template.id}`,
       type: 'punch_card',
-      name: option.name,
-      price: option.totalPrice,
-      description: `${option.totalPunches} day passes`,
-      data: option
+      name: template.name,
+      price: template.totalPrice,
+      description: `${template.totalPunches} day passes`,
+      data: template
     });
     toast({
       title: "Added to Cart",
-      description: `${option.name} has been added to your cart.`,
+      description: `${template.name} has been added to your cart.`,
     });
   };
 
@@ -215,6 +227,12 @@ export default function PackagesPage() {
                       <CardDescription className="text-sm text-foreground/70 font-medium">
                         {plan.description}
                       </CardDescription>
+                      {formatAvailabilityDates(plan.availableFrom, plan.availableUntil) && (
+                        <Badge variant="outline" className="mt-2 w-fit text-xs">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {formatAvailabilityDates(plan.availableFrom, plan.availableUntil)}
+                        </Badge>
+                      )}
                       <div className={`text-3xl font-bold ${theme.accentColor}`}>
                         {formatPrice(plan.monthlyPrice)}
                         <span className="text-sm font-normal text-foreground/60">/month</span>
@@ -305,8 +323,8 @@ export default function PackagesPage() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {punchCardOptions?.map((option, index) => (
-                <Card key={index} className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-accent/20 bg-gradient-to-br from-card to-accent/5">
+              {punchCardTemplates?.map((template) => (
+                <Card key={template.id} className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-accent/20 bg-gradient-to-br from-card to-accent/5">
                   <div className="h-40 bg-gradient-to-br from-accent/20 to-muted/15 relative">
                     <div className="absolute inset-0 bg-black/5"></div>
                     <div className="relative h-full flex flex-col items-center justify-center p-4">
@@ -324,17 +342,23 @@ export default function PackagesPage() {
                   
                   <CardHeader className="pb-4">
                     <CardTitle className="text-xl font-heading text-foreground font-semibold">
-                      {option.name}
+                      {template.name}
                     </CardTitle>
                     <CardDescription className="text-foreground/70 font-medium">
-                      {option.totalPunches} sacred sanctuary visits
+                      {template.totalPunches} sacred sanctuary visits
                     </CardDescription>
+                    {formatAvailabilityDates(template.availableFrom, template.availableUntil) && (
+                      <Badge variant="outline" className="mt-2 w-fit text-xs">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {formatAvailabilityDates(template.availableFrom, template.availableUntil)}
+                      </Badge>
+                    )}
                     <div className="space-y-1">
                       <div className="text-3xl font-bold text-primary">
-                        {formatPrice(option.totalPrice)}
+                        {formatPrice(template.totalPrice)}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {formatPrice(option.pricePerPunch)} per visit
+                        {formatPrice(template.pricePerPunch)} per visit
                       </div>
                     </div>
                   </CardHeader>
@@ -361,12 +385,12 @@ export default function PackagesPage() {
                       </div>
                     </div>
                     
-                    {option.totalPunches >= 10 && (
+                    {template.totalPunches >= 10 && (
                       <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded-lg">
                         <div className="flex items-center gap-2">
                           <Star className="h-4 w-4 text-success" />
                           <span className="text-sm font-medium text-success">
-                            Best Value - Save ${((25 * option.totalPunches - option.totalPrice) / 100).toFixed(0)}!
+                            Best Value - Save ${((25 * template.totalPunches - template.totalPrice) / 100).toFixed(0)}!
                           </span>
                         </div>
                       </div>
@@ -376,7 +400,7 @@ export default function PackagesPage() {
                   <CardFooter className="pt-0">
                     <Button 
                       className="w-full wellness-button-primary"
-                      onClick={() => handleAddPunchCardToCart(option)}
+                      onClick={() => handleAddPunchCardToCart(template)}
                     >
                       <ShoppingCart className="h-4 w-4 mr-2" />
                       Add to Cart

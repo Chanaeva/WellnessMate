@@ -1,9 +1,20 @@
 import Stripe from "stripe";
 
-// Environment validation
+// Environment validation with test key support
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// In development, prefer testing keys if available
+const STRIPE_SECRET_KEY = isDevelopment && process.env.TESTING_STRIPE_SECRET_KEY
+  ? process.env.TESTING_STRIPE_SECRET_KEY
+  : process.env.STRIPE_SECRET_KEY;
+
+const VITE_STRIPE_PUBLIC_KEY = isDevelopment && process.env.TESTING_VITE_STRIPE_PUBLIC_KEY
+  ? process.env.TESTING_VITE_STRIPE_PUBLIC_KEY
+  : process.env.VITE_STRIPE_PUBLIC_KEY;
+
 const requiredStripeEnvVars = {
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-  VITE_STRIPE_PUBLIC_KEY: process.env.VITE_STRIPE_PUBLIC_KEY,
+  STRIPE_SECRET_KEY,
+  VITE_STRIPE_PUBLIC_KEY,
 } as const;
 
 // Validate required environment variables
@@ -14,15 +25,14 @@ for (const [key, value] of Object.entries(requiredStripeEnvVars)) {
 }
 
 // Validate environment-specific keys
-const isDevelopment = process.env.NODE_ENV === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
 
 if (isProduction) {
   // Production validation
-  if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
+  if (!STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
     throw new Error('Production environment requires live Stripe secret key (sk_live_...)');
   }
-  if (!process.env.VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_')) {
+  if (!VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_')) {
     console.warn('⚠️  Warning: Production environment should use live Stripe public key (pk_live_...)');
   }
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -30,13 +40,15 @@ if (isProduction) {
   }
 } else if (isDevelopment) {
   // Development validation
-  if (process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
+  if (STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
     console.warn('⚠️  Warning: Using live Stripe keys in development environment');
+  } else if (STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+    console.log('✅ Using Stripe test keys in development');
   }
 }
 
 // Initialize Stripe with production-ready configuration
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+export const stripe = new Stripe(STRIPE_SECRET_KEY!, {
   apiVersion: "2025-05-28.basil",
   typescript: true,
   telemetry: false, // Disable telemetry for production
@@ -127,8 +139,9 @@ export const STRIPE_ENV_INFO = {
   isProduction,
   isDevelopment,
   hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
-  keyType: process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : 'test',
-  publicKeyType: process.env.VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_') ? 'live' : 'test',
+  keyType: STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : 'test',
+  publicKeyType: VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_') ? 'live' : 'test',
+  publicKey: VITE_STRIPE_PUBLIC_KEY,
 };
 
 // Log configuration on startup

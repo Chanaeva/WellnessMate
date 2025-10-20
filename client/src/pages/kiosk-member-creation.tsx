@@ -27,8 +27,10 @@ import {
   Zap
 } from "lucide-react";
 
-// Stripe setup
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
+// Stripe setup - fetch the public key from the server to support test/live key switching
+const stripePromise = fetch('/api/stripe/config')
+  .then(res => res.json())
+  .then(({ publicKey }) => loadStripe(publicKey));
 
 // Form schemas
 const memberFormSchema = z.object({

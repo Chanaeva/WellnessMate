@@ -45,3 +45,23 @@ Preferred communication style: Simple, everyday language.
 - **Email**: SendGrid for transactional emails.
 - **SMS**: Twilio for SMS messaging (e.g., password reset).
 - **UI Components**: Radix UI primitives.
+
+## Recent Fixes and Improvements (October 2025)
+
+### Availability Dates Feature
+- Added availability date tracking for membership plans, punch card templates, and promotions
+- Fixed timezone issues in date display (now uses UTC components to prevent date shifting)
+- Added availability date badges to:
+  - Landing page membership cards
+  - Packages page membership and day pass cards
+  - Admin promotion cards
+
+### Kiosk and Access Improvements
+- Fixed critical React hooks error in kiosk check-in (useEffect now called before conditional returns)
+- Made packages page publicly accessible (removed authentication requirement for browsing)
+- Updated Stripe configuration to prefer test keys in development
+- Added `/api/stripe/config` endpoint to dynamically provide Stripe public key to frontend
+
+### Known Configuration Issues
+- **Stripe Testing**: The application is configured to use TESTING_STRIPE_SECRET_KEY and TESTING_VITE_STRIPE_PUBLIC_KEY environment variables in development, but these need to be set with actual Stripe test API keys (starting with `sk_test_` and `pk_test_`) for kiosk payment testing to work properly.
+- Until test keys are configured, kiosk member creation with payment will fail with "live mode, but used a known test card" errors.

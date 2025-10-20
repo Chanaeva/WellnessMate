@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import { stripe, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe } from "./stripe-config";
+import { stripe, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe, STRIPE_ENV_INFO } from "./stripe-config";
 import { setupStripeWebhooks } from "./stripe-webhooks";
 
 const scryptAsync = promisify(scrypt);
@@ -27,6 +27,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup authentication routes (/api/register, /api/login, /api/logout, /api/user)
   setupAuth(app);
+
+  // Expose Stripe public key to frontend
+  app.get("/api/stripe/config", (req, res) => {
+    res.json({ publicKey: STRIPE_ENV_INFO.publicKey });
+  });
 
   // Authenticated routes middleware
   const isAuthenticated = (req: any, res: any, next: any) => {

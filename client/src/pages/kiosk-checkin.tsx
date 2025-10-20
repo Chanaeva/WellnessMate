@@ -61,8 +61,10 @@ interface CheckInResponse {
   message: string;
 }
 
-// Stripe setup
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
+// Stripe setup - fetch the public key from the server to support test/live key switching
+const stripePromise = fetch('/api/stripe/config')
+  .then(res => res.json())
+  .then(({ publicKey }) => loadStripe(publicKey));
 
 // Form schemas
 const memberFormSchema = z.object({
@@ -183,6 +185,15 @@ export default function KioskCheckIn() {
     setPendingMembershipId(null);
   };
 
+  // Cleanup scanner on component unmount
+  useEffect(() => {
+    return () => {
+      if (scanner) {
+        scanner.clear();
+      }
+    };
+  }, [scanner]);
+
   // Show member creation form
   if (scannerMode === 'create-member') {
     return (
@@ -192,15 +203,6 @@ export default function KioskCheckIn() {
       />
     );
   }
-
-  // Cleanup scanner on component unmount
-  useEffect(() => {
-    return () => {
-      if (scanner) {
-        scanner.clear();
-      }
-    };
-  }, [scanner]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 flex items-center justify-center p-4">

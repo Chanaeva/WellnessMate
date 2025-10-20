@@ -37,8 +37,6 @@ const landingPageContentFormSchema = insertLandingPageContentSchema.extend({
 
 const promotionFormSchema = insertPromotionSchema.extend({
   isActive: z.boolean().default(true),
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
 });
 
 type LandingPageContentFormData = z.infer<typeof landingPageContentFormSchema>;
@@ -82,15 +80,21 @@ export default function LandingPageManagement() {
   });
 
   // Promotion form
+  const [hasPromotionAvailabilityDates, setHasPromotionAvailabilityDates] = useState(false);
+  const [hasPromotionNoEndDate, setHasPromotionNoEndDate] = useState(false);
+
   const promotionForm = useForm<PromotionFormData>({
     resolver: zodResolver(promotionFormSchema),
     defaultValues: {
       title: "",
       description: "",
-      discountPercentage: 0,
-      promoCode: "",
-      startDate: "",
-      endDate: "",
+      code: "",
+      validUntil: "",
+      bgColor: "bg-gradient-to-r from-amber-500 to-orange-600",
+      textColor: "text-white",
+      sortOrder: 0,
+      availableFrom: undefined,
+      availableUntil: undefined,
       isActive: true,
     },
   });
@@ -262,13 +266,20 @@ export default function LandingPageManagement() {
 
   const handleEditPromotion = (promotion: Promotion) => {
     setEditingPromotion(promotion);
+    const hasAvailability = !!(promotion.availableFrom || promotion.availableUntil);
+    setHasPromotionAvailabilityDates(hasAvailability);
+    setHasPromotionNoEndDate(!promotion.availableUntil && !!promotion.availableFrom);
+    
     promotionForm.reset({
       title: promotion.title,
       description: promotion.description,
-      discountPercentage: promotion.discountPercentage || 0,
-      promoCode: promotion.promoCode || "",
-      startDate: promotion.startDate ? format(new Date(promotion.startDate), "yyyy-MM-dd") : "",
-      endDate: promotion.endDate ? format(new Date(promotion.endDate), "yyyy-MM-dd") : "",
+      code: promotion.code,
+      validUntil: promotion.validUntil,
+      bgColor: promotion.bgColor,
+      textColor: promotion.textColor,
+      sortOrder: promotion.sortOrder,
+      availableFrom: promotion.availableFrom || undefined,
+      availableUntil: promotion.availableUntil || undefined,
       isActive: promotion.isActive,
     });
     setIsPromotionDialogOpen(true);
@@ -288,13 +299,19 @@ export default function LandingPageManagement() {
 
   const handleNewPromotion = () => {
     setEditingPromotion(null);
+    setHasPromotionAvailabilityDates(false);
+    setHasPromotionNoEndDate(false);
+    
     promotionForm.reset({
       title: "",
       description: "",
-      discountPercentage: 0,
-      promoCode: "",
-      startDate: "",
-      endDate: "",
+      code: "",
+      validUntil: "",
+      bgColor: "bg-gradient-to-r from-amber-500 to-orange-600",
+      textColor: "text-white",
+      sortOrder: 0,
+      availableFrom: undefined,
+      availableUntil: undefined,
       isActive: true,
     });
     setIsPromotionDialogOpen(true);
@@ -555,17 +572,12 @@ export default function LandingPageManagement() {
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={promotionForm.control}
-                        name="discountPercentage"
+                        name="code"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Discount Percentage</FormLabel>
+                            <FormLabel>Promo Code</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="0" 
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
+                              <Input placeholder="PROMO2025" {...field} data-testid="input-promo-code" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -573,45 +585,99 @@ export default function LandingPageManagement() {
                       />
                       <FormField
                         control={promotionForm.control}
-                        name="promoCode"
+                        name="validUntil"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Promo Code</FormLabel>
+                            <FormLabel>Valid Until</FormLabel>
                             <FormControl>
-                              <Input placeholder="PROMO2025" {...field} />
+                              <Input placeholder="Dec 31, 2025" {...field} data-testid="input-valid-until" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={promotionForm.control}
-                        name="startDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Start Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={promotionForm.control}
-                        name="endDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>End Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="promotion-has-availability-dates"
+                          checked={hasPromotionAvailabilityDates}
+                          onChange={(e) => {
+                            setHasPromotionAvailabilityDates(e.target.checked);
+                            if (!e.target.checked) {
+                              promotionForm.setValue('availableFrom', undefined);
+                              promotionForm.setValue('availableUntil', undefined);
+                              setHasPromotionNoEndDate(false);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                          data-testid="checkbox-promotion-has-availability-dates"
+                        />
+                        <label htmlFor="promotion-has-availability-dates" className="text-sm font-medium cursor-pointer">
+                          Set availability date range
+                        </label>
+                      </div>
+                      {hasPromotionAvailabilityDates && (
+                        <div className="space-y-3 pl-6">
+                          <FormField
+                            control={promotionForm.control}
+                            name="availableFrom"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Available From</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="date"
+                                    value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
+                                    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                                    data-testid="input-promotion-available-from"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="promotion-has-no-end-date"
+                              checked={hasPromotionNoEndDate}
+                              onChange={(e) => {
+                                setHasPromotionNoEndDate(e.target.checked);
+                                if (e.target.checked) {
+                                  promotionForm.setValue('availableUntil', undefined);
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-gray-300"
+                              data-testid="checkbox-promotion-has-no-end-date"
+                            />
+                            <label htmlFor="promotion-has-no-end-date" className="text-sm font-medium cursor-pointer">
+                              No end date (always available)
+                            </label>
+                          </div>
+                          {!hasPromotionNoEndDate && (
+                            <FormField
+                              control={promotionForm.control}
+                              name="availableUntil"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Available Until</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
+                                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                                      data-testid="input-promotion-available-until"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
                     <FormField
                       control={promotionForm.control}
@@ -671,24 +737,21 @@ export default function LandingPageManagement() {
                         <Badge variant={promotion.isActive ? "default" : "secondary"}>
                           {promotion.isActive ? "Active" : "Inactive"}
                         </Badge>
-                        {promotion.discountPercentage && (
-                          <Badge variant="outline">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {promotion.discountPercentage}% OFF
-                          </Badge>
-                        )}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {promotion.startDate && promotion.endDate && (
+                        {promotion.code && (
                           <>
-                            <Calendar className="h-3 w-3 inline mr-1" />
-                            {format(new Date(promotion.startDate), "MMM d")} - {format(new Date(promotion.endDate), "MMM d, yyyy")}
+                            Code: <span className="font-mono">{promotion.code}</span>
+                            {" • "}
                           </>
                         )}
-                        {promotion.promoCode && (
+                        Valid until: {promotion.validUntil}
+                        {(promotion.availableFrom || promotion.availableUntil) && (
                           <>
                             {" • "}
-                            Code: <span className="font-mono">{promotion.promoCode}</span>
+                            <Calendar className="h-3 w-3 inline mr-1" />
+                            Available: {promotion.availableFrom ? format(new Date(promotion.availableFrom), "MMM d, yyyy") : "Now"}
+                            {promotion.availableUntil ? ` - ${format(new Date(promotion.availableUntil), "MMM d, yyyy")}` : " onwards"}
                           </>
                         )}
                       </p>

@@ -9,6 +9,8 @@ import { AudioControls } from "@/components/ui/audio-controls";
 import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png";
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
+import { format } from "date-fns";
+import type { MembershipPlan } from "@shared/schema";
 import {
   Waves,
   Crown,
@@ -59,6 +61,18 @@ export default function LandingPage() {
   // Format price for display
   const formatPrice = (priceInCents: number) => {
     return `$${(priceInCents / 100).toFixed(0)}`;
+  };
+
+  // Format availability dates
+  const formatAvailabilityDates = (availableFrom?: Date | null, availableUntil?: Date | null) => {
+    if (!availableFrom) return null;
+    
+    const fromDate = format(new Date(availableFrom), 'MMM d, yyyy');
+    if (!availableUntil) {
+      return `Available ${fromDate} onwards`;
+    }
+    const untilDate = format(new Date(availableUntil), 'MMM d, yyyy');
+    return `${fromDate} - ${untilDate}`;
   };
 
   const features = [
@@ -209,22 +223,28 @@ export default function LandingPage() {
               </div>
 
               <div className="space-y-6">
-                {membershipPlans?.map((plan: any) => (
+                {membershipPlans?.map((plan: MembershipPlan) => (
                   <Card
                     key={plan.id}
                     className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
                   >
                     <CardContent className="p-8">
                       <div className="flex justify-between items-start mb-4">
-                        <div>
+                        <div className="flex-1">
                           <h4 className="text-xl font-heading font-bold text-foreground mb-2">
                             {plan.name}
                           </h4>
-                          <p className="text-muted-foreground font-body">
+                          <p className="text-muted-foreground font-body mb-3">
                             {plan.description}
                           </p>
+                          {formatAvailabilityDates(plan.availableFrom, plan.availableUntil) && (
+                            <Badge variant="outline" className="w-fit text-xs border-primary/30 bg-primary/5">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {formatAvailabilityDates(plan.availableFrom, plan.availableUntil)}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-4">
                           <div className="text-3xl font-bold text-primary">
                             {formatPrice(plan.monthlyPrice)}
                           </div>

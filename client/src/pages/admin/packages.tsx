@@ -35,9 +35,13 @@ export default function PackagesManagement() {
     monthlyPrice: 0,
     description: '',
     features: [],
+    availableFrom: undefined,
+    availableUntil: undefined,
     expiresAt: undefined
   });
   const [hasExpiration, setHasExpiration] = useState(false);
+  const [hasAvailabilityDates, setHasAvailabilityDates] = useState(false);
+  const [hasNoEndDate, setHasNoEndDate] = useState(false);
 
   // Punch card template state
   const [editingTemplate, setEditingTemplate] = useState<PunchCardTemplate | null>(null);
@@ -49,9 +53,13 @@ export default function PackagesManagement() {
     totalPrice: 0,
     description: '',
     isActive: true,
-    sortOrder: 0
+    sortOrder: 0,
+    availableFrom: undefined,
+    availableUntil: undefined
   });
   const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
+  const [templateHasAvailabilityDates, setTemplateHasAvailabilityDates] = useState(false);
+  const [templateHasNoEndDate, setTemplateHasNoEndDate] = useState(false);
 
   // Fetch membership plans
   const { data: plans, isLoading: plansLoading } = useQuery<MembershipPlan[]>({
@@ -181,9 +189,13 @@ export default function PackagesManagement() {
       monthlyPrice: 0,
       description: '',
       features: [],
+      availableFrom: undefined,
+      availableUntil: undefined,
       expiresAt: undefined
     });
     setHasExpiration(false);
+    setHasAvailabilityDates(false);
+    setHasNoEndDate(false);
     setEditingPlan(null);
     setIsCreatePlanOpen(false);
   };
@@ -196,8 +208,12 @@ export default function PackagesManagement() {
       totalPrice: 0,
       description: '',
       isActive: true,
-      sortOrder: 0
+      sortOrder: 0,
+      availableFrom: undefined,
+      availableUntil: undefined
     });
+    setTemplateHasAvailabilityDates(false);
+    setTemplateHasNoEndDate(false);
     setEditingTemplate(null);
     setIsCreateTemplateOpen(false);
   };
@@ -210,9 +226,13 @@ export default function PackagesManagement() {
       monthlyPrice: plan.monthlyPrice,
       description: plan.description,
       features: plan.features || [],
+      availableFrom: plan.availableFrom || undefined,
+      availableUntil: plan.availableUntil || undefined,
       expiresAt: plan.expiresAt || undefined
     });
     setHasExpiration(!!plan.expiresAt);
+    setHasAvailabilityDates(!!(plan.availableFrom || plan.availableUntil));
+    setHasNoEndDate(!plan.availableUntil && !!plan.availableFrom);
     setIsCreatePlanOpen(true);
   };
 
@@ -225,8 +245,12 @@ export default function PackagesManagement() {
       totalPrice: template.totalPrice,
       description: template.description || '',
       isActive: template.isActive,
-      sortOrder: template.sortOrder
+      sortOrder: template.sortOrder,
+      availableFrom: template.availableFrom || undefined,
+      availableUntil: template.availableUntil || undefined
     });
+    setTemplateHasAvailabilityDates(!!(template.availableFrom || template.availableUntil));
+    setTemplateHasNoEndDate(!template.availableUntil && !!template.availableFrom);
     setIsCreateTemplateOpen(true);
   };
 
@@ -503,6 +527,78 @@ export default function PackagesManagement() {
                       </div>
                     )}
                   </div>
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="has-availability-dates"
+                        checked={hasAvailabilityDates}
+                        onChange={(e) => {
+                          setHasAvailabilityDates(e.target.checked);
+                          if (!e.target.checked) {
+                            setPlanFormData(prev => ({...prev, availableFrom: undefined, availableUntil: undefined}));
+                            setHasNoEndDate(false);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                        data-testid="checkbox-has-availability-dates"
+                      />
+                      <Label htmlFor="has-availability-dates" className="cursor-pointer">
+                        Set availability date range
+                      </Label>
+                    </div>
+                    {hasAvailabilityDates && (
+                      <div className="space-y-3 pl-6">
+                        <div>
+                          <Label htmlFor="available-from">Available From</Label>
+                          <Input
+                            id="available-from"
+                            type="date"
+                            value={planFormData.availableFrom ? new Date(planFormData.availableFrom).toISOString().split('T')[0] : ''}
+                            onChange={(e) => setPlanFormData(prev => ({
+                              ...prev,
+                              availableFrom: e.target.value ? new Date(e.target.value) : undefined
+                            }))}
+                            data-testid="input-available-from"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="has-no-end-date"
+                            checked={hasNoEndDate}
+                            onChange={(e) => {
+                              setHasNoEndDate(e.target.checked);
+                              if (e.target.checked) {
+                                setPlanFormData(prev => ({...prev, availableUntil: undefined}));
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                            data-testid="checkbox-has-no-end-date"
+                          />
+                          <Label htmlFor="has-no-end-date" className="cursor-pointer">
+                            No end date (always available)
+                          </Label>
+                        </div>
+                        {!hasNoEndDate && (
+                          <div>
+                            <Label htmlFor="available-until">Available Until</Label>
+                            <Input
+                              id="available-until"
+                              type="date"
+                              value={planFormData.availableUntil ? new Date(planFormData.availableUntil).toISOString().split('T')[0] : ''}
+                              onChange={(e) => setPlanFormData(prev => ({
+                                ...prev,
+                                availableUntil: e.target.value ? new Date(e.target.value) : undefined
+                              }))}
+                              min={planFormData.availableFrom ? new Date(planFormData.availableFrom).toISOString().split('T')[0] : ''}
+                              data-testid="input-available-until"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <Label>Features</Label>
                     <div className="space-y-2">
@@ -725,6 +821,78 @@ export default function PackagesManagement() {
                       onChange={(e) => setTemplateFormData(prev => ({...prev, description: e.target.value}))}
                       placeholder="Brief description of this package"
                     />
+                  </div>
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="template-has-availability-dates"
+                        checked={templateHasAvailabilityDates}
+                        onChange={(e) => {
+                          setTemplateHasAvailabilityDates(e.target.checked);
+                          if (!e.target.checked) {
+                            setTemplateFormData(prev => ({...prev, availableFrom: undefined, availableUntil: undefined}));
+                            setTemplateHasNoEndDate(false);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                        data-testid="checkbox-template-has-availability-dates"
+                      />
+                      <Label htmlFor="template-has-availability-dates" className="cursor-pointer">
+                        Set availability date range
+                      </Label>
+                    </div>
+                    {templateHasAvailabilityDates && (
+                      <div className="space-y-3 pl-6">
+                        <div>
+                          <Label htmlFor="template-available-from">Available From</Label>
+                          <Input
+                            id="template-available-from"
+                            type="date"
+                            value={templateFormData.availableFrom ? new Date(templateFormData.availableFrom).toISOString().split('T')[0] : ''}
+                            onChange={(e) => setTemplateFormData(prev => ({
+                              ...prev,
+                              availableFrom: e.target.value ? new Date(e.target.value) : undefined
+                            }))}
+                            data-testid="input-template-available-from"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="template-has-no-end-date"
+                            checked={templateHasNoEndDate}
+                            onChange={(e) => {
+                              setTemplateHasNoEndDate(e.target.checked);
+                              if (e.target.checked) {
+                                setTemplateFormData(prev => ({...prev, availableUntil: undefined}));
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                            data-testid="checkbox-template-has-no-end-date"
+                          />
+                          <Label htmlFor="template-has-no-end-date" className="cursor-pointer">
+                            No end date (always available)
+                          </Label>
+                        </div>
+                        {!templateHasNoEndDate && (
+                          <div>
+                            <Label htmlFor="template-available-until">Available Until</Label>
+                            <Input
+                              id="template-available-until"
+                              type="date"
+                              value={templateFormData.availableUntil ? new Date(templateFormData.availableUntil).toISOString().split('T')[0] : ''}
+                              onChange={(e) => setTemplateFormData(prev => ({
+                                ...prev,
+                                availableUntil: e.target.value ? new Date(e.target.value) : undefined
+                              }))}
+                              min={templateFormData.availableFrom ? new Date(templateFormData.availableFrom).toISOString().split('T')[0] : ''}
+                              data-testid="input-template-available-until"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" disabled={templateMutation.isPending}>

@@ -63,16 +63,20 @@ export default function LandingPage() {
     return `$${(priceInCents / 100).toFixed(0)}`;
   };
 
-  // Format availability dates
+  // Format availability dates (using UTC to avoid timezone shifts)
   const formatAvailabilityDates = (availableFrom?: Date | null, availableUntil?: Date | null) => {
     if (!availableFrom) return null;
     
-    const fromDate = format(new Date(availableFrom), 'MMM d, yyyy');
+    const fromDate = new Date(availableFrom);
+    const fromFormatted = format(new Date(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate()), 'MMM d, yyyy');
+    
     if (!availableUntil) {
-      return `Available ${fromDate} onwards`;
+      return `Available ${fromFormatted} onwards`;
     }
-    const untilDate = format(new Date(availableUntil), 'MMM d, yyyy');
-    return `${fromDate} - ${untilDate}`;
+    
+    const untilDate = new Date(availableUntil);
+    const untilFormatted = format(new Date(untilDate.getUTCFullYear(), untilDate.getUTCMonth(), untilDate.getUTCDate()), 'MMM d, yyyy');
+    return `${fromFormatted} - ${untilFormatted}`;
   };
 
   const features = [

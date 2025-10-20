@@ -629,8 +629,8 @@ export default function LandingPageManagement() {
                                 <FormControl>
                                   <Input
                                     type="date"
-                                    value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                                    onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                                    value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ? String(field.value).split('T')[0] : '')}
+                                    onChange={(e) => field.onChange(e.target.value ? e.target.value : undefined)}
                                     data-testid="input-promotion-available-from"
                                   />
                                 </FormControl>
@@ -666,8 +666,8 @@ export default function LandingPageManagement() {
                                   <FormControl>
                                     <Input
                                       type="date"
-                                      value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
-                                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                                      value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : (field.value ? String(field.value).split('T')[0] : '')}
+                                      onChange={(e) => field.onChange(e.target.value ? e.target.value : undefined)}
                                       data-testid="input-promotion-available-until"
                                     />
                                   </FormControl>

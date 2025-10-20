@@ -16,7 +16,8 @@ import {
   insertPunchCardTemplateSchema,
   insertPunchCardSchema,
   insertNotificationSchema,
-  insertUserSchema
+  insertUserSchema,
+  insertPromotionSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1632,7 +1633,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/promotions", isAdmin, async (req, res) => {
     try {
-      const promotion = await storage.createPromotion(req.body);
+      const validatedData = insertPromotionSchema.parse(req.body);
+      const promotion = await storage.createPromotion(validatedData);
       res.status(201).json(promotion);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1642,7 +1644,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/promotions/:id", isAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const promotion = await storage.updatePromotion(id, req.body);
+      const validatedData = insertPromotionSchema.parse(req.body);
+      const promotion = await storage.updatePromotion(id, validatedData);
       res.json(promotion);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

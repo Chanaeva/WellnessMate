@@ -462,22 +462,14 @@ export const insertPromotionSchema = createInsertSchema(promotions).omit({
   updatedAt: true,
 }).extend({
   availableFrom: z.union([
-    z.string()
-      .datetime({ offset: true })
-      .transform(v => new Date(v))
-      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
-    z.date()
-      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.string().transform(v => v ? new Date(v) : undefined),
+    z.date(),
     z.null(),
     z.undefined()
   ]).optional(),
   availableUntil: z.union([
-    z.string()
-      .datetime({ offset: true })
-      .transform(v => new Date(v))
-      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
-    z.date()
-      .refine(d => !isNaN(d.getTime()), { message: 'Invalid date' }),
+    z.string().transform(v => v ? new Date(v) : undefined),
+    z.date(),
     z.null(),
     z.undefined()
   ]).optional(),

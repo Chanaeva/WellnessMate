@@ -748,7 +748,7 @@ export default function LandingPageManagement() {
                         Valid until: {promotion.validUntil}
                         {(promotion.availableFrom || promotion.availableUntil) && (
                           <>
-                            {" • "}
+                            <br />
                             <Calendar className="h-3 w-3 inline mr-1" />
                             Available: {promotion.availableFrom ? format(new Date(promotion.availableFrom), "MMM d, yyyy") : "Now"}
                             {promotion.availableUntil ? ` - ${format(new Date(promotion.availableUntil), "MMM d, yyyy")}` : " onwards"}

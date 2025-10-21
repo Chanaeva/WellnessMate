@@ -21,7 +21,12 @@ import {
   Tag,
   Calendar,
   DollarSign,
-  Megaphone
+  Megaphone,
+  Settings,
+  Clock,
+  Building2,
+  Copyright,
+  Instagram
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -48,6 +53,17 @@ export default function LandingPageManagement() {
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
+  
+  // Site settings state
+  const [siteSettings, setSiteSettings] = useState({
+    hoursOfOperation: '',
+    hoursMembers: '',
+    hoursDayPass: '',
+    address: '',
+    addressLine2: '',
+    copyrightYear: '',
+    instagramHandle: '',
+  });
 
   // Fetch landing page content
   const { data: landingPageContent = [], isLoading: isContentLoading } = useQuery<LandingPageContent[]>({
@@ -64,6 +80,28 @@ export default function LandingPageManagement() {
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/promotions");
       return await res.json();
+    },
+  });
+
+  // Fetch site settings
+  const { isLoading: isSettingsLoading } = useQuery({
+    queryKey: ['/api/landing-content/footer'],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/footer");
+      const data = await res.json();
+      
+      const settingsObj = {
+        hoursOfOperation: data.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
+        hoursMembers: data.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
+        hoursDayPass: data.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
+        address: data.find((s: any) => s.key === 'address')?.value || '2124 E Admiral',
+        addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
+        copyrightYear: data.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
+        instagramHandle: data.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
+      };
+      
+      setSiteSettings(settingsObj);
+      return data;
     },
   });
 
@@ -235,6 +273,28 @@ export default function LandingPageManagement() {
     },
   });
 
+  // Site settings mutation
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (settings: typeof siteSettings) => {
+      const res = await apiRequest("POST", "/api/admin/site-settings", settings);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/landing-content/footer'] });
+      toast({
+        title: "Settings Saved",
+        description: "Your changes have been saved successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Form handlers
   const handleContentSubmit = (data: LandingPageContentFormData) => {
     if (editingContent) {
@@ -334,6 +394,7 @@ export default function LandingPageManagement() {
         <TabsList>
           <TabsTrigger value="content">Page Content</TabsTrigger>
           <TabsTrigger value="promotions">Promotions</TabsTrigger>
+          <TabsTrigger value="settings">Site Settings</TabsTrigger>
         </TabsList>
 
         {/* Page Content Tab */}
@@ -785,6 +846,147 @@ export default function LandingPageManagement() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Site Settings Tab */}
+        <TabsContent value="settings" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Footer & Contact Information</h3>
+            <Button onClick={() => saveSettingsMutation.mutate(siteSettings)} disabled={saveSettingsMutation.isPending}>
+              <Settings className="h-4 w-4 mr-2" />
+              Save Settings
+            </Button>
+          </div>
+
+          {isSettingsLoading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading settings...</p>
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {/* Hours of Operation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Hours of Operation
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Set the hours displayed on the landing page
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursOfOperation">Daily Hours</Label>
+                    <Input
+                      id="hoursOfOperation"
+                      value={siteSettings.hoursOfOperation}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, hoursOfOperation: e.target.value })}
+                      placeholder="6:00 AM - 10:00 PM"
+                      data-testid="input-hours-operation"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursMembers">Members Only Access</Label>
+                    <Input
+                      id="hoursMembers"
+                      value={siteSettings.hoursMembers}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, hoursMembers: e.target.value })}
+                      placeholder="6:00 AM - 9:00 AM"
+                      data-testid="input-hours-members"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursDayPass">Day Pass Access</Label>
+                    <Input
+                      id="hoursDayPass"
+                      value={siteSettings.hoursDayPass}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, hoursDayPass: e.target.value })}
+                      placeholder="9:00 AM - 10:00 PM"
+                      data-testid="input-hours-daypass"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Address */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Address
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Physical location displayed on the landing page
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Street Address</Label>
+                    <Input
+                      id="address"
+                      value={siteSettings.address}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, address: e.target.value })}
+                      placeholder="2124 E Admiral"
+                      data-testid="input-address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="addressLine2">City, State</Label>
+                    <Textarea
+                      id="addressLine2"
+                      value={siteSettings.addressLine2}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, addressLine2: e.target.value })}
+                      placeholder="Kendall Whitter Neighborhood&#10;Tulsa, OK"
+                      rows={2}
+                      data-testid="input-address-line2"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Copyright & Social */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Copyright className="h-5 w-5" />
+                    Copyright & Social Media
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Footer copyright year and social media links
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="copyrightYear">Copyright Year</Label>
+                    <Input
+                      id="copyrightYear"
+                      value={siteSettings.copyrightYear}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, copyrightYear: e.target.value })}
+                      placeholder="2025"
+                      data-testid="input-copyright-year"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="instagramHandle" className="flex items-center gap-2">
+                      <Instagram className="h-4 w-4" />
+                      Instagram Handle
+                    </Label>
+                    <Input
+                      id="instagramHandle"
+                      value={siteSettings.instagramHandle}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, instagramHandle: e.target.value })}
+                      placeholder="wolfmothertulsa"
+                      data-testid="input-instagram"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Enter without @: {siteSettings.instagramHandle && `@${siteSettings.instagramHandle}`}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -79,6 +79,94 @@ export default function LandingPage() {
     },
   });
 
+  // Fetch hero content
+  const { data: heroContent } = useQuery({
+    queryKey: ["/api/landing-content/hero"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/hero");
+      const data = await res.json();
+      
+      return {
+        title: data.find((s: any) => s.key === 'title')?.value || 'Wolf Mother',
+        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || 'A Wellness Social Club',
+        description: data.find((s: any) => s.key === 'description')?.value || 'Where ancient thermal wisdom meets modern wellness.',
+        badgeText: data.find((s: any) => s.key === 'badgeText')?.value || 'Coming soon to Kendall-Whitter Neighborhood, Tulsa, OK',
+      };
+    },
+  });
+
+  // Fetch features content
+  const { data: featuresContent } = useQuery({
+    queryKey: ["/api/landing-content/features"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/features");
+      const data = await res.json();
+      
+      return [
+        {
+          title: data.find((s: any) => s.key === 'feature1Title')?.value || 'Sacred Thermal Sauna',
+          description: data.find((s: any) => s.key === 'feature1Description')?.value || 'Ancient healing Sauna',
+        },
+        {
+          title: data.find((s: any) => s.key === 'feature2Title')?.value || 'Glacial Water Exposure',
+          description: data.find((s: any) => s.key === 'feature2Description')?.value || 'Cold Plunge',
+        },
+        {
+          title: data.find((s: any) => s.key === 'feature3Title')?.value || 'Wellness Sanctuary',
+          description: data.find((s: any) => s.key === 'feature3Description')?.value || 'Complete mind-body restoration in our peaceful environment',
+        },
+        {
+          title: data.find((s: any) => s.key === 'feature4Title')?.value || 'Community of Wolves',
+          description: data.find((s: any) => s.key === 'feature4Description')?.value || 'Join our pack of wellness warriors on the journey to vitality',
+        },
+      ];
+    },
+  });
+
+  // Fetch benefits content
+  const { data: benefitsContent } = useQuery({
+    queryKey: ["/api/landing-content/benefits"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/benefits");
+      const data = await res.json();
+      
+      return [
+        {
+          title: data.find((s: any) => s.key === 'benefit1Title')?.value || 'Ancient Wisdom',
+          description: data.find((s: any) => s.key === 'benefit1Description')?.value || 'Traditional thermal healing practices rooted in Roman history',
+        },
+        {
+          title: data.find((s: any) => s.key === 'benefit2Title')?.value || 'Safe & Clean',
+          description: data.find((s: any) => s.key === 'benefit2Description')?.value || 'Highest safety standards with pristine facilities maintained daily',
+        },
+        {
+          title: data.find((s: any) => s.key === 'benefit3Title')?.value || 'Supportive Community',
+          description: data.find((s: any) => s.key === 'benefit3Description')?.value || 'Join our pack of wellness warriors on their journey to vitality',
+        },
+      ];
+    },
+  });
+
+  // Fetch partners content
+  const { data: partnersContent } = useQuery({
+    queryKey: ["/api/landing-content/partners"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/partners");
+      const data = await res.json();
+      
+      return [
+        {
+          name: data.find((s: any) => s.key === 'partner1Name')?.value || 'LIT Method Plunges',
+          description: data.find((s: any) => s.key === 'partner1Description')?.value || 'Experience the transformative power of cold therapy with premium LIT Method cold plunge pools. Designed for optimal cold exposure and recovery.',
+        },
+        {
+          name: data.find((s: any) => s.key === 'partner2Name')?.value || 'Nomad Saunas',
+          description: data.find((s: any) => s.key === 'partner2Description')?.value || 'Indulge in the ancient ritual of thermal therapy with authentic Nomad barrel saunas. Crafted for the perfect heat experience and relaxation.',
+        },
+      ];
+    },
+  });
+
   // Format price for display
   const formatPrice = (priceInCents: number) => {
     return `$${(priceInCents / 100).toFixed(0)}`;
@@ -100,28 +188,19 @@ export default function LandingPage() {
     return `${fromFormatted} - ${untilFormatted}`;
   };
 
-  const features = [
-    {
-      icon: <Waves className="h-8 w-8 text-primary" />,
-      title: "Sacred Thermal Sauna",
-      description: "Ancient healing Sauna",
-    },
-    {
-      icon: <Crown className="h-8 w-8 text-primary" />,
-      title: "Glacial Water Exposure",
-      description: "Cold Plunge",
-    },
-    {
-      icon: <Heart className="h-8 w-8 text-primary" />,
-      title: "Wellness Sanctuary",
-      description: "Complete mind-body restoration in our peaceful environment",
-    },
-    {
-      icon: <Users className="h-8 w-8 text-primary" />,
-      title: "Community of Wolves",
-      description:
-        "Join our pack of wellness warriors on the journey to vitality",
-    },
+  // Feature icons mapping
+  const featureIcons = [
+    <Waves className="h-8 w-8 text-primary" />,
+    <Crown className="h-8 w-8 text-primary" />,
+    <Heart className="h-8 w-8 text-primary" />,
+    <Users className="h-8 w-8 text-primary" />,
+  ];
+
+  // Benefit icons mapping
+  const benefitIcons = [
+    <Waves className="h-8 w-8 text-primary" />,
+    <Shield className="h-8 w-8 text-primary" />,
+    <Users className="h-8 w-8 text-primary" />,
   ];
 
   return (
@@ -179,20 +258,20 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading text-foreground mb-4">
-            Wolf Mother
+            {heroContent?.title}
           </h1>
 
           <p className="text-lg font-body text-muted-foreground mb-2">
-            A Wellness Social Club
+            {heroContent?.subtitle}
           </p>
 
           <Badge className="mb-8 bg-primary/10 text-primary border-primary/20">
             <Sparkles className="h-4 w-4 mr-2" />
-            Coming soon to Kendall-Whitter Neighborhood, Tulsa, OK
+            {heroContent?.badgeText}
           </Badge>
 
           <p className="text-xl md:text-2xl mb-12 text-foreground/80 max-w-3xl mx-auto leading-relaxed font-body">
-            Where ancient thermal wisdom meets modern wellness.
+            {heroContent?.description}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -390,43 +469,19 @@ export default function LandingPage() {
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="text-center">
-                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Waves className="h-8 w-8 text-primary" />
+              {benefitsContent?.map((benefit, index) => (
+                <div key={index} className="text-center">
+                  <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    {benefitIcons[index]}
+                  </div>
+                  <h4 className="font-heading font-semibold text-foreground mb-2">
+                    {benefit.title}
+                  </h4>
+                  <p className="text-muted-foreground font-body text-sm">
+                    {benefit.description}
+                  </p>
                 </div>
-                <h4 className="font-heading font-semibold text-foreground mb-2">
-                  Ancient Wisdom
-                </h4>
-                <p className="text-muted-foreground font-body text-sm">
-                  Traditional thermal healing practices rooted in Roman history
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="h-8 w-8 text-primary" />
-                </div>
-                <h4 className="font-heading font-semibold text-foreground mb-2">
-                  Safe & Clean
-                </h4>
-                <p className="text-muted-foreground font-body text-sm">
-                  Highest safety standards with pristine facilities maintained
-                  daily
-                </p>
-              </div>
-
-              <div className="text-center">
-                <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="h-8 w-8 text-primary" />
-                </div>
-                <h4 className="font-heading font-semibold text-foreground mb-2">
-                  Supportive Community
-                </h4>
-                <p className="text-muted-foreground font-body text-sm">
-                  Join our pack of wellness warriors on their journey to
-                  vitality
-                </p>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -486,47 +541,25 @@ export default function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
-            {/* LIT Method Cold Plunges */}
-            <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
-              <div className="aspect-video overflow-hidden">
-                <img
-                  src={coldPlungeImg}
-                  alt="LIT Method Glacial Plunge"
-                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-              <CardContent className="p-6">
-                <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
-                  LIT Method Plunges
-                </h3>
-                <p className="text-muted-foreground font-body leading-relaxed">
-                  Experience the transformative power of cold therapy with
-                  premium LIT Method cold plunge pools. Designed for optimal
-                  cold exposure and recovery.
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Nomad Saunas */}
-            <Card className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
-              <div className="aspect-video overflow-hidden">
-                <img
-                  src={saunaImg}
-                  alt="Nomad Sauna"
-                  className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-              <CardContent className="p-6">
-                <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
-                  Nomad Saunas
-                </h3>
-                <p className="text-muted-foreground font-body leading-relaxed">
-                  Indulge in the ancient ritual of thermal therapy with
-                  authentic Nomad barrel saunas. Crafted for the perfect heat
-                  experience and relaxation.
-                </p>
-              </CardContent>
-            </Card>
+            {partnersContent?.map((partner, index) => (
+              <Card key={index} className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
+                <div className="aspect-video overflow-hidden">
+                  <img
+                    src={index === 0 ? coldPlungeImg : saunaImg}
+                    alt={partner.name}
+                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+                <CardContent className="p-6">
+                  <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
+                    {partner.name}
+                  </h3>
+                  <p className="text-muted-foreground font-body leading-relaxed">
+                    {partner.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
@@ -539,13 +572,13 @@ export default function LandingPage() {
           </h2>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {features.map((feature, index) => (
+            {featuresContent?.map((feature, index) => (
               <Card
                 key={index}
                 className="text-center border-0 shadow-sm hover:shadow-md transition-shadow duration-300 bg-background"
               >
                 <CardContent className="pt-8 pb-6">
-                  <div className="flex justify-center mb-4">{feature.icon}</div>
+                  <div className="flex justify-center mb-4">{featureIcons[index]}</div>
                   <h3 className="text-xl font-heading font-semibold mb-3 text-foreground">
                     {feature.title}
                   </h3>

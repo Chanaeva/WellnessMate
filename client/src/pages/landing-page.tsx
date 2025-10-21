@@ -594,36 +594,30 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Contact Info */}
-      <section className="py-12 px-4 bg-muted/20">
+      {/* Contact Info / Footer */}
+      <footer className="py-12 px-4 bg-muted/20">
         <div className="max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
+          <div className="grid md:grid-cols-3 gap-8 text-center mb-8">
             <div className="flex flex-col items-center">
               <MapPin className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">
                 Visit Us
               </h3>
               <p className="text-muted-foreground font-body">
-                2124 E Admiral
+                {footerSettings?.address || '2124 E Admiral'}
                 <br />
-                Kendall Whitter Neighborhood
-                <br />
-                Tulsa, OK
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Phone className="h-8 w-8 text-primary mb-3" />
-              <h3 className="font-heading font-semibold text-foreground mb-2">
-                Email Us
-              </h3>
-              <p className="text-muted-foreground font-body">
-                <a
-                  href="mailto:info@wolfmotherwellness.com"
-                  className="hover:underline"
-                >
-                  info@wolfmotherwellness.com
-                </a>
+                {footerSettings?.addressLine2?.split('\n').map((line: string, i: number) => (
+                  <span key={i}>
+                    {line}
+                    {i < (footerSettings?.addressLine2?.split('\n').length || 1) - 1 && <br />}
+                  </span>
+                )) || (
+                  <>
+                    Kendall Whitter Neighborhood
+                    <br />
+                    Tulsa, OK
+                  </>
+                )}
               </p>
             </div>
 
@@ -640,69 +634,39 @@ export default function LandingPage() {
                 Day Pass Access: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
               </p>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-4 bg-foreground text-background">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8 mb-8">
-            {/* Address */}
-            <div>
-              <h4 className="font-heading font-semibold mb-3 flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Location
-              </h4>
-              <p className="text-muted font-body">
-                {footerSettings?.address || '2124 E Admiral'}
-                <br />
-                {footerSettings?.addressLine2?.split('\n').map((line: string, i: number) => (
-                  <span key={i}>
-                    {line}
-                    {i < (footerSettings?.addressLine2?.split('\n').length || 1) - 1 && <br />}
-                  </span>
-                ))}
+            <div className="flex flex-col items-center">
+              <Instagram className="h-8 w-8 text-primary mb-3" />
+              <h3 className="font-heading font-semibold text-foreground mb-2">
+                Connect
+              </h3>
+              <p className="text-muted-foreground font-body">
+                {footerSettings?.instagramHandle ? (
+                  <a
+                    href={`https://instagram.com/${footerSettings.instagramHandle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline inline-flex items-center gap-2"
+                    data-testid="link-instagram"
+                  >
+                    <Instagram className="h-5 w-5" />
+                    @{footerSettings.instagramHandle}
+                  </a>
+                ) : (
+                  <a
+                    href="mailto:info@wolfmotherwellness.com"
+                    className="hover:underline"
+                  >
+                    info@wolfmotherwellness.com
+                  </a>
+                )}
               </p>
-            </div>
-
-            {/* Hours */}
-            <div>
-              <h4 className="font-heading font-semibold mb-3 flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Hours
-              </h4>
-              <p className="text-muted font-body">
-                {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
-                <br />
-                <span className="text-sm">Members: {footerSettings?.hoursMembers || '6:00 AM - 9:00 AM'}</span>
-                <br />
-                <span className="text-sm">Day Pass: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}</span>
-              </p>
-            </div>
-
-            {/* Social & Contact */}
-            <div>
-              <h4 className="font-heading font-semibold mb-3">Connect</h4>
-              {footerSettings?.instagramHandle && (
-                <a
-                  href={`https://instagram.com/${footerSettings.instagramHandle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-muted hover:text-primary transition-colors font-body"
-                  data-testid="link-instagram"
-                >
-                  <Instagram className="h-5 w-5" />
-                  @{footerSettings.instagramHandle}
-                </a>
-              )}
             </div>
           </div>
 
-          <div className="text-center pt-8 border-t border-muted/20">
-            <p className="text-muted font-body">
-              © {footerSettings?.copyrightYear || '2025'} Wolf Mother Wellness. Where legends are born and wellness
-              thrives.
+          <div className="text-center pt-6 border-t border-muted-foreground/20">
+            <p className="text-muted-foreground font-body text-sm">
+              © {footerSettings?.copyrightYear || '2025'} Wolf Mother Wellness. Where legends are born and wellness thrives.
             </p>
           </div>
         </div>

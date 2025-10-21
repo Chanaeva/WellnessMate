@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { LandingPageContent, insertLandingPageContentSchema, Promotion, insertPromotionSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,26 +85,29 @@ export default function LandingPageManagement() {
   });
 
   // Fetch site settings
-  const { isLoading: isSettingsLoading } = useQuery({
+  const { data: footerData, isLoading: isSettingsLoading } = useQuery({
     queryKey: ['/api/landing-content/footer'],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/landing-content/footer");
-      const data = await res.json();
-      
-      const settingsObj = {
-        hoursOfOperation: data.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
-        hoursMembers: data.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
-        hoursDayPass: data.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
-        address: data.find((s: any) => s.key === 'address')?.value || '2124 E Admiral',
-        addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
-        copyrightYear: data.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
-        instagramHandle: data.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
-      };
-      
-      setSiteSettings(settingsObj);
-      return data;
+      return await res.json();
     },
   });
+
+  // Update siteSettings when footerData changes
+  useEffect(() => {
+    if (footerData) {
+      const settingsObj = {
+        hoursOfOperation: footerData.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
+        hoursMembers: footerData.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
+        hoursDayPass: footerData.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
+        address: footerData.find((s: any) => s.key === 'address')?.value || '2124 E Admiral',
+        addressLine2: footerData.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
+        copyrightYear: footerData.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
+        instagramHandle: footerData.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
+      };
+      setSiteSettings(settingsObj);
+    }
+  }, [footerData]);
 
   // Content form
   const contentForm = useForm<LandingPageContentFormData>({

@@ -1691,6 +1691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/kiosk/create-member-payment", async (req, res) => {
     try {
       const { memberData, packageData } = req.body;
+      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData });
       
       // Validate the request data
       const memberFormSchema = z.object({
@@ -1703,6 +1704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const validatedMemberData = memberFormSchema.parse(memberData);
+      console.log('✅ Validated member data:', validatedMemberData);
       
       // Check if email already exists
       const existingUser = await storage.getUserByEmail(validatedMemberData.email);
@@ -1743,9 +1745,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/kiosk/confirm-member-creation", async (req, res) => {
     try {
       const { paymentIntentId, memberData, packageData } = req.body;
+      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, memberData, packageData });
       
       // Verify payment was successful
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      console.log('💳 Payment Intent status:', paymentIntent.status);
       if (paymentIntent.status !== 'succeeded') {
         return res.status(400).json({ message: "Payment not completed" });
       }

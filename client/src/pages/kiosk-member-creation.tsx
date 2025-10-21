@@ -442,23 +442,23 @@ export default function KioskMemberCreation({ onBack, onSuccess }: {
                             </FormControl>
                             <SelectContent>
                               {packageType === "membership" ? (
-                                membershipPlans.map((plan) => {
+                                membershipPlans.map((plan: any) => {
                                   const Icon = getPlanIcon(plan.planType);
                                   return (
                                     <SelectItem key={plan.id} value={plan.id.toString()}>
                                       <div className="flex items-center">
                                         <Icon className="h-4 w-4 mr-2" />
-                                        {plan.name} - ${plan.monthlyPrice}/month
+                                        {plan.name} - ${(plan.monthlyPrice / 100).toFixed(2)}/month
                                       </div>
                                     </SelectItem>
                                   );
                                 })
                               ) : (
-                                punchCardTemplates.map((template) => (
+                                punchCardTemplates.map((template: any) => (
                                   <SelectItem key={template.id} value={template.id.toString()}>
                                     <div className="flex items-center">
                                       <Calendar className="h-4 w-4 mr-2" />
-                                      {template.name} - ${template.totalPrice}
+                                      {template.name} - ${(template.totalPrice / 100).toFixed(2)}
                                     </div>
                                   </SelectItem>
                                 ))
@@ -507,7 +507,7 @@ export default function KioskMemberCreation({ onBack, onSuccess }: {
                           <div>
                             <h3 className="font-semibold text-lg">{packageData.name}</h3>
                             <p className="text-green-600 font-bold text-xl">
-                              ${packageType === "membership" ? packageData.monthlyPrice : packageData.totalPrice}
+                              ${(packageType === "membership" ? packageData.monthlyPrice : packageData.totalPrice) / 100}
                               {packageType === "membership" && "/month"}
                             </p>
                           </div>

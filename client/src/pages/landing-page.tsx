@@ -26,6 +26,8 @@ import {
   Shield,
   Clock,
   Copy,
+  Instagram,
+  Building2,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -55,6 +57,25 @@ export default function LandingPage() {
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/punch-cards/options");
       return await res.json();
+    },
+  });
+
+  // Fetch footer settings
+  const { data: footerSettings } = useQuery({
+    queryKey: ["/api/landing-content/footer"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/footer");
+      const data = await res.json();
+      
+      return {
+        hoursOfOperation: data.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
+        hoursMembers: data.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
+        hoursDayPass: data.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
+        address: data.find((s: any) => s.key === 'address')?.value || '2124 E Admiral',
+        addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
+        copyrightYear: data.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
+        instagramHandle: data.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
+      };
     },
   });
 
@@ -612,11 +633,11 @@ export default function LandingPage() {
                 Daily Hours
               </h3>
               <p className="text-muted-foreground font-body">
-                Hours of Operation: 6:00 AM - 10:00PM
+                Hours of Operation: {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
                 <br />
-                Members Only Access: 6:00 AM - 9:00 AM
+                Members Only Access: {footerSettings?.hoursMembers || '6:00 AM - 9:00 AM'}
                 <br />
-                Day Pass Access: 9:00AM - 10:00 PM
+                Day Pass Access: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
               </p>
             </div>
           </div>
@@ -624,12 +645,66 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-4 bg-foreground text-background">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-muted font-body">
-            © 2025 Wolf Mother Wellness. Where legends are born and wellness
-            thrives.
-          </p>
+      <footer className="py-12 px-4 bg-foreground text-background">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
+            {/* Address */}
+            <div>
+              <h4 className="font-heading font-semibold mb-3 flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Location
+              </h4>
+              <p className="text-muted font-body">
+                {footerSettings?.address || '2124 E Admiral'}
+                <br />
+                {footerSettings?.addressLine2?.split('\n').map((line: string, i: number) => (
+                  <span key={i}>
+                    {line}
+                    {i < (footerSettings?.addressLine2?.split('\n').length || 1) - 1 && <br />}
+                  </span>
+                ))}
+              </p>
+            </div>
+
+            {/* Hours */}
+            <div>
+              <h4 className="font-heading font-semibold mb-3 flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Hours
+              </h4>
+              <p className="text-muted font-body">
+                {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
+                <br />
+                <span className="text-sm">Members: {footerSettings?.hoursMembers || '6:00 AM - 9:00 AM'}</span>
+                <br />
+                <span className="text-sm">Day Pass: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}</span>
+              </p>
+            </div>
+
+            {/* Social & Contact */}
+            <div>
+              <h4 className="font-heading font-semibold mb-3">Connect</h4>
+              {footerSettings?.instagramHandle && (
+                <a
+                  href={`https://instagram.com/${footerSettings.instagramHandle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-muted hover:text-primary transition-colors font-body"
+                  data-testid="link-instagram"
+                >
+                  <Instagram className="h-5 w-5" />
+                  @{footerSettings.instagramHandle}
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div className="text-center pt-8 border-t border-muted/20">
+            <p className="text-muted font-body">
+              © {footerSettings?.copyrightYear || '2025'} Wolf Mother Wellness. Where legends are born and wellness
+              thrives.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

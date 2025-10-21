@@ -66,14 +66,12 @@ export default function LandingPageManagement() {
     instagramHandle: '',
   });
 
-  // Fetch landing page content (excluding footer)
+  // Fetch landing page content
   const { data: landingPageContent = [], isLoading: isContentLoading } = useQuery<LandingPageContent[]>({
     queryKey: ["/api/admin/landing-content"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/landing-content");
-      const data = await res.json();
-      // Filter out footer content as it has its own tab
-      return data.filter((item: LandingPageContent) => item.section !== 'footer');
+      return await res.json();
     },
   });
 

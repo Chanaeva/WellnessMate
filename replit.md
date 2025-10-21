@@ -83,11 +83,11 @@ Preferred communication style: Simple, everyday language.
 - **Testing**: End-to-end test verified footer displays correct data and Instagram link works properly
 
 ### Page Content Tab Refactoring (October 21, 2025)
-- **Filtered Footer Content**: Page Content tab now excludes footer data (footer has its own dedicated Site Settings tab)
 - **Section-Based Organization**: Content blocks are now grouped and displayed by section with clear section headers
+- **All Content Display**: Page Content tab displays all landing page content blocks including footer (footer also has dedicated Site Settings tab for easier editing)
 - **Improved UX**: 
   - Section headers show section name and count of content blocks
   - Content cards have left border accent for visual hierarchy
   - Empty state provides clear guidance for creating first content block
 - **Data Structure**: Uses `landing_page_content` table with section/key/value structure for flexible content management
-- **Sections Support**: Ready to manage content for hero, features, benefits, partners, and other landing page sections
+- **Sections Support**: Manages content for all sections including footer, hero, features, benefits, partners, and other landing page sections

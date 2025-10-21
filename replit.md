@@ -70,3 +70,14 @@ Preferred communication style: Simple, everyday language.
 - **Kiosk Payment Testing**: End-to-end testing confirmed successful payment processing with Stripe test cards
 - **Member Creation Flow**: Verified that kiosk member creation creates user accounts, activates memberships, and records payments correctly
 - **Note**: Production Stripe keys (STRIPE_SECRET_KEY, VITE_STRIPE_PUBLIC_KEY) should be configured separately for deployment
+
+### Admin-Editable Landing Page Footer (October 21, 2025)
+- **Site Settings Tab**: Added a third tab to the admin landing page editor for managing footer content
+- **Editable Fields**: Hours of operation (daily, members-only, day pass), physical address, copyright year, and Instagram handle
+- **Database Storage**: Footer settings stored in `landing_page_content` table with section='footer'
+- **API Endpoints**: 
+  - GET `/api/landing-content/footer` - Public endpoint for retrieving footer data
+  - POST `/api/admin/site-settings` - Admin-only endpoint for saving footer settings
+- **Landing Page Footer**: Redesigned as a 3-column layout displaying Location, Hours, and Connect (with Instagram icon link)
+- **Default Values**: Fallback values ensure footer displays correctly even if database is empty
+- **Testing**: End-to-end test verified footer displays correct data and Instagram link works properly

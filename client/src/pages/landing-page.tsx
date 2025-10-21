@@ -87,10 +87,10 @@ export default function LandingPage() {
       const data = await res.json();
       
       return {
-        title: data.find((s: any) => s.key === 'title')?.value || 'Wolf Mother',
-        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || 'A Wellness Social Club',
-        description: data.find((s: any) => s.key === 'description')?.value || 'Where ancient thermal wisdom meets modern wellness.',
-        badgeText: data.find((s: any) => s.key === 'badgeText')?.value || 'Coming soon to Kendall-Whitter Neighborhood, Tulsa, OK',
+        title: data.find((s: any) => s.key === 'title')?.value || '',
+        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || '',
+        description: data.find((s: any) => s.key === 'description')?.value || '',
+        badgeText: data.find((s: any) => s.key === 'badgeText')?.value || '',
       };
     },
   });
@@ -104,20 +104,20 @@ export default function LandingPage() {
       
       return [
         {
-          title: data.find((s: any) => s.key === 'feature1Title')?.value || 'Sacred Thermal Sauna',
-          description: data.find((s: any) => s.key === 'feature1Description')?.value || 'Ancient healing Sauna',
+          title: data.find((s: any) => s.key === 'feature1Title')?.value || '',
+          description: data.find((s: any) => s.key === 'feature1Description')?.value || '',
         },
         {
-          title: data.find((s: any) => s.key === 'feature2Title')?.value || 'Glacial Water Exposure',
-          description: data.find((s: any) => s.key === 'feature2Description')?.value || 'Cold Plunge',
+          title: data.find((s: any) => s.key === 'feature2Title')?.value || '',
+          description: data.find((s: any) => s.key === 'feature2Description')?.value || '',
         },
         {
-          title: data.find((s: any) => s.key === 'feature3Title')?.value || 'Wellness Sanctuary',
-          description: data.find((s: any) => s.key === 'feature3Description')?.value || 'Complete mind-body restoration in our peaceful environment',
+          title: data.find((s: any) => s.key === 'feature3Title')?.value || '',
+          description: data.find((s: any) => s.key === 'feature3Description')?.value || '',
         },
         {
-          title: data.find((s: any) => s.key === 'feature4Title')?.value || 'Community of Wolves',
-          description: data.find((s: any) => s.key === 'feature4Description')?.value || 'Join our pack of wellness warriors on the journey to vitality',
+          title: data.find((s: any) => s.key === 'feature4Title')?.value || '',
+          description: data.find((s: any) => s.key === 'feature4Description')?.value || '',
         },
       ];
     },
@@ -132,16 +132,16 @@ export default function LandingPage() {
       
       return [
         {
-          title: data.find((s: any) => s.key === 'benefit1Title')?.value || 'Ancient Wisdom',
-          description: data.find((s: any) => s.key === 'benefit1Description')?.value || 'Traditional thermal healing practices rooted in Roman history',
+          title: data.find((s: any) => s.key === 'benefit1Title')?.value || '',
+          description: data.find((s: any) => s.key === 'benefit1Description')?.value || '',
         },
         {
-          title: data.find((s: any) => s.key === 'benefit2Title')?.value || 'Safe & Clean',
-          description: data.find((s: any) => s.key === 'benefit2Description')?.value || 'Highest safety standards with pristine facilities maintained daily',
+          title: data.find((s: any) => s.key === 'benefit2Title')?.value || '',
+          description: data.find((s: any) => s.key === 'benefit2Description')?.value || '',
         },
         {
-          title: data.find((s: any) => s.key === 'benefit3Title')?.value || 'Supportive Community',
-          description: data.find((s: any) => s.key === 'benefit3Description')?.value || 'Join our pack of wellness warriors on their journey to vitality',
+          title: data.find((s: any) => s.key === 'benefit3Title')?.value || '',
+          description: data.find((s: any) => s.key === 'benefit3Description')?.value || '',
         },
       ];
     },
@@ -156,12 +156,12 @@ export default function LandingPage() {
       
       return [
         {
-          name: data.find((s: any) => s.key === 'partner1Name')?.value || 'LIT Method Plunges',
-          description: data.find((s: any) => s.key === 'partner1Description')?.value || 'Experience the transformative power of cold therapy with premium LIT Method cold plunge pools. Designed for optimal cold exposure and recovery.',
+          name: data.find((s: any) => s.key === 'partner1Name')?.value || '',
+          description: data.find((s: any) => s.key === 'partner1Description')?.value || '',
         },
         {
-          name: data.find((s: any) => s.key === 'partner2Name')?.value || 'Nomad Saunas',
-          description: data.find((s: any) => s.key === 'partner2Description')?.value || 'Indulge in the ancient ritual of thermal therapy with authentic Nomad barrel saunas. Crafted for the perfect heat experience and relaxation.',
+          name: data.find((s: any) => s.key === 'partner2Name')?.value || '',
+          description: data.find((s: any) => s.key === 'partner2Description')?.value || '',
         },
       ];
     },

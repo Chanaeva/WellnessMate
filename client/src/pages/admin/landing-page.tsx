@@ -100,7 +100,7 @@ export default function LandingPageManagement() {
         hoursOfOperation: footerData.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
         hoursMembers: footerData.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
         hoursDayPass: footerData.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
-        address: footerData.find((s: any) => s.key === 'address')?.value || '2124 E Admiral',
+        address: footerData.find((s: any) => s.key === 'address')?.value || '2124 W Admiral',
         addressLine2: footerData.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
         copyrightYear: footerData.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
         instagramHandle: footerData.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
@@ -114,9 +114,8 @@ export default function LandingPageManagement() {
     resolver: zodResolver(landingPageContentFormSchema),
     defaultValues: {
       section: "",
-      title: "",
-      content: "",
-      orderIndex: 0,
+      key: "",
+      value: "",
       isActive: true,
     },
   });
@@ -320,9 +319,8 @@ export default function LandingPageManagement() {
     setEditingContent(content);
     contentForm.reset({
       section: content.section,
-      title: content.title,
-      content: content.content,
-      orderIndex: content.orderIndex,
+      key: content.key,
+      value: content.value,
       isActive: content.isActive,
     });
     setIsContentDialogOpen(true);
@@ -353,9 +351,8 @@ export default function LandingPageManagement() {
     setEditingContent(null);
     contentForm.reset({
       section: "",
-      title: "",
-      content: "",
-      orderIndex: 0,
+      key: "",
+      value: "",
       isActive: true,
     });
     setIsContentDialogOpen(true);
@@ -446,12 +443,12 @@ export default function LandingPageManagement() {
                     />
                     <FormField
                       control={contentForm.control}
-                      name="title"
+                      name="key"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Title</FormLabel>
+                          <FormLabel>Key</FormLabel>
                           <FormControl>
-                            <Input placeholder="Content title" {...field} />
+                            <Input placeholder="Content key (e.g., heroTitle)" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -459,13 +456,13 @@ export default function LandingPageManagement() {
                     />
                     <FormField
                       control={contentForm.control}
-                      name="content"
+                      name="value"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Content</FormLabel>
+                          <FormLabel>Value</FormLabel>
                           <FormControl>
                             <Textarea 
-                              placeholder="Content text" 
+                              placeholder="Content value" 
                               rows={4}
                               {...field} 
                             />
@@ -474,43 +471,23 @@ export default function LandingPageManagement() {
                         </FormItem>
                       )}
                     />
-                    <div className="flex gap-4">
-                      <FormField
-                        control={contentForm.control}
-                        name="orderIndex"
-                        render={({ field }) => (
-                          <FormItem className="flex-1">
-                            <FormLabel>Order Index</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                placeholder="0" 
-                                {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={contentForm.control}
-                        name="isActive"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                            <div className="space-y-0.5">
-                              <FormLabel>Active</FormLabel>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <FormField
+                      control={contentForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Active</FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                     <div className="flex justify-end gap-2">
                       <Button 
                         type="button" 
@@ -545,13 +522,13 @@ export default function LandingPageManagement() {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <FileText className="h-4 w-4" />
-                        {content.title}
+                        {content.key}
                         <Badge variant={content.isActive ? "default" : "secondary"}>
                           {content.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        Section: {content.section} • Order: {content.orderIndex}
+                        Section: {content.section}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -573,7 +550,7 @@ export default function LandingPageManagement() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm">{content.content}</p>
+                    <p className="text-sm">{content.value}</p>
                   </CardContent>
                 </Card>
               ))

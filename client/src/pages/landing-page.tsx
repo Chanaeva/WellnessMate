@@ -71,7 +71,7 @@ export default function LandingPage() {
         hoursOfOperation: data.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
         hoursMembers: data.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
         hoursDayPass: data.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
-        address: data.find((s: any) => s.key === 'address')?.value || '2124 E Admiral',
+        address: data.find((s: any) => s.key === 'address')?.value || '2124 W Admiral',
         addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
         copyrightYear: data.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
         instagramHandle: data.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',

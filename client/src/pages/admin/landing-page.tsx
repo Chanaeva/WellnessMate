@@ -95,7 +95,7 @@ export default function LandingPageManagement() {
 
   // Update siteSettings when footerData changes
   useEffect(() => {
-    if (footerData) {
+    if (footerData && Array.isArray(footerData)) {
       const settingsObj = {
         hoursOfOperation: footerData.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
         hoursMembers: footerData.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',

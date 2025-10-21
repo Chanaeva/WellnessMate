@@ -6,19 +6,19 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Debug: Log what we're seeing
 console.log('🔍 Environment Debug:', {
   isDev: isDevelopment,
-  hasTESTING_SECRET: !!process.env.TESTING_STRIPE_SECRET_KEY,
-  hasTESTING_PUBLIC: !!process.env.TESTING_VITE_STRIPE_PUBLIC_KEY,
-  TESTING_SECRET_starts: process.env.TESTING_STRIPE_SECRET_KEY?.substring(0, 15),
-  TESTING_PUBLIC_starts: process.env.TESTING_VITE_STRIPE_PUBLIC_KEY?.substring(0, 15),
+  hasDEV_SECRET: !!process.env.DEV_STRIPE_SECRET,
+  hasDEV_PUBLIC: !!process.env.DEV_STRIPE_PUBLIC,
+  DEV_SECRET_starts: process.env.DEV_STRIPE_SECRET?.substring(0, 15),
+  DEV_PUBLIC_starts: process.env.DEV_STRIPE_PUBLIC?.substring(0, 15),
 });
 
-// In development, prefer testing keys if available
-const STRIPE_SECRET_KEY = isDevelopment && process.env.TESTING_STRIPE_SECRET_KEY
-  ? process.env.TESTING_STRIPE_SECRET_KEY
+// In development, prefer testing keys if available (try new names first, then old names)
+const STRIPE_SECRET_KEY = isDevelopment && (process.env.DEV_STRIPE_SECRET || process.env.TESTING_STRIPE_SECRET_KEY)
+  ? (process.env.DEV_STRIPE_SECRET || process.env.TESTING_STRIPE_SECRET_KEY)
   : process.env.STRIPE_SECRET_KEY;
 
-const VITE_STRIPE_PUBLIC_KEY = isDevelopment && process.env.TESTING_VITE_STRIPE_PUBLIC_KEY
-  ? process.env.TESTING_VITE_STRIPE_PUBLIC_KEY
+const VITE_STRIPE_PUBLIC_KEY = isDevelopment && (process.env.DEV_STRIPE_PUBLIC || process.env.TESTING_VITE_STRIPE_PUBLIC_KEY)
+  ? (process.env.DEV_STRIPE_PUBLIC || process.env.TESTING_VITE_STRIPE_PUBLIC_KEY)
   : process.env.VITE_STRIPE_PUBLIC_KEY;
 
 const requiredStripeEnvVars = {

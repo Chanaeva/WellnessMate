@@ -27,9 +27,25 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminMembershipPlans from "@/pages/admin-membership-plans";
 
 import KioskCheckIn from "@/pages/kiosk-checkin";
+import KioskMemberCreation from "@/pages/kiosk-member-creation";
 import MembershipAgreement from "@/pages/membership-agreement";
 import StaffCheckIn from "@/pages/staff-checkin";
+import { useLocation } from "wouter";
 
+// Wrapper for KioskMemberCreation to provide required props
+function KioskMemberCreationWrapper() {
+  const [, setLocation] = useLocation();
+  
+  const handleBack = () => {
+    setLocation("/kiosk");
+  };
+  
+  const handleSuccess = () => {
+    setLocation("/kiosk");
+  };
+  
+  return <KioskMemberCreation onBack={handleBack} onSuccess={handleSuccess} />;
+}
 
 function Router() {
   return (
@@ -63,6 +79,7 @@ function Router() {
 
       <Route path="/kiosk" component={KioskCheckIn} />
       <Route path="/kiosk-checkin" component={KioskCheckIn} />
+      <Route path="/kiosk/member-creation" component={KioskMemberCreationWrapper} />
       
       {/* Landing page as default */}
       <Route path="/" component={LandingPage} />

@@ -85,35 +85,54 @@ function PaymentForm({ memberData, packageData, onSuccess, onBack }: {
       });
 
       if (error) {
+        console.error('❌ Payment error:', error);
         toast({
           title: "Payment Failed",
           description: error.message,
           variant: "destructive",
         });
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        console.log('✅ Payment succeeded, confirming member creation...', paymentIntent.id);
         // Payment succeeded, now create the member account
-        const confirmResponse = await apiRequest("POST", "/api/kiosk/confirm-member-creation", {
-          paymentIntentId: paymentIntent.id,
-          memberData,
-          packageData,
-        });
-        
-        if (confirmResponse.ok) {
-          toast({
-            title: "Member Created Successfully",
-            description: `${memberData.firstName} ${memberData.lastName} has been registered and payment processed.`,
+        try {
+          const confirmResponse = await apiRequest("POST", "/api/kiosk/confirm-member-creation", {
+            paymentIntentId: paymentIntent.id,
+            memberData,
+            packageData,
           });
-          onSuccess();
-        } else {
-          const errorData = await confirmResponse.json();
+          
+          console.log('📝 Confirm response status:', confirmResponse.status);
+          
+          if (confirmResponse.ok) {
+            const responseData = await confirmResponse.json();
+            console.log('🎉 Member created successfully:', responseData);
+            toast({
+              title: "Member Created Successfully",
+              description: `${memberData.firstName} ${memberData.lastName} has been registered and payment processed.`,
+            });
+            onSuccess();
+          } else {
+            const errorData = await confirmResponse.json();
+            console.error('❌ Confirm member creation failed:', errorData);
+            toast({
+              title: "Member Creation Failed",
+              description: errorData.message || "Failed to create member account",
+              variant: "destructive",
+            });
+          }
+        } catch (confirmError: any) {
+          console.error('❌ Error during confirm member creation:', confirmError);
           toast({
             title: "Member Creation Failed",
-            description: errorData.message || "Failed to create member account",
+            description: confirmError.message || "Failed to create member account",
             variant: "destructive",
           });
         }
+      } else {
+        console.warn('⚠️ Payment intent status not succeeded:', paymentIntent?.status);
       }
     } catch (error: any) {
+      console.error('❌ Payment processing error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to process payment",
@@ -148,7 +167,7 @@ function PaymentForm({ memberData, packageData, onSuccess, onBack }: {
           </div>
           <div className="flex justify-between font-semibold text-lg border-t pt-2">
             <span>Total:</span>
-            <span>${packageData.price}</span>
+            <span>${(packageData.price / 100).toFixed(2)}</span>
           </div>
         </div>
       </div>

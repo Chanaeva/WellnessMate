@@ -59,9 +59,14 @@ Preferred communication style: Simple, everyday language.
 ### Kiosk and Access Improvements
 - Fixed critical React hooks error in kiosk check-in (useEffect now called before conditional returns)
 - Made packages page publicly accessible (removed authentication requirement for browsing)
-- Updated Stripe configuration to prefer test keys in development
-- Added `/api/stripe/config` endpoint to dynamically provide Stripe public key to frontend
+- Added `/kiosk/member-creation` route to enable kiosk-based member registration with payment
+- Fixed price formatting bug in kiosk member creation (prices now display as $45.00 instead of $4500)
+- Added comprehensive logging to kiosk payment flow for debugging
 
-### Known Configuration Issues
-- **Stripe Testing**: The application is configured to use TESTING_STRIPE_SECRET_KEY and TESTING_VITE_STRIPE_PUBLIC_KEY environment variables in development, but these need to be set with actual Stripe test API keys (starting with `sk_test_` and `pk_test_`) for kiosk payment testing to work properly.
-- Until test keys are configured, kiosk member creation with payment will fail with "live mode, but used a known test card" errors.
+### Stripe Configuration (October 21, 2025)
+- **Development Environment**: Successfully configured Stripe test keys using `DEV_STRIPE_SECRET` and `DEV_STRIPE_PUBLIC` environment variables
+- **Test Keys**: Application now correctly uses Stripe test keys (sk_test_*, pk_test_*) in development
+- **Dynamic Key Loading**: `/api/stripe/config` endpoint dynamically provides correct Stripe public key to frontend
+- **Kiosk Payment Testing**: End-to-end testing confirmed successful payment processing with Stripe test cards
+- **Member Creation Flow**: Verified that kiosk member creation creates user accounts, activates memberships, and records payments correctly
+- **Note**: Production Stripe keys (STRIPE_SECRET_KEY, VITE_STRIPE_PUBLIC_KEY) should be configured separately for deployment

@@ -1667,6 +1667,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Site settings route (Admin only)
+  app.post("/api/admin/site-settings", isAdmin, async (req, res) => {
+    try {
+      const settings = req.body;
+      const settingsToSave = [
+        { section: 'footer', key: 'hoursOfOperation', value: settings.hoursOfOperation, isActive: true },
+        { section: 'footer', key: 'hoursMembers', value: settings.hoursMembers, isActive: true },
+        { section: 'footer', key: 'hoursDayPass', value: settings.hoursDayPass, isActive: true },
+        { section: 'footer', key: 'address', value: settings.address, isActive: true },
+        { section: 'footer', key: 'addressLine2', value: settings.addressLine2, isActive: true },
+        { section: 'footer', key: 'copyrightYear', value: settings.copyrightYear, isActive: true },
+        { section: 'footer', key: 'instagramHandle', value: settings.instagramHandle, isActive: true },
+      ];
+
+      // Delete existing footer settings
+      const existingFooterSettings = await storage.getLandingPageContentBySection('footer');
+      for (const setting of existingFooterSettings) {
+        await storage.deleteLandingPageContent(setting.id);
+      }
+
+      // Create new settings
+      for (const setting of settingsToSave) {
+        await storage.createLandingPageContent(setting);
+      }
+
+      res.json({ message: 'Site settings saved successfully' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public routes for landing page
   app.get("/api/promotions", async (req, res) => {
     try {

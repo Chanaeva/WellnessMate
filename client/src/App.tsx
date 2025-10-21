@@ -25,6 +25,7 @@ import AdminDashboard from "@/pages/admin/dashboard";
 import AdminMembers from "@/pages/admin/members";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminMembershipPlans from "@/pages/admin-membership-plans";
+import LandingPageManagement from "@/pages/admin/landing-page";
 
 import KioskCheckIn from "@/pages/kiosk-checkin";
 import KioskMemberCreation from "@/pages/kiosk-member-creation";
@@ -76,6 +77,7 @@ function Router() {
       <ProtectedRoute path="/admin/members" component={AdminMembers} />
       <ProtectedRoute path="/admin/notifications" component={AdminNotifications} />
       <ProtectedRoute path="/admin/membership-plans" component={AdminMembershipPlans} />
+      <ProtectedRoute path="/admin/landing-page" component={LandingPageManagement} />
 
       <Route path="/kiosk" component={KioskCheckIn} />
       <Route path="/kiosk-checkin" component={KioskCheckIn} />

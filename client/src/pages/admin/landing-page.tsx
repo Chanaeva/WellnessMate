@@ -525,58 +525,110 @@ export default function LandingPageManagement() {
                 <p className="text-muted-foreground">Loading content...</p>
               </div>
             ) : landingPageContent.length > 0 ? (
-              Object.keys(contentBySection).sort().map((section) => (
-                <div key={section} className="space-y-4">
-                  {/* Section Header */}
-                  <div className="border-b pb-2">
-                    <h4 className="text-lg font-semibold capitalize text-foreground">
-                      {section}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {contentBySection[section].length} content {contentBySection[section].length === 1 ? 'block' : 'blocks'}
-                    </p>
-                  </div>
-                  
-                  {/* Content Cards */}
-                  <div className="grid gap-3 pl-4">
-                    {contentBySection[section].map((content) => (
-                      <Card key={content.id} className="border-l-4 border-l-primary/30">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                          <div className="flex-1">
-                            <CardTitle className="flex items-center gap-2 text-base">
-                              <FileText className="h-4 w-4" />
-                              {content.key}
-                              <Badge variant={content.isActive ? "default" : "secondary"} className="text-xs">
-                                {content.isActive ? "Active" : "Inactive"}
-                              </Badge>
-                            </CardTitle>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditContent(content)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteContentMutation.mutate(content.id)}
-                              disabled={deleteContentMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+              Object.keys(contentBySection).sort().map((section) => {
+                const isFooter = section === 'footer';
+                
+                return (
+                  <div key={section} className="space-y-4">
+                    {/* Section Header */}
+                    <div className="border-b pb-2">
+                      <h4 className="text-lg font-semibold capitalize text-foreground">
+                        {section}
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {isFooter ? '1 content block' : `${contentBySection[section].length} content ${contentBySection[section].length === 1 ? 'block' : 'blocks'}`}
+                      </p>
+                    </div>
+                    
+                    {/* Content Cards */}
+                    {isFooter ? (
+                      // Footer: Display as single card with all fields
+                      <Card className="border-l-4 border-l-primary/30 pl-4">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <FileText className="h-4 w-4" />
+                            Footer Settings
+                            <Badge variant="outline" className="text-xs">
+                              {contentBySection[section].length} fields
+                            </Badge>
+                          </CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-0">
-                          <p className="text-sm text-muted-foreground">{content.value}</p>
+                        <CardContent className="space-y-3">
+                          {contentBySection[section].map((content) => (
+                            <div key={content.id} className="flex items-start justify-between border-b pb-2 last:border-0">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium text-foreground">{content.key}</span>
+                                  <Badge variant={content.isActive ? "default" : "secondary"} className="text-xs">
+                                    {content.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{content.value}</p>
+                              </div>
+                              <div className="flex gap-2 ml-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditContent(content)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteContentMutation.mutate(content.id)}
+                                  disabled={deleteContentMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
                         </CardContent>
                       </Card>
-                    ))}
+                    ) : (
+                      // Other sections: Display as individual cards
+                      <div className="grid gap-3 pl-4">
+                        {contentBySection[section].map((content) => (
+                          <Card key={content.id} className="border-l-4 border-l-primary/30">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                              <div className="flex-1">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                  <FileText className="h-4 w-4" />
+                                  {content.key}
+                                  <Badge variant={content.isActive ? "default" : "secondary"} className="text-xs">
+                                    {content.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </CardTitle>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditContent(content)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => deleteContentMutation.mutate(content.id)}
+                                  disabled={deleteContentMutation.isPending}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-0">
+                              <p className="text-sm text-muted-foreground">{content.value}</p>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-8 bg-muted/30 rounded-lg border-2 border-dashed">
                 <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />

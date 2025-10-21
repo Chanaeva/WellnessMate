@@ -85,8 +85,10 @@ Preferred communication style: Simple, everyday language.
 ### Page Content Tab Refactoring (October 21, 2025)
 - **Section-Based Organization**: Content blocks are now grouped and displayed by section with clear section headers
 - **All Content Display**: Page Content tab displays all landing page content blocks including footer (footer also has dedicated Site Settings tab for easier editing)
+- **Special Footer Display**: Footer displays as 1 content block with all fields shown together (not as separate cards)
 - **Improved UX**: 
   - Section headers show section name and count of content blocks
+  - Footer section shows "1 content block" with all 7 fields in a single card
   - Content cards have left border accent for visual hierarchy
   - Empty state provides clear guidance for creating first content block
 - **Data Structure**: Uses `landing_page_content` table with section/key/value structure for flexible content management

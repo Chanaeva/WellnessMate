@@ -3,6 +3,15 @@ import Stripe from "stripe";
 // Environment validation with test key support
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+// Debug: Log what we're seeing
+console.log('🔍 Environment Debug:', {
+  isDev: isDevelopment,
+  hasTESTING_SECRET: !!process.env.TESTING_STRIPE_SECRET_KEY,
+  hasTESTING_PUBLIC: !!process.env.TESTING_VITE_STRIPE_PUBLIC_KEY,
+  TESTING_SECRET_starts: process.env.TESTING_STRIPE_SECRET_KEY?.substring(0, 15),
+  TESTING_PUBLIC_starts: process.env.TESTING_VITE_STRIPE_PUBLIC_KEY?.substring(0, 15),
+});
+
 // In development, prefer testing keys if available
 const STRIPE_SECRET_KEY = isDevelopment && process.env.TESTING_STRIPE_SECRET_KEY
   ? process.env.TESTING_STRIPE_SECRET_KEY

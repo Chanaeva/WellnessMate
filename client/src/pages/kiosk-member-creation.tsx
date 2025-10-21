@@ -225,9 +225,9 @@ export default function KioskMemberCreation({ onBack, onSuccess }: {
     if (!packageId) return null;
     
     if (packageType === "membership") {
-      return membershipPlans.find(plan => plan.id.toString() === packageId);
+      return membershipPlans.find((plan: any) => plan.id.toString() === packageId);
     } else {
-      return punchCardTemplates.find(template => template.id.toString() === packageId);
+      return punchCardTemplates.find((template: any) => template.id.toString() === packageId);
     }
   };
 

@@ -93,3 +93,15 @@ Preferred communication style: Simple, everyday language.
   - Empty state provides clear guidance for creating first content block
 - **Data Structure**: Uses `landing_page_content` table with section/key/value structure for flexible content management
 - **Sections Support**: Manages content for all sections including footer, hero, features, benefits, partners, and other landing page sections
+
+### Database-Driven Landing Page Sections (October 21, 2025)
+- **Hero Section**: Converted from hardcoded to database-driven with 4 editable fields (title, subtitle, description, badgeText)
+- **Features Section**: Converted from hardcoded to database-driven with 8 fields (4 features × 2 fields each: title, description)
+- **Benefits Section**: Converted from hardcoded to database-driven with 6 fields (3 benefits × 2 fields each: title, description)
+- **Partners Section**: Converted from hardcoded to database-driven with 4 fields (2 partners × 2 fields each: name, description)
+- **Public Access**: All sections use public API endpoint `/api/landing-content/{section}` for unauthenticated access
+- **No Hardcoded Fallbacks**: All content comes exclusively from the database; no hardcoded text remains
+- **Icon Mappings**: Features and benefits use predefined icon arrays (Waves, Crown, Heart, Users, Shield) mapped by index
+- **Database Seeding**: Initial content seeded with 22 content blocks across all four sections
+- **Admin Management**: All sections fully editable through Admin > Landing Page > Page Content tab
+- **Testing**: End-to-end tests confirm all sections display correctly from database on both public landing page and admin interface

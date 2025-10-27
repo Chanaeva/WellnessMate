@@ -1335,16 +1335,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cart checkout with payment processing
   app.post("/api/checkout-with-payment", isAuthenticated, async (req, res) => {
     try {
-      const { items, totalAmount, paymentMethodId } = req.body;
+      const { items, paymentMethodId, promoCode } = req.body;
       const userId = req.user!.id;
 
       if (!paymentMethodId) {
         return res.status(400).json({ message: "Payment method is required" });
       }
 
-      // Create payment intent with Stripe
+      // Calculate subtotal from authoritative pricing (fetch from database)
+      let subtotal = 0;
+      const validatedItems: Array<{ type: string; data: any; quantity: number; price: number }> = [];
+      
+      for (const item of items) {
+        let itemPrice = 0;
+        
+        if (item.type === 'membership') {
+          // Fetch authoritative membership plan pricing from database
+          const plans = await storage.getAllMembershipPlans();
+          const plan = plans.find(p => p.planType === item.data?.planType);
+          
+          if (!plan) {
+            return res.status(400).json({ message: `Invalid membership plan: ${item.data?.planType}` });
+          }
+          
+          itemPrice = plan.monthlyPrice;
+          validatedItems.push({ type: 'membership', data: plan, quantity: 1, price: itemPrice });
+        } else if (item.type === 'punch_card') {
+          // Fetch authoritative punch card template pricing from database
+          const templates = await storage.getAllPunchCardTemplates();
+          const template = templates.find(t => t.id === item.data?.templateId);
+          
+          if (!template) {
+            return res.status(400).json({ message: `Invalid punch card template: ${item.data?.templateId}` });
+          }
+          
+          itemPrice = template.totalPrice;
+          const quantity = item.quantity || 1;
+          validatedItems.push({ type: 'punch_card', data: template, quantity, price: itemPrice });
+          subtotal += itemPrice * quantity;
+          continue; // Skip the subtotal addition below since we handled quantity here
+        }
+        
+        subtotal += itemPrice;
+      }
+
+      // Validate and apply promo code discount (server-side)
+      let discount = 0;
+      let validatedPromo = null;
+      if (promoCode && promoCode.code) {
+        try {
+          // Re-fetch promotion from database to ensure it's current and valid
+          const promotion = await storage.getPromotionByCode(promoCode.code);
+          
+          if (!promotion) {
+            return res.status(400).json({ message: "Invalid promo code" });
+          }
+
+          // Check if promotion is active
+          if (!promotion.isActive) {
+            return res.status(400).json({ message: "This promo code is no longer active" });
+          }
+
+          // Check if promotion is expired
+          if (promotion.validUntil) {
+            const expiryDate = new Date(promotion.validUntil);
+            if (expiryDate < new Date()) {
+              return res.status(400).json({ message: "This promo code has expired" });
+            }
+          }
+
+          // Calculate discount based on type
+          if (promotion.discountType === 'percentage') {
+            discount = Math.round(subtotal * (promotion.discountValue / 100));
+          } else if (promotion.discountType === 'fixed_amount') {
+            discount = Math.min(promotion.discountValue, subtotal); // Cap discount at subtotal
+          }
+
+          validatedPromo = promotion;
+        } catch (error) {
+          console.error('Error validating promo code:', error);
+          return res.status(400).json({ message: "Failed to validate promo code" });
+        }
+      }
+
+      // Calculate final amount (subtotal - discount, minimum $0.50 for Stripe)
+      const finalAmount = Math.max(50, subtotal - discount);
+
+      // Build metadata
+      const metadata: any = {
+        userId: userId.toString(),
+        itemCount: validatedItems.length.toString(),
+        subtotal: subtotal.toString(),
+        discount: discount.toString(),
+        finalAmount: finalAmount.toString()
+      };
+
+      // Add validated promo code to metadata
+      if (validatedPromo) {
+        metadata.promoCode = validatedPromo.code;
+        metadata.promoId = validatedPromo.id.toString();
+        metadata.discountType = validatedPromo.discountType;
+        metadata.discountValue = validatedPromo.discountValue.toString();
+      }
+
+      // Create payment intent with Stripe using server-calculated amount
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: totalAmount,
+        amount: finalAmount,
         currency: 'usd',
         customer: req.user!.stripeCustomerId || undefined,
         payment_method: paymentMethodId,
@@ -1353,21 +1449,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           enabled: true,
           allow_redirects: 'never'
         },
-        metadata: {
-          userId: userId.toString(),
-          itemCount: items.length.toString()
-        }
+        metadata
       });
 
       if (paymentIntent.status !== 'succeeded') {
         return res.status(400).json({ message: "Payment failed" });
       }
 
-      // Process each item in the cart
-      for (const item of items) {
-        if (item.type === 'membership') {
-          // Create or update membership
-          const planData = item.data;
+      // Process validated items (create memberships/punch cards)
+      const itemDescriptions: string[] = [];
+      for (const validatedItem of validatedItems) {
+        if (validatedItem.type === 'membership') {
+          // Create or update membership using validated plan data
+          const planData = validatedItem.data;
           const existingMembership = await storage.getMembershipByUserId(userId);
           
           const startDate = new Date().toISOString().split('T')[0];
@@ -1394,49 +1488,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
               autoRenew: true
             });
           }
-
-          // Create payment record
-          await storage.createPayment({
-            userId,
-            membershipId: "membership-purchase",
-            amount: planData.monthlyPrice || planData.price,
-            description: `${planData.name} - Monthly Membership`,
-            status: "successful",
-            method: "credit_card",
-            stripePaymentIntentId: paymentIntent.id,
-            stripePaymentMethodId: paymentMethodId
-          });
-        } else if (item.type === 'punch_card') {
-          // Create punch card
-          const cardData = item.data;
-          const quantity = item.quantity || 1;
+          itemDescriptions.push(`${planData.name} - Monthly Membership`);
+        } else if (validatedItem.type === 'punch_card') {
+          // Create punch cards using validated template data
+          const templateData = validatedItem.data;
+          const quantity = validatedItem.quantity;
           
           for (let i = 0; i < quantity; i++) {
             await storage.createPunchCard({
               userId,
-              templateId: cardData.templateId || null,
-              name: cardData.name,
-              totalPunches: cardData.totalPunches,
-              remainingPunches: cardData.totalPunches,
-              pricePerPunch: cardData.pricePerPunch,
-              totalPrice: cardData.totalPrice,
+              templateId: templateData.id,
+              name: templateData.name,
+              totalPunches: templateData.totalPunches,
+              remainingPunches: templateData.totalPunches,
+              pricePerPunch: templateData.pricePerPunch,
+              totalPrice: templateData.totalPrice,
               status: 'active'
             });
           }
-
-          // Create payment record for all punch cards
-          await storage.createPayment({
-            userId,
-            membershipId: "punchcard-purchase",
-            amount: cardData.totalPrice * quantity,
-            description: `${cardData.name} - Day Pass Package${quantity > 1 ? ` (x${quantity})` : ''}`,
-            status: "successful",
-            method: "credit_card",
-            stripePaymentIntentId: paymentIntent.id,
-            stripePaymentMethodId: paymentMethodId
-          });
+          itemDescriptions.push(`${templateData.name} - Day Pass Package${quantity > 1 ? ` (x${quantity})` : ''}`);
         }
       }
+
+      // Create single payment record with discounted amount
+      const paymentDescription = itemDescriptions.join(', ') + (validatedPromo ? ` (Promo: ${validatedPromo.code})` : '');
+      await storage.createPayment({
+        userId,
+        membershipId: "cart-purchase",
+        amount: finalAmount, // Use the server-calculated discounted amount
+        description: paymentDescription,
+        status: "successful",
+        method: "credit_card",
+        stripePaymentIntentId: paymentIntent.id,
+        stripePaymentMethodId: paymentMethodId,
+        promoCode: validatedPromo?.code || undefined
+      });
 
       res.json({ success: true, message: "Purchase completed successfully", paymentIntentId: paymentIntent.id });
     } catch (error: any) {
@@ -1705,6 +1791,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(promotions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Validate promo code
+  app.post("/api/validate-promo-code", async (req, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      // Get promotion by code
+      const promotion = await storage.getPromotionByCode(code.toUpperCase());
+      
+      if (!promotion) {
+        return res.status(404).json({ message: "Invalid promo code" });
+      }
+
+      // Check if promotion is active
+      if (!promotion.isActive) {
+        return res.status(400).json({ message: "This promo code is no longer active" });
+      }
+
+      // Check availability dates
+      const now = new Date();
+      if (promotion.availableFrom && new Date(promotion.availableFrom) > now) {
+        return res.status(400).json({ message: "This promo code is not yet available" });
+      }
+      if (promotion.availableUntil && new Date(promotion.availableUntil) < now) {
+        return res.status(400).json({ message: "This promo code has expired" });
+      }
+
+      // Return promotion details
+      res.json({
+        id: promotion.id,
+        title: promotion.title,
+        description: promotion.description,
+        code: promotion.code,
+        discountType: promotion.discountType,
+        discountValue: promotion.discountValue,
+        validUntil: promotion.validUntil,
+      });
+    } catch (error: any) {
+      console.error("Promo code validation error:", error);
+      res.status(500).json({ message: "Failed to validate promo code: " + error.message });
     }
   });
 

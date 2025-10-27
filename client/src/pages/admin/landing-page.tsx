@@ -145,6 +145,8 @@ export default function LandingPageManagement() {
       sortOrder: 0,
       availableFrom: undefined,
       availableUntil: undefined,
+      discountType: "percentage",
+      discountValue: 0,
       isActive: true,
     },
   });
@@ -317,10 +319,18 @@ export default function LandingPageManagement() {
   };
 
   const handlePromotionSubmit = (data: PromotionFormData) => {
+    // Convert fixed_amount from dollars to cents for storage
+    const submitData = {
+      ...data,
+      discountValue: data.discountType === 'fixed_amount' 
+        ? Math.round((data.discountValue || 0) * 100) 
+        : data.discountValue || 0,
+    };
+    
     if (editingPromotion) {
-      updatePromotionMutation.mutate({ id: editingPromotion.id, data });
+      updatePromotionMutation.mutate({ id: editingPromotion.id, data: submitData });
     } else {
-      createPromotionMutation.mutate(data);
+      createPromotionMutation.mutate(submitData);
     }
   };
 
@@ -341,6 +351,11 @@ export default function LandingPageManagement() {
     setHasPromotionAvailabilityDates(hasAvailability);
     setHasPromotionNoEndDate(!promotion.availableUntil && !!promotion.availableFrom);
     
+    // Convert fixed_amount from cents to dollars for display
+    const displayValue = promotion.discountType === 'fixed_amount' 
+      ? (promotion.discountValue || 0) / 100 
+      : promotion.discountValue || 0;
+    
     promotionForm.reset({
       title: promotion.title,
       description: promotion.description,
@@ -351,6 +366,8 @@ export default function LandingPageManagement() {
       sortOrder: promotion.sortOrder,
       availableFrom: promotion.availableFrom || undefined,
       availableUntil: promotion.availableUntil || undefined,
+      discountType: promotion.discountType || "percentage",
+      discountValue: displayValue,
       isActive: promotion.isActive,
     });
     setIsPromotionDialogOpen(true);
@@ -382,6 +399,8 @@ export default function LandingPageManagement() {
       sortOrder: 0,
       availableFrom: undefined,
       availableUntil: undefined,
+      discountType: "percentage",
+      discountValue: 0,
       isActive: true,
     });
     setIsPromotionDialogOpen(true);
@@ -718,6 +737,64 @@ export default function LandingPageManagement() {
                         )}
                       />
                     </div>
+                    
+                    <div className="space-y-3 border-t pt-4">
+                      <h4 className="text-sm font-medium">Discount Settings</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={promotionForm.control}
+                          name="discountType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Discount Type</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || "percentage"}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-discount-type">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                  <SelectItem value="fixed_amount">Fixed Amount ($)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={promotionForm.control}
+                          name="discountValue"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>
+                                {promotionForm.watch('discountType') === 'percentage' 
+                                  ? 'Discount (%)' 
+                                  : 'Discount ($)'}
+                              </FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number"
+                                  min="0"
+                                  max={promotionForm.watch('discountType') === 'percentage' ? 100 : undefined}
+                                  step={promotionForm.watch('discountType') === 'percentage' ? 1 : 0.01}
+                                  placeholder={promotionForm.watch('discountType') === 'percentage' ? '10' : '5.00'}
+                                  {...field}
+                                  value={field.value || 0}
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value) || 0;
+                                    field.onChange(value);
+                                  }}
+                                  data-testid="input-discount-value"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                    
                     <div className="space-y-3 border-t pt-4">
                       <div className="flex items-center space-x-2">
                         <input

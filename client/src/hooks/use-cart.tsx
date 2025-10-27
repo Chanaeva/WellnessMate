@@ -11,14 +11,29 @@ export interface CartItem {
   data?: any; // Store full plan/package data
 }
 
+export interface PromoCode {
+  id: number;
+  title: string;
+  description: string;
+  code: string;
+  discountType: 'percentage' | 'fixed_amount';
+  discountValue: number; // Percentage (0-100) or amount in cents
+  validUntil: string;
+}
+
 interface CartContextType {
   items: CartItem[];
+  promoCode: PromoCode | null;
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   getTotalPrice: () => number;
+  getSubtotal: () => number;
+  getDiscount: () => number;
   getItemCount: () => number;
+  applyPromoCode: (promo: PromoCode) => void;
+  removePromoCode: () => void;
   openCart: () => void;
   setCartOpenCallback: (callback: (() => void) | null) => void;
 }
@@ -27,6 +42,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [promoCode, setPromoCode] = useState<PromoCode | null>(null);
   const [cartOpenCallback, setCartOpenCallback] = useState<(() => void) | null>(null);
 
   const addItem = (newItem: CartItem) => {
@@ -81,27 +97,62 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => {
     setItems([]);
+    setPromoCode(null);
   };
 
-  const getTotalPrice = () => {
+  const getSubtotal = () => {
     return items.reduce((total, item) => {
       return total + (item.price * (item.quantity || 1));
     }, 0);
+  };
+
+  const getDiscount = () => {
+    if (!promoCode) return 0;
+
+    const subtotal = getSubtotal();
+    
+    if (promoCode.discountType === 'percentage') {
+      // Calculate percentage discount (discountValue is 0-100)
+      return Math.round((subtotal * promoCode.discountValue) / 100);
+    } else {
+      // Fixed amount discount (discountValue is in cents)
+      // Don't allow discount to exceed subtotal
+      return Math.min(promoCode.discountValue, subtotal);
+    }
+  };
+
+  const getTotalPrice = () => {
+    const subtotal = getSubtotal();
+    const discount = getDiscount();
+    return Math.max(0, subtotal - discount);
   };
 
   const getItemCount = () => {
     return items.reduce((count, item) => count + (item.quantity || 1), 0);
   };
 
+  const applyPromoCode = (promo: PromoCode) => {
+    setPromoCode(promo);
+  };
+
+  const removePromoCode = () => {
+    setPromoCode(null);
+  };
+
   return (
     <CartContext.Provider value={{
       items,
+      promoCode,
       addItem,
       removeItem,
       updateQuantity,
       clearCart,
       getTotalPrice,
+      getSubtotal,
+      getDiscount,
       getItemCount,
+      applyPromoCode,
+      removePromoCode,
       openCart,
       setCartOpenCallback
     }}>

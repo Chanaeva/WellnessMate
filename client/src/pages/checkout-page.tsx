@@ -23,7 +23,7 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
 
 export default function CheckoutPage() {
   const { user } = useAuth();
-  const { items, getTotalPrice, clearCart } = useCart();
+  const { items, promoCode, getTotalPrice, getSubtotal, getDiscount, clearCart } = useCart();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
@@ -83,7 +83,8 @@ export default function CheckoutPage() {
           data: item.data
         })),
         totalAmount: getTotalPrice(),
-        paymentMethodId: paymentMethods?.[0]?.stripePaymentMethodId
+        paymentMethodId: paymentMethods?.[0]?.stripePaymentMethodId,
+        promoCode: promoCode || undefined
       };
 
       const res = await apiRequest("POST", "/api/checkout-with-payment", cartData);
@@ -381,6 +382,27 @@ export default function CheckoutPage() {
                         <span>{formatPrice(item.price * (item.quantity || 1))}</span>
                       </div>
                     ))}
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatPrice(getSubtotal())}</span>
+                    </div>
+                    
+                    {promoCode && getDiscount() > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span className="flex items-center gap-1">
+                          <Badge variant="outline" className="text-xs border-green-200 bg-green-50 text-green-700">
+                            {promoCode.code}
+                          </Badge>
+                          Discount:
+                        </span>
+                        <span>-{formatPrice(getDiscount())}</span>
+                      </div>
+                    )}
                   </div>
                   
                   <Separator />

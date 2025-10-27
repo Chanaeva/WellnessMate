@@ -130,6 +130,7 @@ export interface IStorage {
   getAllPromotions(): Promise<Promotion[]>;
   getActivePromotions(): Promise<Promotion[]>;
   getPromotionById(id: number): Promise<Promotion | undefined>;
+  getPromotionByCode(code: string): Promise<Promotion | undefined>;
   createPromotion(promotion: InsertPromotion): Promise<Promotion>;
   updatePromotion(id: number, data: Partial<Promotion>): Promise<Promotion>;
   deletePromotion(id: number): Promise<void>;
@@ -916,6 +917,11 @@ export class DatabaseStorage implements IStorage {
 
   async getPromotionById(id: number): Promise<Promotion | undefined> {
     const [promotion] = await db.select().from(promotions).where(eq(promotions.id, id));
+    return promotion || undefined;
+  }
+
+  async getPromotionByCode(code: string): Promise<Promotion | undefined> {
+    const [promotion] = await db.select().from(promotions).where(eq(promotions.code, code));
     return promotion || undefined;
   }
 

@@ -47,6 +47,9 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 // Membership plan types enum
 export const planTypeEnum = pgEnum('plan_type', ['basic', 'premium', 'vip', 'daily']);
 
+// Discount type enum
+export const discountTypeEnum = pgEnum('discount_type', ['percentage', 'fixed_amount']);
+
 // Membership status enum
 export const membershipStatusEnum = pgEnum('membership_status', ['active', 'inactive', 'expired', 'frozen']);
 
@@ -184,6 +187,8 @@ export const promotions = pgTable("promotions", {
   sortOrder: integer("sort_order").notNull().default(0),
   availableFrom: timestamp("available_from"),
   availableUntil: timestamp("available_until"),
+  discountType: discountTypeEnum("discount_type").default('percentage'),
+  discountValue: integer("discount_value").default(0), // Percentage (0-100) or amount in cents
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -3,23 +3,94 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { ShoppingCart, Plus, Minus, Trash2, Tag, X } from "lucide-react";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CartSidebarProps {
   trigger?: React.ReactNode;
 }
 
 export function CartSidebar({ trigger }: CartSidebarProps) {
-  const { items, removeItem, updateQuantity, getTotalPrice, getItemCount, clearCart, setCartOpenCallback } = useCart();
+  const { 
+    items, 
+    promoCode,
+    removeItem, 
+    updateQuantity, 
+    getTotalPrice, 
+    getSubtotal,
+    getDiscount,
+    getItemCount, 
+    clearCart, 
+    applyPromoCode,
+    removePromoCode,
+    setCartOpenCallback 
+  } = useCart();
   const [isOpen, setIsOpen] = useState(false);
+  const [promoInput, setPromoInput] = useState("");
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const { toast } = useToast();
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
     }).format(price / 100);
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a promo code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsApplyingPromo(true);
+    try {
+      const res = await apiRequest("POST", "/api/validate-promo-code", {
+        code: promoInput.trim(),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        toast({
+          title: "Invalid Promo Code",
+          description: error.message || "This promo code is not valid",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const promo = await res.json();
+      applyPromoCode(promo);
+      setPromoInput("");
+      toast({
+        title: "Promo Code Applied!",
+        description: `${promo.title} - ${promo.description}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to apply promo code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    removePromoCode();
+    toast({
+      title: "Promo Code Removed",
+      description: "The promo code has been removed from your cart",
+    });
   };
 
   // Set up cart open callback
@@ -129,8 +200,76 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
 
               <Separator />
 
+              {/* Promo Code Section */}
+              <div className="space-y-3">
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <Tag className="h-4 w-4" />
+                  Promo Code
+                </div>
+                
+                {promoCode ? (
+                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <Tag className="h-4 w-4 text-green-600" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm text-green-700">
+                        {promoCode.code}
+                      </div>
+                      <div className="text-xs text-green-600">
+                        {promoCode.title}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={handleRemovePromo}
+                      data-testid="button-remove-promo"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter promo code"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
+                      className="text-sm"
+                      data-testid="input-promo-code"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleApplyPromo}
+                      disabled={isApplyingPromo}
+                      data-testid="button-apply-promo"
+                    >
+                      {isApplyingPromo ? "..." : "Apply"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
               {/* Cart Summary */}
               <div className="space-y-3">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>{formatPrice(getSubtotal())}</span>
+                  </div>
+                  {promoCode && getDiscount() > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount ({promoCode.code}):</span>
+                      <span>-{formatPrice(getDiscount())}</span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Total:</span>
                   <span className="font-bold text-lg">
@@ -140,7 +279,7 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
 
                 <div className="space-y-2">
                   <Link href="/checkout">
-                    <Button className="w-full wellness-button-primary">
+                    <Button className="w-full wellness-button-primary" data-testid="button-checkout">
                       Proceed to Checkout
                     </Button>
                   </Link>
@@ -148,6 +287,7 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
                     variant="outline" 
                     className="w-full" 
                     onClick={clearCart}
+                    data-testid="button-clear-cart"
                   >
                     Clear Cart
                   </Button>

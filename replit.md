@@ -105,3 +105,31 @@ Preferred communication style: Simple, everyday language.
 - **Database Seeding**: Initial content seeded with 22 content blocks across all four sections
 - **Admin Management**: All sections fully editable through Admin > Landing Page > Page Content tab
 - **Testing**: End-to-end tests confirm all sections display correctly from database on both public landing page and admin interface
+
+### Admin Members CRUD Operations (October 28, 2025)
+- **Complete CRUD Functionality**: Admin Members page now supports full Create, Read, Update, and Delete operations
+- **View Member Details Dialog**: 
+  - Tabbed interface with Overview, Payments, and Check-ins tabs
+  - Overview displays personal info and complete membership details
+  - Payments tab shows payment history with amounts, dates, and status badges
+  - Check-ins tab shows check-in history with locations, timestamps, and methods
+  - Loading states for async data
+- **Edit Member Dialog**:
+  - Two-section form: Personal Information + Membership Details
+  - Update user data (name, email, phone, username, role)
+  - Update membership data (status, plan type, start/end dates)
+  - Server-side validation and proper field mapping (phoneNumber, numeric membership IDs)
+- **Delete Member**:
+  - Confirmation dialog with member name warning
+  - Cascade deletion of all associated data
+  - Immediate UI update after deletion
+- **Search and Filters**: Search by name/email/ID, filter by status and plan type, 10 items/page pagination
+- **data-testid Attributes**: Comprehensive test IDs on all interactive elements for E2E testing
+- **API Endpoints**:
+  - GET `/api/admin/members` - List all members with memberships
+  - POST `/api/admin/create-member` - Create member with initial plan
+  - PUT `/api/admin/members/:id` - Update member details
+  - PATCH `/api/admin/memberships/:id` - Update membership
+  - DELETE `/api/admin/members/:id` - Delete member (cascade)
+  - GET `/api/admin/members/:id/payments` - Member payment history
+  - GET `/api/admin/members/:id/check-ins` - Member check-in history

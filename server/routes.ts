@@ -494,6 +494,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get member's payment history (Admin only)
+  app.get("/api/admin/members/:id/payments", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const payments = await storage.getPaymentsByUserId(memberId);
+      res.json(payments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get member's check-in history (Admin only)
+  app.get("/api/admin/members/:id/check-ins", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const checkIns = await storage.getCheckInsByUserId(memberId);
+      res.json(checkIns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all check-ins (with pagination)
   app.get("/api/admin/check-ins", isAdmin, async (req, res) => {
     try {

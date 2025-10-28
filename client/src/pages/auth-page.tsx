@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft, Calendar } from "lucide-react";
+import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft, Calendar, Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import { SMSResetForm } from "@/components/auth/sms-reset-form";
@@ -93,6 +93,9 @@ function AuthPage() {
   const [location, navigate] = useLocation();
   const isAdminLogin = location === "/admin-login";
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
 
   // Check URL parameters to set default tab
   useEffect(() => {
@@ -216,11 +219,14 @@ function AuthPage() {
           <Card className="wellness-card w-full">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-center mb-4">
-                <img
-                  src={logoMossGreen}
-                  alt="Wolf Mother Wellness"
-                  className="h-16 w-16"
-                />
+                <Link href="/" data-testid="link-logo-home">
+                  <img
+                    src={logoMossGreen}
+                    alt="Wolf Mother Wellness"
+                    className="h-16 w-16 cursor-pointer hover:opacity-80 transition-opacity"
+                    data-testid="img-logo"
+                  />
+                </Link>
               </div>
               <CardTitle className="text-xl sm:text-2xl md:text-3xl text-center font-heading">
                 {isAdminLogin ? "Admin Access" : "Wolf Mother Wellness"}
@@ -253,11 +259,12 @@ function AuthPage() {
                   </div>
                 )}
 
-                <TabsContent value="login">
+                <TabsContent value="login" data-testid="tab-content-login">
                   <Form {...loginForm}>
                     <form
                       onSubmit={loginForm.handleSubmit(onLoginSubmit)}
                       className="space-y-4"
+                      data-testid="form-login"
                     >
                       <FormField
                         control={loginForm.control}
@@ -272,6 +279,7 @@ function AuthPage() {
                                   type="email"
                                   placeholder="romulus@tiber.river"
                                   className="pl-10"
+                                  data-testid="input-login-email"
                                   {...field}
                                 />
                               </div>
@@ -290,10 +298,23 @@ function AuthPage() {
                               <div className="relative">
                                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  type="password"
-                                  className="pl-10"
+                                  type={showLoginPassword ? "text" : "password"}
+                                  className="pl-10 pr-10"
+                                  data-testid="input-login-password"
                                   {...field}
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                                  data-testid="button-toggle-login-password"
+                                >
+                                  {showLoginPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
                             </FormControl>
                             <FormMessage />
@@ -304,6 +325,7 @@ function AuthPage() {
                         type="submit"
                         className="w-full wellness-button-primary"
                         disabled={loginMutation.isPending}
+                        data-testid="button-login-submit"
                       >
                         {loginMutation.isPending ? (
                           <>
@@ -322,6 +344,7 @@ function AuthPage() {
                         <Button
                           variant="link"
                           className="text-sm text-muted-foreground p-0"
+                          data-testid="button-reset-email"
                         >
                           <Mail className="h-3 w-3 mr-1" />
                           Reset via Email
@@ -331,6 +354,7 @@ function AuthPage() {
                         variant="link"
                         onClick={() => setShowSMSReset(true)}
                         className="text-sm text-muted-foreground p-0"
+                        data-testid="button-reset-sms"
                       >
                         <Smartphone className="h-3 w-3 mr-1" />
                         Reset via SMS
@@ -344,6 +368,7 @@ function AuthPage() {
                             variant="link"
                             onClick={() => setActiveTab("register")}
                             className="p-0"
+                            data-testid="button-switch-to-register"
                           >
                             Register here
                           </Button>
@@ -375,11 +400,12 @@ function AuthPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="register">
+                <TabsContent value="register" data-testid="tab-content-register">
                   <Form {...registerForm}>
                     <form
                       onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
                       className="space-y-4"
+                      data-testid="form-register"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField
@@ -389,7 +415,7 @@ function AuthPage() {
                             <FormItem>
                               <FormLabel>First Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="Romulus" {...field} />
+                                <Input placeholder="Romulus" data-testid="input-register-firstname" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -402,7 +428,7 @@ function AuthPage() {
                             <FormItem>
                               <FormLabel>Last Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="Lupus" {...field} />
+                                <Input placeholder="Lupus" data-testid="input-register-lastname" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -422,6 +448,7 @@ function AuthPage() {
                                 <Input
                                   placeholder="+1 (777) WOLF-MOM"
                                   className="pl-10"
+                                  data-testid="input-register-phone"
                                   {...field}
                                 />
                               </div>
@@ -444,6 +471,7 @@ function AuthPage() {
                                   type="email"
                                   placeholder="romulus@tiber.river"
                                   className="pl-10"
+                                  data-testid="input-register-email"
                                   {...field}
                                 />
                               </div>
@@ -466,6 +494,7 @@ function AuthPage() {
                                   type="text"
                                   placeholder="MM/DD/YYYY"
                                   className="pl-10"
+                                  data-testid="input-register-dob"
                                   {...field}
                                 />
                               </div>
@@ -486,6 +515,7 @@ function AuthPage() {
                                 checked={field.value}
                                 onChange={field.onChange}
                                 className="mt-1"
+                                data-testid="checkbox-age-confirmation"
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
@@ -511,10 +541,23 @@ function AuthPage() {
                               <div className="relative">
                                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  type="password"
-                                  className="pl-10"
+                                  type={showRegisterPassword ? "text" : "password"}
+                                  className="pl-10 pr-10"
+                                  data-testid="input-register-password"
                                   {...field}
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                                  data-testid="button-toggle-register-password"
+                                >
+                                  {showRegisterPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
                             </FormControl>
                             <FormMessage />
@@ -532,10 +575,23 @@ function AuthPage() {
                               <div className="relative">
                                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                  type="password"
-                                  className="pl-10"
+                                  type={showRegisterConfirmPassword ? "text" : "password"}
+                                  className="pl-10 pr-10"
+                                  data-testid="input-register-confirm-password"
                                   {...field}
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowRegisterConfirmPassword(!showRegisterConfirmPassword)}
+                                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                                  data-testid="button-toggle-register-confirm-password"
+                                >
+                                  {showRegisterConfirmPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
                             </FormControl>
                             <FormMessage />
@@ -547,6 +603,7 @@ function AuthPage() {
                         type="submit"
                         className="w-full bg-primary hover:bg-primary/90"
                         disabled={registerMutation.isPending}
+                        data-testid="button-register-submit"
                       >
                         {registerMutation.isPending ? (
                           <>
@@ -566,6 +623,7 @@ function AuthPage() {
                         variant="link"
                         onClick={() => setActiveTab("login")}
                         className="p-0"
+                        data-testid="button-switch-to-login"
                       >
                         Login here
                       </Button>

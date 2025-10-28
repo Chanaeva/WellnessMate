@@ -27,7 +27,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock, User, Smartphone, ArrowLeft, Calendar, Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
-import { SMSResetForm } from "@/components/auth/sms-reset-form";
 
 // Login schema
 const loginSchema = z.object({
@@ -105,7 +104,6 @@ function AuthPage() {
       setActiveTab(tab);
     }
   }, []);
-  const [showSMSReset, setShowSMSReset] = useState(false);
 
   // Set ambient sound for auth page
   usePageAmbient('auth');
@@ -123,11 +121,6 @@ function AuthPage() {
     }
   }, [user, navigate, isAdminLogin]);
 
-  // Handle SMS reset success
-  const handleSMSResetSuccess = () => {
-    setShowSMSReset(false);
-    setActiveTab("login");
-  };
 
   // Login form
   const loginForm = useForm<LoginFormValues>({
@@ -194,22 +187,6 @@ function AuthPage() {
       }
     });
   };
-
-  // Show SMS reset form if requested
-  if (showSMSReset) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-            <SMSResetForm 
-              onBack={() => setShowSMSReset(false)}
-              onSuccess={handleSMSResetSuccess}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
@@ -339,27 +316,15 @@ function AuthPage() {
                     </form>
                   </Form>
                   <div className="text-center mt-4 space-y-2">
-                    <div className="flex justify-center gap-4">
-                      <Link href="/forgot-password">
-                        <Button
-                          variant="link"
-                          className="text-sm text-muted-foreground p-0"
-                          data-testid="button-reset-email"
-                        >
-                          <Mail className="h-3 w-3 mr-1" />
-                          Reset via Email
-                        </Button>
-                      </Link>
+                    <Link href="/forgot-password">
                       <Button
                         variant="link"
-                        onClick={() => setShowSMSReset(true)}
                         className="text-sm text-muted-foreground p-0"
-                        data-testid="button-reset-sms"
+                        data-testid="button-reset-password"
                       >
-                        <Smartphone className="h-3 w-3 mr-1" />
-                        Reset via SMS
+                        Forgot password?
                       </Button>
-                    </div>
+                    </Link>
                     {!isAdminLogin && (
                       <>
                         <p className="text-sm text-muted-foreground">

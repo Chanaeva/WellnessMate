@@ -162,8 +162,9 @@ function AuthPage() {
           navigate("/dashboard");
         }
       },
-      onError: () => {
+      onError: (error: Error) => {
         playError();
+        // Note: Toast notification is already handled by loginMutation in useAuth
       }
     });
   };
@@ -182,8 +183,9 @@ function AuthPage() {
           navigate(response.redirectTo);
         }
       },
-      onError: () => {
+      onError: (error: Error) => {
         playError();
+        // Note: Toast notification is already handled by registerMutation in useAuth
       }
     });
   };

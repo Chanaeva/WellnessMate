@@ -133,3 +133,22 @@ Preferred communication style: Simple, everyday language.
   - DELETE `/api/admin/members/:id` - Delete member (cascade)
   - GET `/api/admin/members/:id/payments` - Member payment history
   - GET `/api/admin/members/:id/check-ins` - Member check-in history
+
+### Auth Page Enhancements (October 28, 2025)
+- **Password Visibility Toggle**: Added Eye/EyeOff icon buttons to all password fields (login password, register password, register confirm password)
+  - Default state: passwords hidden (type="password")
+  - Click toggle: passwords visible (type="text")
+  - Visual feedback with icon change (Eye ↔ EyeOff)
+- **Logo Navigation**: Made Wolf Mother logo clickable on auth page
+  - Links to landing page (/)
+  - Hover effect with opacity transition
+  - Improves user navigation and brand consistency
+- **SMS Reset Removal**: Removed SMS password reset feature from login page
+  - Simplified password reset to email-only flow
+  - Single "Forgot password?" link that navigates to /forgot-password
+  - Removed SMS reset state, handler, and SMSResetForm component import
+- **Comprehensive Test Coverage**: Added data-testid attributes to all interactive elements
+  - Login form: email, password, submit button, password toggle
+  - Register form: all input fields, checkboxes, password toggles, submit button
+  - Navigation: logo link, tab switching buttons, password reset link
+  - Enables automated E2E testing with Playwright

@@ -24,7 +24,8 @@ import {
   Vibrate,
   WifiOff,
   ArrowLeft,
-  Copy
+  Copy,
+  Wallet
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +39,14 @@ export default function QRCodePage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [brightness, setBrightness] = useState(1);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [isGeneratingWalletPass, setIsGeneratingWalletPass] = useState(false);
   const qrCodeRef = useRef<HTMLDivElement>(null);
+
+  // Check if Apple Wallet is configured
+  const { data: walletStatus } = useQuery<{ configured: boolean; message: string }>({
+    queryKey: ['/api/wallet/status'],
+    enabled: !!user,
+  });
 
   // Check for offline capability
   useEffect(() => {
@@ -104,13 +112,52 @@ export default function QRCodePage() {
     }
   };
 
-  const addToWallet = () => {
-    // This would integrate with Apple Wallet or Google Pay in a real app
-    toast({
-      title: "Add to Wallet",
-      description: "Feature coming soon - save QR code to your device for now",
-      variant: "default",
-    });
+  const addToWallet = async () => {
+    if (!walletStatus?.configured) {
+      toast({
+        title: "Apple Wallet Not Available",
+        description: "Apple Wallet is not configured on this server. Contact support for assistance.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingWalletPass(true);
+    try {
+      const response = await apiRequest('POST', '/api/wallet/generate-pass');
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate pass');
+      }
+
+      // Get the pass file as a blob
+      const blob = await response.blob();
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${membership?.membershipId || 'wolf-mother'}.pkpass`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success!",
+        description: "Your Apple Wallet pass has been downloaded. Open the file to add it to your wallet.",
+      });
+    } catch (error) {
+      console.error('Error generating Apple Wallet pass:', error);
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Could not generate Apple Wallet pass",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingWalletPass(false);
+    }
   };
 
   // Fetch membership data
@@ -318,10 +365,24 @@ export default function QRCodePage() {
                               variant="outline" 
                               className="bg-neutral-light hover:bg-gray-200 flex items-center justify-center"
                               onClick={copyToClipboard}
+                              data-testid="button-copy-qr"
                             >
                               <Copy className="mr-2 h-4 w-4" /> 
                               Copy
                             </Button>
+
+                            {walletStatus?.configured && (
+                              <Button 
+                                variant="outline" 
+                                className="bg-neutral-light hover:bg-gray-200 flex items-center justify-center"
+                                onClick={addToWallet}
+                                disabled={isGeneratingWalletPass}
+                                data-testid="button-add-to-wallet"
+                              >
+                                <Wallet className="mr-2 h-4 w-4" /> 
+                                {isGeneratingWalletPass ? "Generating..." : "Add to Wallet"}
+                              </Button>
+                            )}
                             
                             {!isMobile && (
                               <>

@@ -152,3 +152,43 @@ Preferred communication style: Simple, everyday language.
   - Register form: all input fields, checkboxes, password toggles, submit button
   - Navigation: logo link, tab switching buttons, password reset link
   - Enables automated E2E testing with Playwright
+
+### Apple Wallet Integration (November 5, 2025)
+- **Apple Wallet Pass Generation**: Members can now add their check-in QR code to Apple Wallet
+  - Generates .pkpass files with embedded member QR code
+  - QR code in wallet works identically to the in-app QR code
+  - Pass includes member name, ID, status, and facility information
+  - Backend service uses `passkit-generator` library
+  - Secure certificate storage via environment variables
+- **Backend Implementation**:
+  - `WalletService` class handles pass generation
+  - API endpoints:
+    - POST `/api/wallet/generate-pass` - Generates and downloads .pkpass file
+    - GET `/api/wallet/status` - Checks if Apple Wallet is configured
+  - Graceful handling when certificates not configured
+  - QR code data format matches existing check-in system
+  - ES module compatible (uses fileURLToPath for __dirname)
+- **Frontend Integration**:
+  - "Add to Wallet" button on QR Code page
+  - Only displays when Apple Wallet is configured on server
+  - Shows loading state during pass generation
+  - Downloads .pkpass file automatically
+  - User-friendly error messages if feature unavailable
+  - data-testid="button-add-to-wallet" for E2E testing
+- **Setup Requirements** (documented in `server/wallet/SETUP_GUIDE.md`):
+  - Apple Developer account ($99/year)
+  - Pass Type ID certificate
+  - Required environment variables: APPLE_PASS_TYPE_ID, APPLE_TEAM_ID, APPLE_WWDR_CERT, APPLE_SIGNER_CERT, APPLE_SIGNER_KEY
+  - Optional: APPLE_CERT_PASSPHRASE
+  - Image assets: icon.png (29x29), icon@2x (58x58), icon@3x (87x87), logo.png (160x50), logo@2x (320x100), logo@3x (480x150)
+- **Security Features**:
+  - Certificates stored in environment variables (never in codebase)
+  - `.gitignore` includes certificate file patterns
+  - Certificate validation before pass generation
+  - User-facing error messages hide technical details
+- **File Structure**:
+  - `server/wallet/wallet-service.ts` - Pass generation service
+  - `server/wallet/models/MemberPass.pass/` - Pass template directory
+  - `server/wallet/models/MemberPass.pass/pass.json` - Pass configuration
+  - `server/wallet/SETUP_GUIDE.md` - Complete setup documentation
+  - `server/wallet/certs/` - Certificate storage (gitignored)

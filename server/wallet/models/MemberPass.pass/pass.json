@@ -1,0 +1,65 @@
+{
+  "formatVersion": 1,
+  "passTypeIdentifier": "pass.com.wolfmother.memberpass",
+  "teamIdentifier": "TEAM_ID_PLACEHOLDER",
+  "organizationName": "Wolf Mother Wellness",
+  "description": "Wolf Mother Wellness Member Pass",
+  "logoText": "Wolf Mother",
+  "foregroundColor": "rgb(255, 255, 255)",
+  "backgroundColor": "rgb(96, 108, 88)",
+  "labelColor": "rgb(255, 255, 255)",
+  "generic": {
+    "headerFields": [
+      {
+        "key": "status",
+        "label": "STATUS",
+        "value": "ACTIVE"
+      }
+    ],
+    "primaryFields": [
+      {
+        "key": "member",
+        "label": "MEMBER",
+        "value": "Member Name"
+      }
+    ],
+    "secondaryFields": [
+      {
+        "key": "membershipId",
+        "label": "MEMBERSHIP ID",
+        "value": "WM-000"
+      }
+    ],
+    "auxiliaryFields": [
+      {
+        "key": "facility",
+        "label": "FACILITY",
+        "value": "Wolf Mother Wellness"
+      }
+    ],
+    "backFields": [
+      {
+        "key": "instructions",
+        "label": "HOW TO USE",
+        "value": "Scan this QR code at the check-in kiosk when you arrive at Wolf Mother Wellness."
+      },
+      {
+        "key": "valid",
+        "label": "VALID",
+        "value": "This pass contains a dynamic QR code for daily check-in."
+      },
+      {
+        "key": "contact",
+        "label": "CONTACT",
+        "value": "For assistance, please contact staff at the facility."
+      }
+    ]
+  },
+  "barcodes": [
+    {
+      "message": "PLACEHOLDER_QR_DATA",
+      "format": "PKBarcodeFormatQR",
+      "messageEncoding": "iso-8859-1"
+    }
+  ]
+}

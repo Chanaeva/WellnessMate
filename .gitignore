@@ -4,3 +4,9 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Apple Wallet Certificates (NEVER commit these!)
+server/wallet/certs/
+*.pem
+*.p12
+*.cer

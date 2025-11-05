@@ -6,6 +6,7 @@ import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { stripe, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe, STRIPE_ENV_INFO } from "./stripe-config";
 import { setupStripeWebhooks } from "./stripe-webhooks";
+import { walletService } from "./wallet/wallet-service";
 
 const scryptAsync = promisify(scrypt);
 import { 
@@ -434,6 +435,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(500).json({ message: "Server error" });
     }
+  });
+
+  // Generate Apple Wallet pass for member
+  app.post("/api/wallet/generate-pass", isAuthenticated, async (req, res) => {
+    try {
+      // Check if Apple Wallet is configured
+      if (!walletService.isConfigured()) {
+        return res.status(503).json({ 
+          message: "Apple Wallet is not configured on this server. Please contact support.",
+          configured: false
+        });
+      }
+
+      const userId = req.user!.id;
+      const membership = await storage.getMembershipByUserId(userId);
+      
+      if (!membership) {
+        return res.status(404).json({ message: "No active membership found" });
+      }
+
+      // Generate QR code data (same format as the QR code page)
+      const qrCodeData = JSON.stringify({
+        type: "member_daily_checkin",
+        membershipId: membership.membershipId,
+        userId: userId,
+        date: new Date().toISOString().split('T')[0],
+        facility: "wolf_mother_wellness",
+        memberName: `${req.user!.firstName} ${req.user!.lastName}`,
+      });
+
+      // Generate the pass
+      const passBuffer = await walletService.generateMemberPass({
+        membershipId: membership.membershipId,
+        userId: userId,
+        firstName: req.user!.firstName,
+        lastName: req.user!.lastName,
+        status: membership.status,
+        qrCodeData: qrCodeData
+      });
+
+      // Send the pass file
+      res.set({
+        'Content-Type': 'application/vnd.apple.pkpass',
+        'Content-Disposition': `attachment; filename="${membership.membershipId}.pkpass"`
+      });
+      res.send(passBuffer);
+
+    } catch (error) {
+      console.error("Error generating Apple Wallet pass:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to generate Apple Wallet pass"
+      });
+    }
+  });
+
+  // Check Apple Wallet configuration status
+  app.get("/api/wallet/status", isAuthenticated, async (req, res) => {
+    res.json({ 
+      configured: walletService.isConfigured(),
+      message: walletService.isConfigured() 
+        ? "Apple Wallet is ready to use" 
+        : "Apple Wallet is not configured. Contact support to enable this feature."
+    });
   });
 
   // Admin routes

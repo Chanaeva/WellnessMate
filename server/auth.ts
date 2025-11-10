@@ -16,7 +16,7 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
@@ -190,10 +190,12 @@ export function setupAuth(app: Express) {
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
         
-        // Determine redirect based on user status
+        // Determine redirect based on user role and status
         let redirectTo = "/dashboard";
         if (userWithoutPassword.role === "admin") {
           redirectTo = "/admin";
+        } else if (userWithoutPassword.role === "staff") {
+          redirectTo = "/staff/check-in";
         } else if (!userWithoutPassword.membershipAgreementCompleted) {
           redirectTo = "/membership-agreement";
         }

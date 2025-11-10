@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth } from "./auth";
+import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { db } from "./db";
 import { scrypt, randomBytes } from "crypto";
@@ -21,6 +21,7 @@ import {
   insertNotificationSchema,
   insertUserSchema,
   insertPromotionSchema,
+  createStaffAdminSchema,
   users as usersTable
 } from "@shared/schema";
 import { z } from "zod";
@@ -52,6 +53,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.status(403).json({ message: "Forbidden" });
   };
+
+  // Admin-only: Create staff or admin account
+  app.post("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const staffAdminData = createStaffAdminSchema.parse(req.body);
+      
+      const existingEmail = await storage.getUserByEmail(staffAdminData.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      const hashedPassword = await hashPassword(staffAdminData.password);
+      
+      const user = await storage.createStaffAdmin({
+        ...staffAdminData,
+        password: hashedPassword,
+      });
+
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json({
+        message: "User created successfully",
+        user: userWithoutPassword,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors });
+      }
+      console.error("Error creating staff/admin account:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Admin-only: List all staff and admin accounts
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.listStaffAdmins();
+      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error listing staff/admin accounts:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
 
   // Get membership for current user
   app.get("/api/membership", isAuthenticated, async (req, res) => {

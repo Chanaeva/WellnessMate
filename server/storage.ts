@@ -18,7 +18,7 @@ import {
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, and, lt, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, lt, gte, lte, sql, or, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -34,6 +34,8 @@ export interface IStorage {
   updateUser(userId: number, data: Partial<User>): Promise<User>;
   updateUserPassword(userId: number, newPassword: string): Promise<User>;
   deleteUser(userId: number): Promise<void>;
+  createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string }): Promise<User>;
+  listStaffAdmins(): Promise<User[]>;
 
   // Password reset methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -230,6 +232,41 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string }): Promise<User> {
+    let username = data.email.split('@')[0];
+    let usernameExists = await this.getUserByUsername(username);
+    let suffix = 1;
+    
+    while (usernameExists) {
+      username = `${data.email.split('@')[0]}_${suffix}`;
+      usernameExists = await this.getUserByUsername(username);
+      suffix++;
+    }
+    
+    const [user] = await db
+      .insert(users)
+      .values({
+        username,
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role,
+        phoneNumber: data.phoneNumber,
+        membershipAgreementCompleted: true,
+        membershipAgreementDate: new Date(),
+      })
+      .returning();
+    return user;
+  }
+
+  async listStaffAdmins(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(inArray(users.role, ['staff', 'admin']));
   }
 
   async updateUserPassword(userId: number, newPassword: string): Promise<User> {

@@ -4,11 +4,23 @@ This guide will help you configure Apple Wallet passes for Wolf Mother Wellness 
 
 ## Prerequisites
 
-1. **Apple Developer Account** ($99/year)
-   - Sign up at https://developer.apple.com
-   - You'll need this to create pass certificates
+### 1. Apple Developer Account ($99/year)
+**IMPORTANT:** You must have one of these roles:
+- **Account Holder** (person who owns the account), OR
+- **Admin** (granted admin access by Account Holder)
 
-2. **Image Assets** (PNG files with transparent background)
+**Enrollment steps:**
+1. Sign up at https://developer.apple.com
+2. Click "Account" → "Join the Apple Developer Program"
+3. Complete enrollment (takes 1-2 business days for approval)
+4. Pay $99/year fee
+
+**Can't see certificates section?** 
+- Enrollment must be 100% complete and paid
+- Wait up to 10 minutes after approval for access
+- Individual accounts have full access; Organization accounts need admin role
+
+### 2. Image Assets (PNG files with transparent background)
    - `icon.png` (29x29px)
    - `icon@2x.png` (58x58px)
    - `icon@3x.png` (87x87px)
@@ -18,13 +30,31 @@ This guide will help you configure Apple Wallet passes for Wolf Mother Wellness 
 
 ## Step 1: Create Pass Type ID
 
-1. Go to https://developer.apple.com/account
-2. Navigate to **Certificates, Identifiers & Profiles**
-3. Select **Identifiers** → **+** (Add new)
-4. Choose **Pass Type IDs**
-5. Enter Description: "Wolf Mother Wellness Member Pass"
-6. Enter Identifier: `pass.com.wolfmother.memberpass`
-7. Click **Register**
+**Option A: Direct Link (Fastest)**
+1. Go directly to: https://developer.apple.com/account/resources/identifiers/passTypeId/add
+2. If prompted, log in with your Apple Developer account
+3. Fill in the form:
+   - Description: "Wolf Mother Wellness Member Pass"
+   - Identifier: `pass.com.wolfmother.memberpass`
+4. Click **Continue** → **Register**
+
+**Option B: Manual Navigation**
+1. Go to https://developer.apple.com
+2. Click **"Account"** (top right corner)
+3. Under "Program Resources", click **"Certificates, Identifiers & Profiles"**
+   - If you don't see this, check you're enrolled and paid
+4. In the left sidebar, click **"Identifiers"**
+5. Click the **"+" button** (top left, next to "Identifiers" title)
+6. Select **"Pass Type IDs"** from the list
+7. Click **Continue**
+8. Enter Description: "Wolf Mother Wellness Member Pass"
+9. Enter Identifier: `pass.com.wolfmother.memberpass`
+10. Click **Continue** → **Register**
+
+**Troubleshooting:**
+- **Don't see "Certificates, Identifiers & Profiles"?** Your enrollment isn't complete or you don't have the right role
+- **Don't see "Pass Type IDs" option?** Make sure you're in "Identifiers", not "Certificates"
+- **Can't click the "+" button?** You need Account Holder or Admin role
 
 ## Step 2: Generate Pass Certificate
 

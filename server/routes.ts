@@ -2,11 +2,13 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
+import { db } from "./db";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
 import { stripe, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe, STRIPE_ENV_INFO } from "./stripe-config";
 import { setupStripeWebhooks } from "./stripe-webhooks";
 import { walletService } from "./wallet/wallet-service";
+import { eq, or, sql } from "drizzle-orm";
 
 const scryptAsync = promisify(scrypt);
 import { 
@@ -18,7 +20,8 @@ import {
   insertPunchCardSchema,
   insertNotificationSchema,
   insertUserSchema,
-  insertPromotionSchema
+  insertPromotionSchema,
+  users as usersTable
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1263,34 +1266,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Manual check-in for staff
-  app.post("/api/admin/manual-checkin", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.sendStatus(401);
+  // Search members for manual check-in (by name, email, phone, or membership ID)
+  app.get("/api/admin/search-member", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
+      return res.sendStatus(403);
     }
     
     try {
-      const { membershipId } = req.body;
+      const { query } = req.query;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: "Search query required" });
+      }
+
+      const searchTerm = query.toLowerCase().trim();
       
-      // Find user by membership ID
-      const user = await storage.getUserByMembershipId(membershipId);
+      // Search users by name, email, or phone
+      const users = await db
+        .select()
+        .from(usersTable)
+        .where(
+          or(
+            sql`LOWER(${usersTable.firstName}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(${usersTable.lastName}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(${usersTable.email}) LIKE ${`%${searchTerm}%`}`,
+            sql`${usersTable.phoneNumber} LIKE ${`%${searchTerm}%`}`
+          )
+        )
+        .limit(10);
+
+      // For each user, get their membership and day pass info
+      const results = await Promise.all(users.map(async (user) => {
+        const membership = await storage.getMembershipByUserId(user.id);
+        const punchCards = await storage.getPunchCardsByUserId(user.id);
+        
+        const activeDayPasses = punchCards.filter(card => 
+          card.status === 'active' && card.remainingPunches > 0
+        );
+        
+        const totalDayPasses = activeDayPasses.reduce((sum, card) => sum + card.remainingPunches, 0);
+
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          membership: membership ? {
+            membershipId: membership.membershipId,
+            planType: membership.planType,
+            status: membership.status,
+            endDate: membership.endDate
+          } : null,
+          dayPasses: {
+            total: totalDayPasses,
+            packages: activeDayPasses.map(card => ({
+              id: card.id,
+              name: `${card.totalPunches}-Visit Pass`,
+              remaining: card.remainingPunches
+            }))
+          }
+        };
+      }));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Member search error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Manual check-in for staff (enhanced with day pass support)
+  app.post("/api/admin/manual-checkin", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const { userId, useDayPass } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Get user info
+      const user = await storage.getUserById(userId);
       if (!user) {
         return res.status(404).json({ message: "Member not found" });
+      }
+
+      // Get membership
+      const membership = await storage.getMembershipByUserId(userId);
+      
+      // Check if using day pass
+      if (useDayPass) {
+        const punchCards = await storage.getPunchCardsByUserId(userId);
+        const activeDayPasses = punchCards.filter(card => 
+          card.status === 'active' && card.remainingPunches > 0
+        );
+        
+        if (activeDayPasses.length === 0) {
+          return res.status(400).json({ message: "No day passes available" });
+        }
+        
+        // Use the oldest day pass
+        const oldestDayPass = activeDayPasses.sort((a, b) => 
+          new Date(a.purchasedAt || new Date()).getTime() - new Date(b.purchasedAt || new Date()).getTime()
+        )[0];
+        
+        await storage.usePunchCardEntry(oldestDayPass.id);
+        
+        // Create check-in record with day pass reference
+        const checkIn = await storage.createCheckIn({
+          userId: userId,
+          membershipId: `day-pass-${oldestDayPass.id}`,
+          location: 'Front Desk - Manual',
+          method: 'manual'
+        });
+
+        return res.status(201).json({ 
+          message: "Check-in successful using day pass",
+          checkIn,
+          member: { 
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email 
+          },
+          dayPassUsed: true,
+          remainingPasses: oldestDayPass.remainingPunches - 1
+        });
+      }
+
+      // Regular membership check-in
+      if (!membership) {
+        return res.status(404).json({ message: "Member has no membership" });
       }
 
       // Create check-in record  
       const checkIn = await storage.createCheckIn({
         userId: user.id,
-        membershipId: membershipId,
-        location: 'Front Desk - Manual'
+        membershipId: membership.membershipId,
+        location: 'Front Desk - Manual',
+        method: 'manual'
       });
 
       res.status(201).json({ 
         message: "Check-in successful",
         checkIn,
-        member: { username: user.username, email: user.email }
+        member: { 
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email 
+        }
       });
     } catch (error: any) {
+      console.error("Manual check-in error:", error);
       res.status(500).json({ message: error.message });
     }
   });

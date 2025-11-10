@@ -46,3 +46,37 @@ Preferred communication style: Simple, everyday language.
 - **SMS**: Twilio for SMS messaging (e.g., password reset functionality previously, now simplified to email for password reset).
 - **UI Components**: Radix UI primitives.
 - **Apple Wallet**: `passkit-generator` library for generating Apple Wallet passes.
+
+## Recent Updates
+
+### Enhanced Admin/Staff Account Management (November 10, 2025)
+- **Admin-Only Staff/Admin Creation**: Administrators can now create staff and admin accounts through a dedicated interface
+- **Backend Implementation**:
+  - POST `/api/admin/users` - Create staff or admin accounts (admin-only, requires authentication)
+  - GET `/api/admin/users` - List all staff and admin accounts (admin-only)
+  - Auto-generates usernames from email addresses (handles collisions with numeric suffixes)
+  - Validates email uniqueness before account creation
+  - Passwords hashed with scrypt before storage
+  - Staff/admin accounts bypass membership agreement workflow (auto-completed)
+  - Schema validation via `createStaffAdminSchema` (email, password, firstName, lastName, role, phoneNumber)
+- **Frontend Implementation** (`/admin/staff-management`):
+  - Admin-only page for creating and managing staff/admin accounts
+  - Creation dialog with React Hook Form + Zod validation
+  - Table view showing name, email, phone, role badge, and creation date
+  - Role selection: Staff or Admin
+  - TanStack Query integration for data fetching and mutations
+  - Comprehensive data-testid attributes for E2E testing
+- **Enhanced Login Experience**:
+  - Staff users now redirect to `/staff/check-in` after login (previously redirected to dashboard)
+  - Admin users redirect to `/admin` dashboard
+  - Member users redirect to `/dashboard` or `/membership-agreement` if incomplete
+- **Security Features**:
+  - Admin-only access enforced with `isAdmin` middleware
+  - Email as primary identifier (unique constraint enforced)
+  - No passwords returned in API responses
+  - Session-based authentication required for all operations
+- **User Management**:
+  - Auto-generated usernames from email prefix (e.g., john.doe@example.com → john.doe)
+  - Collision handling with numeric suffixes (john.doe_1, john.doe_2, etc.)
+  - Staff/admin accounts marked as membership agreement completed
+  - No age verification required for staff/admin accounts

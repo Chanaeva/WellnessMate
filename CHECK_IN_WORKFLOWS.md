@@ -151,22 +151,32 @@ This document outlines all in-person check-in methods for members and day pass h
 ```
 1. Staff member logs into system
 2. Navigates to Staff Check-In page
-3. Two options available:
+3. Three options available:
    
    OPTION A: QR Code Scan
    - Staff uses device camera to scan member's QR code
    - System auto-processes check-in (same validation as kiosk)
    - Success confirmation appears
    
-   OPTION B: Manual Entry
-   - Staff enters membership ID manually (e.g., "WM-123")
-   - Clicks "Check In" button
+   OPTION B: Manual Lookup (NEW)
+   - Staff searches for member by name, email, or phone
+   - Search is debounced (300ms) and requires 2+ characters
+   - Results show:
+     * Member name, email, phone
+     * Active membership status with plan type and expiration
+     * Day pass count (if any)
+   - Staff clicks "Check In" for active members
+   - Staff clicks "Use Day Pass" for day pass confirmation
    - System validates and processes
    - Success confirmation appears
+   
+   OPTION C: Backup Entry (Legacy)
+   - Currently disabled in favor of Manual Lookup
+   - Previously allowed manual membership ID entry
 
 4. System creates check-in record:
    - User ID
-   - Membership ID
+   - Membership ID (or day-pass-{id} for day pass check-ins)
    - Timestamp
    - Location: "Front Desk - Manual"
    - Method: "manual"
@@ -177,9 +187,76 @@ This document outlines all in-person check-in methods for members and day pass h
    - Check-in time
 ```
 
-**API Endpoint**: `POST /api/admin/manual-checkin`
+### Manual Lookup Flow (OPTION B Details)
+
+```
+SCENARIO 1: Active Membership Check-In
+1. Staff searches "jane" in Manual Lookup tab
+2. System searches members by name/email/phone containing "jane"
+3. Results show "Jane Doe" with:
+   - Active: Premium badge (green)
+   - "Until 2026-01-15"
+   - Check In button
+4. Staff clicks "Check In"
+5. ✅ Immediate check-in using membership ID
+6. Success message appears
+
+SCENARIO 2: Day Pass Check-In
+1. Staff searches for member
+2. Results show member with:
+   - Membership: expired badge (gray)
+   - "5 Day Passes" badge (blue)
+   - "Use Day Pass" button
+3. Staff clicks "Use Day Pass"
+4. ⚠️ Confirmation dialog appears:
+   - Shows member name
+   - Shows "5 day passes available"
+   - Shows "After check-in: 4 remaining"
+   - [Cancel] or [Confirm Check-in] buttons
+5. Staff clicks "Confirm Check-in"
+6. ✅ System deducts 1 day pass and completes check-in
+7. Success message appears
+8. Search results refresh with updated day pass count (4)
+
+SCENARIO 3: No Access Available
+1. Staff searches for member
+2. Results show member with:
+   - "No Active Access" badge (yellow)
+   - "No Access" button (disabled)
+3. Staff cannot check in member
+4. Staff directs member to purchase membership or day passes
+```
+
+**API Endpoints**:
+
+**Search Members**: `GET /api/staff/search-members?query={searchTerm}`
 **Authentication**: Required (staff or admin role)
-**Request**: `{ membershipId: "WM-XXX" }`
+**Response**: 
+```json
+[
+  {
+    "id": 123,
+    "username": "janedoe",
+    "email": "jane@example.com",
+    "phoneNumber": "555-1234",
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "membership": {
+      "membershipId": "WM-123",
+      "status": "active",
+      "planType": "premium",
+      "startDate": "2025-01-15",
+      "endDate": "2026-01-15"
+    },
+    "dayPassCount": 5
+  }
+]
+```
+
+**Manual Check-In**: `POST /api/admin/manual-checkin`
+**Authentication**: Required (staff or admin role)
+**Request (Membership)**: `{ membershipId: "WM-XXX", userId: 123 }`
+**Request (Day Pass)**: `{ userId: 123, useDayPass: true }`
 **Response**: 
 ```json
 {
@@ -452,4 +529,4 @@ punch_cards (
 
 ---
 
-*Last Updated: November 5, 2025*
+*Last Updated: November 10, 2025*

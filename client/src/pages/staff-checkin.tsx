@@ -1,46 +1,140 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, UserCheck, Clock, QrCode, Scan } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CheckCircle, UserCheck, Clock, QrCode, Search, User, Calendar, CreditCard, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { QRScanner } from "@/components/ui/qr-scanner";
+
+type MemberSearchResult = {
+  id: number;
+  username: string;
+  email: string;
+  phoneNumber: string | null;
+  firstName: string;
+  lastName: string;
+  membership?: {
+    membershipId: string;
+    status: string;
+    planType: string;
+    startDate: string;
+    endDate: string;
+  };
+  dayPassCount: number;
+};
 
 export default function StaffCheckIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastCheckIn, setLastCheckIn] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("scan");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+  const [showDayPassDialog, setShowDayPassDialog] = useState(false);
   const { toast } = useToast();
 
-  const processCheckIn = async (membershipId: string) => {
-    setIsLoading(true);
-    try {
-      const response = await apiRequest("POST", "/api/admin/manual-checkin", {
-        membershipId: membershipId,
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Search members query
+  const { data: searchResults, isLoading: isSearching } = useQuery<MemberSearchResult[]>({
+    queryKey: ['/api/staff/search-members', debouncedSearchTerm],
+    queryFn: async () => {
+      const response = await fetch(`/api/staff/search-members?query=${encodeURIComponent(debouncedSearchTerm)}`, {
+        credentials: 'include',
       });
-      
-      const result = await response.json();
-      
+      if (!response.ok) {
+        throw new Error('Failed to search members');
+      }
+      return response.json();
+    },
+    enabled: debouncedSearchTerm.length >= 2,
+  });
+
+  // Check-in mutation
+  const checkInMutation = useMutation({
+    mutationFn: async ({ membershipId, userId, useDayPass }: { membershipId?: string; userId?: number; useDayPass?: boolean }) => {
+      const response = await apiRequest("POST", "/api/admin/manual-checkin", {
+        membershipId,
+        userId,
+        useDayPass,
+      });
+      return response.json();
+    },
+    onSuccess: (result) => {
       setLastCheckIn({
         member: result.member,
         timestamp: new Date(),
-        membershipId: membershipId
+        membershipId: result.membershipId
       });
       
       toast({
         title: "Check-in Successful",
         description: `${result.member.username} has been checked in`,
       });
-    } catch (error: any) {
+      
+      // Invalidate search results to refresh day pass counts
+      queryClient.invalidateQueries({ queryKey: ['/api/staff/search-members'] });
+      
+      // Clear selected member and close dialogs
+      setSelectedMember(null);
+      setShowDayPassDialog(false);
+    },
+    onError: (error: any) => {
       toast({
         title: "Check-in Failed",
         description: error.message || "Unable to check in member",
         variant: "destructive",
       });
+    }
+  });
+
+  const processCheckIn = async (membershipId: string) => {
+    setIsLoading(true);
+    try {
+      await checkInMutation.mutateAsync({ membershipId });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleManualCheckIn = (member: MemberSearchResult, useDayPass: boolean = false) => {
+    if (useDayPass && member.dayPassCount === 0) {
+      toast({
+        title: "No Day Passes Available",
+        description: "This member has no remaining day passes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (useDayPass) {
+      setSelectedMember(member);
+      setShowDayPassDialog(true);
+    } else if (member.membership) {
+      checkInMutation.mutate({ 
+        membershipId: member.membership.membershipId,
+        userId: member.id 
+      });
+    }
+  };
+
+  const confirmDayPassCheckIn = () => {
+    if (selectedMember) {
+      checkInMutation.mutate({ 
+        userId: selectedMember.id,
+        useDayPass: true 
+      });
     }
   };
 
@@ -144,13 +238,13 @@ export default function StaffCheckIn() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="scan" className="flex items-center gap-2">
+                <TabsTrigger value="scan" className="flex items-center gap-2" data-testid="tab-qr-scan">
                   <QrCode className="h-4 w-4" />
                   Scan QR Code
                 </TabsTrigger>
-                <TabsTrigger value="manual" className="flex items-center gap-2">
-                  <Scan className="h-4 w-4" />
-                  Backup Entry
+                <TabsTrigger value="manual" className="flex items-center gap-2" data-testid="tab-manual-lookup">
+                  <Search className="h-4 w-4" />
+                  Manual Lookup
                 </TabsTrigger>
               </TabsList>
               
@@ -175,13 +269,142 @@ export default function StaffCheckIn() {
               <TabsContent value="manual" className="mt-6">
                 <div className="space-y-4">
                   <p className="text-sm text-gray-600 mb-4">
-                    Use this backup method only if QR scanning is not available:
+                    Search for a member by name, email, or phone number:
                   </p>
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      Manual entry is temporarily disabled. Please use QR code scanning for member check-ins.
-                    </p>
+                  
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search by name, email, or phone..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-member-search"
+                    />
                   </div>
+
+                  {/* Search Results */}
+                  {isSearching && (
+                    <div className="text-center py-8">
+                      <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p className="text-sm text-gray-600">Searching members...</p>
+                    </div>
+                  )}
+
+                  {debouncedSearchTerm.length >= 2 && !isSearching && searchResults && searchResults.length === 0 && (
+                    <div className="text-center py-8" data-testid="empty-search-results">
+                      <User className="h-12 w-12 mx-auto text-gray-300 mb-2" />
+                      <p className="text-sm text-gray-600">No members found matching "{debouncedSearchTerm}"</p>
+                    </div>
+                  )}
+
+                  {debouncedSearchTerm.length < 2 && !isSearching && (
+                    <div className="text-center py-8 text-gray-400">
+                      <Search className="h-12 w-12 mx-auto mb-2" />
+                      <p className="text-sm">Enter at least 2 characters to search</p>
+                    </div>
+                  )}
+
+                  {searchResults && searchResults.length > 0 && (
+                    <div className="space-y-3" data-testid="search-results-container">
+                      {searchResults.map((member) => (
+                        <Card key={member.id} className="hover:shadow-md transition-shadow" data-testid={`member-card-${member.id}`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-2">
+                                {/* Member Info */}
+                                <div>
+                                  <h3 className="font-semibold text-lg" data-testid={`member-name-${member.id}`}>
+                                    {member.firstName} {member.lastName}
+                                  </h3>
+                                  <p className="text-sm text-gray-600" data-testid={`member-email-${member.id}`}>
+                                    {member.email}
+                                  </p>
+                                  {member.phoneNumber && (
+                                    <p className="text-sm text-gray-600" data-testid={`member-phone-${member.id}`}>
+                                      {member.phoneNumber}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Membership Status */}
+                                {member.membership && member.membership.status === 'active' && (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge className="bg-green-100 text-green-800 border-green-200" data-testid={`membership-badge-${member.id}`}>
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Active: {member.membership.planType}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500" data-testid={`membership-dates-${member.id}`}>
+                                      Until {new Date(member.membership.endDate).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {member.membership && member.membership.status !== 'active' && (
+                                  <Badge variant="secondary" className="bg-gray-100 text-gray-600" data-testid={`membership-expired-${member.id}`}>
+                                    Membership: {member.membership.status}
+                                  </Badge>
+                                )}
+
+                                {/* Day Pass Info */}
+                                {member.dayPassCount > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="border-blue-300 text-blue-700" data-testid={`day-pass-badge-${member.id}`}>
+                                      <CreditCard className="h-3 w-3 mr-1" />
+                                      {member.dayPassCount} Day Pass{member.dayPassCount !== 1 ? 'es' : ''}
+                                    </Badge>
+                                  </div>
+                                )}
+
+                                {!member.membership && member.dayPassCount === 0 && (
+                                  <Badge variant="secondary" className="bg-yellow-50 text-yellow-700 border-yellow-300" data-testid={`no-access-badge-${member.id}`}>
+                                    <AlertCircle className="h-3 w-3 mr-1" />
+                                    No Active Access
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex flex-col gap-2">
+                                {member.membership && member.membership.status === 'active' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleManualCheckIn(member, false)}
+                                    disabled={checkInMutation.isPending}
+                                    data-testid={`button-checkin-${member.id}`}
+                                  >
+                                    <UserCheck className="h-4 w-4 mr-1" />
+                                    Check In
+                                  </Button>
+                                )}
+                                
+                                {member.dayPassCount > 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleManualCheckIn(member, true)}
+                                    disabled={checkInMutation.isPending}
+                                    data-testid={`button-use-day-pass-${member.id}`}
+                                  >
+                                    <CreditCard className="h-4 w-4 mr-1" />
+                                    Use Day Pass
+                                  </Button>
+                                )}
+
+                                {member.membership && member.membership.status !== 'active' && member.dayPassCount === 0 && (
+                                  <Button size="sm" variant="secondary" disabled data-testid={`button-no-access-${member.id}`}>
+                                    No Access
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
@@ -246,6 +469,50 @@ export default function StaffCheckIn() {
           </a>
         </div>
       </div>
+
+      {/* Day Pass Confirmation Dialog */}
+      <Dialog open={showDayPassDialog} onOpenChange={setShowDayPassDialog}>
+        <DialogContent data-testid="dialog-day-pass-confirm">
+          <DialogHeader>
+            <DialogTitle>Confirm Day Pass Usage</DialogTitle>
+            <DialogDescription>
+              This will use one day pass for the member's check-in.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMember && (
+            <div className="space-y-3 py-4">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Member</p>
+                <p className="font-semibold">{selectedMember.firstName} {selectedMember.lastName}</p>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-700">Day Passes Available</p>
+                <p className="text-2xl font-bold text-blue-900">{selectedMember.dayPassCount}</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  After check-in: {selectedMember.dayPassCount - 1} remaining
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDayPassDialog(false)}
+              disabled={checkInMutation.isPending}
+              data-testid="button-cancel-day-pass"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDayPassCheckIn}
+              disabled={checkInMutation.isPending}
+              data-testid="button-confirm-day-pass"
+            >
+              {checkInMutation.isPending ? "Processing..." : "Confirm Check-in"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

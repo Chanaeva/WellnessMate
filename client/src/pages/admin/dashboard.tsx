@@ -42,6 +42,7 @@ import PackagesManagement from "./packages";
 import AdminMembers from "./members";
 import AdminNotifications from "./notifications";
 import LandingPageManagement from "./landing-page";
+import AdminStaffManagement from "./staff-management";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -240,9 +241,10 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
+            <TabsTrigger value="staff">Staff</TabsTrigger>
             <TabsTrigger value="packages">Packages</TabsTrigger>
             <TabsTrigger value="landing-page">Landing Page</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -415,6 +417,11 @@ export default function AdminDashboard() {
           {/* Members Tab */}
           <TabsContent value="members" className="space-y-6">
             <AdminMembers />
+          </TabsContent>
+
+          {/* Staff Management Tab */}
+          <TabsContent value="staff" className="space-y-6">
+            <AdminStaffManagement />
           </TabsContent>
 
           {/* Package Management Tab */}

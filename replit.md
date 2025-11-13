@@ -12,11 +12,19 @@ Preferred communication style: Simple, everyday language.
 
 For development and testing purposes, use these pre-configured accounts:
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Admin** | admin@wolfmother.com | Admin123! |
-| **Staff** | staff@wolfmother.com | Staff123! |
-| **Member** | member@wolfmother.com | Member123! |
+**Admin & Staff** (Admin123! / Staff123!):
+- admin@wolfmother.com (Admin)
+- staff@wolfmother.com (Staff)
+
+**Members** (All use password: Member123!):
+- member@wolfmother.com - Active basic membership
+- expired@wolfmother.com - Expired membership
+- frozen@wolfmother.com - Frozen premium membership
+- inactive@wolfmother.com - Inactive membership
+- premium@wolfmother.com - Active premium membership
+- vip@wolfmother.com - Active VIP membership
+- newmember@wolfmother.com - No membership agreement
+- daypass@wolfmother.com - Day pass user (no membership)
 
 ### Database Management
 

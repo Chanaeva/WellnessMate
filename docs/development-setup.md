@@ -11,13 +11,27 @@ This guide explains how to set up your development database with test accounts.
 
 ### Test Accounts
 
-The seed script creates three test accounts for development:
+The seed script creates test accounts for various edge cases:
+
+#### Staff & Admin Accounts
 
 | Role | Email | Password |
 |------|-------|----------|
 | **Admin** | admin@wolfmother.com | Admin123! |
 | **Staff** | staff@wolfmother.com | Staff123! |
-| **Member** | member@wolfmother.com | Member123! |
+
+#### Member Accounts (All passwords: Member123!)
+
+| Email | Status | Type | Use Case |
+|-------|--------|------|----------|
+| member@wolfmother.com | Active | Basic | Standard active member |
+| expired@wolfmother.com | Expired | Basic | Test expired membership handling |
+| frozen@wolfmother.com | Frozen | Premium | Test frozen membership |
+| inactive@wolfmother.com | Inactive | Basic | Test inactive membership |
+| premium@wolfmother.com | Active | Premium | Test premium membership features |
+| vip@wolfmother.com | Active | VIP | Test VIP membership features |
+| newmember@wolfmother.com | N/A | N/A | No membership agreement completed |
+| daypass@wolfmother.com | N/A | None | Day pass user (no membership) |
 
 ### Seed Commands
 

@@ -12,7 +12,7 @@ import { sql } from "drizzle-orm";
  * Test Accounts Created:
  * - Admin: admin@wolfmother.com / Admin123!
  * - Staff: staff@wolfmother.com / Staff123!
- * - Member: member@wolfmother.com / Member123!
+ * - Members with various edge cases for testing
  */
 
 const TEST_ACCOUNTS = [
@@ -36,11 +36,12 @@ const TEST_ACCOUNTS = [
     role: "staff" as const,
     membershipAgreementCompleted: true,
   },
+  // Active member with basic membership
   {
-    username: "member_test",
+    username: "member_active",
     email: "member@wolfmother.com",
     password: "Member123!",
-    firstName: "Test",
+    firstName: "Active",
     lastName: "Member",
     phoneNumber: "918-555-0003",
     role: "member" as const,
@@ -50,6 +51,129 @@ const TEST_ACCOUNTS = [
     emergencyContact: "Emergency Contact",
     emergencyPhone: "918-555-0099",
     address: "123 Test St, Tulsa, OK 74103",
+    membershipType: "basic" as const,
+    membershipStatus: "active" as const,
+  },
+  // Member with expired membership
+  {
+    username: "member_expired",
+    email: "expired@wolfmother.com",
+    password: "Member123!",
+    firstName: "Expired",
+    lastName: "Member",
+    phoneNumber: "918-555-0004",
+    role: "member" as const,
+    membershipAgreementCompleted: true,
+    dateOfBirth: "1985-05-15",
+    ageConfirmation: true,
+    emergencyContact: "Emergency Contact",
+    emergencyPhone: "918-555-0098",
+    address: "456 Expired Ln, Tulsa, OK 74103",
+    membershipType: "basic" as const,
+    membershipStatus: "expired" as const,
+  },
+  // Member with frozen membership
+  {
+    username: "member_frozen",
+    email: "frozen@wolfmother.com",
+    password: "Member123!",
+    firstName: "Frozen",
+    lastName: "Member",
+    phoneNumber: "918-555-0005",
+    role: "member" as const,
+    membershipAgreementCompleted: true,
+    dateOfBirth: "1988-03-20",
+    ageConfirmation: true,
+    emergencyContact: "Emergency Contact",
+    emergencyPhone: "918-555-0097",
+    address: "789 Frozen Ave, Tulsa, OK 74103",
+    membershipType: "premium" as const,
+    membershipStatus: "frozen" as const,
+  },
+  // Member with inactive membership
+  {
+    username: "member_inactive",
+    email: "inactive@wolfmother.com",
+    password: "Member123!",
+    firstName: "Inactive",
+    lastName: "Member",
+    phoneNumber: "918-555-0006",
+    role: "member" as const,
+    membershipAgreementCompleted: true,
+    dateOfBirth: "1992-07-10",
+    ageConfirmation: true,
+    emergencyContact: "Emergency Contact",
+    emergencyPhone: "918-555-0096",
+    address: "321 Inactive Rd, Tulsa, OK 74103",
+    membershipType: "basic" as const,
+    membershipStatus: "inactive" as const,
+  },
+  // Member with premium membership
+  {
+    username: "member_premium",
+    email: "premium@wolfmother.com",
+    password: "Member123!",
+    firstName: "Premium",
+    lastName: "Member",
+    phoneNumber: "918-555-0007",
+    role: "member" as const,
+    membershipAgreementCompleted: true,
+    dateOfBirth: "1987-11-25",
+    ageConfirmation: true,
+    emergencyContact: "Emergency Contact",
+    emergencyPhone: "918-555-0095",
+    address: "654 Premium Blvd, Tulsa, OK 74103",
+    membershipType: "premium" as const,
+    membershipStatus: "active" as const,
+  },
+  // Member with VIP membership
+  {
+    username: "member_vip",
+    email: "vip@wolfmother.com",
+    password: "Member123!",
+    firstName: "VIP",
+    lastName: "Member",
+    phoneNumber: "918-555-0008",
+    role: "member" as const,
+    membershipAgreementCompleted: true,
+    dateOfBirth: "1995-02-14",
+    ageConfirmation: true,
+    emergencyContact: "Emergency Contact",
+    emergencyPhone: "918-555-0094",
+    address: "987 VIP Parkway, Tulsa, OK 74103",
+    membershipType: "vip" as const,
+    membershipStatus: "active" as const,
+  },
+  // New member without membership agreement completed
+  {
+    username: "member_new",
+    email: "newmember@wolfmother.com",
+    password: "Member123!",
+    firstName: "New",
+    lastName: "Member",
+    phoneNumber: "918-555-0009",
+    role: "member" as const,
+    membershipAgreementCompleted: false,
+    dateOfBirth: "1993-09-05",
+    ageConfirmation: false,
+  },
+  // Member with no membership (day pass user)
+  {
+    username: "member_daypass",
+    email: "daypass@wolfmother.com",
+    password: "Member123!",
+    firstName: "DayPass",
+    lastName: "User",
+    phoneNumber: "918-555-0010",
+    role: "member" as const,
+    membershipAgreementCompleted: true,
+    dateOfBirth: "1991-12-30",
+    ageConfirmation: true,
+    emergencyContact: "Emergency Contact",
+    emergencyPhone: "918-555-0093",
+    address: "159 DayPass St, Tulsa, OK 74103",
+    membershipType: null,
+    membershipStatus: null,
   },
 ];
 
@@ -61,7 +185,7 @@ async function seedTestAccounts() {
     console.log("\n📝 Creating test accounts...");
     
     for (const account of TEST_ACCOUNTS) {
-      const { password, ...accountData } = account;
+      const { password, membershipType, membershipStatus, ...accountData } = account;
       const hashedPassword = await hashPassword(password);
       
       try {
@@ -77,26 +201,43 @@ async function seedTestAccounts() {
         if (user) {
           console.log(`✅ Created ${account.role}: ${account.email}`);
           
-          // Create a test membership for the member account
-          if (account.role === "member") {
-            const startDate = new Date();
-            const endDate = new Date();
-            endDate.setMonth(endDate.getMonth() + 1); // 1 month membership
+          // Create a test membership for members (if membershipType is specified)
+          if (account.role === "member" && membershipType) {
+            const today = new Date();
+            let startDate = new Date(today);
+            let endDate = new Date(today);
+            
+            // Set dates based on status
+            if (membershipStatus === "expired") {
+              // Expired 30 days ago
+              startDate.setMonth(startDate.getMonth() - 2);
+              endDate.setMonth(endDate.getMonth() - 1);
+            } else if (membershipStatus === "active") {
+              // Started 15 days ago, ends in 15 days
+              startDate.setDate(startDate.getDate() - 15);
+              endDate.setMonth(endDate.getMonth() + 1);
+            } else if (membershipStatus === "frozen" || membershipStatus === "inactive") {
+              // Started 30 days ago, ends in future
+              startDate.setMonth(startDate.getMonth() - 1);
+              endDate.setMonth(endDate.getMonth() + 1);
+            }
             
             try {
               await db.insert(memberships).values({
                 userId: user.id,
                 membershipId: `MEM-${user.id}-${Date.now()}`,
-                planType: "basic",
-                status: "active",
+                planType: membershipType,
+                status: membershipStatus || "active",
                 startDate: startDate.toISOString().split('T')[0],
                 endDate: endDate.toISOString().split('T')[0],
-                autoRenew: true,
+                autoRenew: membershipStatus === "active",
               });
-              console.log(`   💳 Added basic membership for ${account.email}`);
+              console.log(`   💳 Added ${membershipType} ${membershipStatus || 'active'} membership for ${account.email}`);
             } catch (error) {
               console.log(`   ⚠️  Membership might already exist for ${account.email}`);
             }
+          } else if (account.role === "member" && !membershipType) {
+            console.log(`   ℹ️  No membership created for ${account.email} (day pass user)`);
           }
         } else {
           console.log(`⚠️  ${account.role} ${account.email} already exists`);
@@ -107,11 +248,18 @@ async function seedTestAccounts() {
     }
     
     console.log("\n✅ Database seeding complete!");
-    console.log("\n📋 Test Credentials:");
+    console.log("\n📋 Test Credentials (All passwords: Member123!):");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("Admin:  admin@wolfmother.com / Admin123!");
-    console.log("Staff:  staff@wolfmother.com / Staff123!");
-    console.log("Member: member@wolfmother.com / Member123!");
+    console.log("Admin:           admin@wolfmother.com");
+    console.log("Staff:           staff@wolfmother.com");
+    console.log("Member (Active): member@wolfmother.com");
+    console.log("Expired Member:  expired@wolfmother.com");
+    console.log("Frozen Member:   frozen@wolfmother.com");
+    console.log("Inactive Member: inactive@wolfmother.com");
+    console.log("Premium Member:  premium@wolfmother.com");
+    console.log("VIP Member:      vip@wolfmother.com");
+    console.log("New Member:      newmember@wolfmother.com (no agreement)");
+    console.log("Day Pass User:   daypass@wolfmother.com (no membership)");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     
   } catch (error) {

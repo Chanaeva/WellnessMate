@@ -6,6 +6,30 @@ Wolf Mother Wellness is a full-stack web application for managing a thermal well
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Development Environment
+
+### Test Accounts (Development Only)
+
+For development and testing purposes, use these pre-configured accounts:
+
+| Role | Email | Password |
+|------|-------|----------|
+| **Admin** | admin@wolfmother.com | Admin123! |
+| **Staff** | staff@wolfmother.com | Staff123! |
+| **Member** | member@wolfmother.com | Member123! |
+
+### Database Management
+
+**Seed Commands** (run from project root):
+- `npx tsx server/seed.ts reset` - Clean database and create test accounts (recommended)
+- `npx tsx server/seed.ts clean` - Remove all user data, keep configuration
+- `npx tsx server/seed.ts seed` - Create test accounts only
+
+**What Gets Cleaned**: Users, memberships, check-ins, payments, notifications
+**What's Preserved**: Membership plans, landing content, promotions
+
+⚠️ **Production Safety**: Never run seed commands in production. Always clean test data before publishing.
+
 ## System Architecture
 
 ### Frontend

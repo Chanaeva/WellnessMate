@@ -89,6 +89,56 @@ Once the database is seeded, you can:
    - Use: `member@wolfmother.com` / `Member123!`
    - Redirects to: `/dashboard`
 
+## Stripe Test Credit Cards
+
+When testing payment functionality in development mode, use these official Stripe test card numbers:
+
+### Successful Payments
+
+| Card Number | Brand | CVC | Expiry | ZIP |
+|-------------|-------|-----|--------|-----|
+| `4242 4242 4242 4242` | Visa | Any 3 digits | Any future date | Any 5 digits |
+| `4000 0566 5566 5556` | Visa (debit) | Any 3 digits | Any future date | Any 5 digits |
+| `5555 5555 5555 4444` | Mastercard | Any 3 digits | Any future date | Any 5 digits |
+| `2223 0031 2200 3222` | Mastercard (2-series) | Any 3 digits | Any future date | Any 5 digits |
+| `3782 822463 10005` | American Express | Any 4 digits | Any future date | Any 5 digits |
+| `6011 1111 1111 1117` | Discover | Any 3 digits | Any future date | Any 5 digits |
+
+### Testing Specific Scenarios
+
+| Card Number | Scenario |
+|-------------|----------|
+| `4000 0000 0000 9995` | Declined - Insufficient funds |
+| `4000 0000 0000 9987` | Declined - Lost card |
+| `4000 0000 0000 9979` | Declined - Stolen card |
+| `4000 0000 0000 0069` | Expired card error |
+| `4000 0000 0000 0127` | Incorrect CVC error |
+| `4000 0000 0000 0002` | Declined - Generic decline |
+
+### 3D Secure Authentication
+
+| Card Number | Authentication |
+|-------------|----------------|
+| `4000 0027 6000 3184` | Requires 3D Secure authentication |
+| `4000 0025 0000 3155` | Requires 3D Secure 2 authentication |
+
+### Important Notes
+
+- ✅ **All test cards work ONLY in test mode** (when using test API keys)
+- ✅ **Any future expiry date works** (e.g., 12/34, 01/30, etc.)
+- ✅ **Any 3-digit CVC works** (4 digits for Amex)
+- ✅ **Any valid ZIP code works** (e.g., 12345, 90210, etc.)
+- ⚠️ **Never use real credit card numbers in development**
+
+### Testing in the Application
+
+1. Log in as a member
+2. Navigate to checkout or payment page
+3. Use `4242 4242 4242 4242` for successful test payments
+4. Use other test cards to simulate different scenarios
+
+For more test cards and scenarios, visit: [Stripe Testing Documentation](https://stripe.com/docs/testing)
+
 ### Troubleshooting
 
 **"Account already exists" warnings**:

@@ -25,16 +25,17 @@ export class WalletService {
   }
 
   private checkCertificates(): boolean {
-    const hasWWDR = !!process.env.APPLE_WWDR_CERT;
-    const hasSignerCert = !!process.env.APPLE_SIGNER_CERT;
-    const hasSignerKey = !!process.env.APPLE_SIGNER_KEY;
+    const hasPassCert = !!process.env.APPLE_PASS_CERT;
+    const hasPassCertPassword = !!process.env.APPLE_PASS_CERT_PASSWORD;
     const hasPassTypeId = !!process.env.APPLE_PASS_TYPE_ID;
     const hasTeamId = !!process.env.APPLE_TEAM_ID;
 
-    this.certificatesConfigured = hasWWDR && hasSignerCert && hasSignerKey && hasPassTypeId && hasTeamId;
+    this.certificatesConfigured = hasPassCert && hasPassCertPassword && hasPassTypeId && hasTeamId;
     
     if (!this.certificatesConfigured) {
-      console.warn("Apple Wallet certificates not configured. See server/wallet/models/MemberPass.pass/README.md for setup instructions.");
+      console.warn("Apple Wallet certificates not configured. See docs/apple-wallet-setup.md for setup instructions.");
+    } else {
+      console.log("✅ Apple Wallet configured successfully!");
     }
 
     return this.certificatesConfigured;
@@ -50,12 +51,14 @@ export class WalletService {
     }
 
     try {
-      // Load certificates from environment variables
+      // Load .p12 certificate from environment variable (base64 encoded)
+      const p12Buffer = Buffer.from(process.env.APPLE_PASS_CERT || "", 'base64');
+      const passphrase = process.env.APPLE_PASS_CERT_PASSWORD || "";
+      
       const certificates = {
-        wwdr: Buffer.from(process.env.APPLE_WWDR_CERT || "", 'utf-8'),
-        signerCert: Buffer.from(process.env.APPLE_SIGNER_CERT || "", 'utf-8'),
-        signerKey: Buffer.from(process.env.APPLE_SIGNER_KEY || "", 'utf-8'),
-        signerKeyPassphrase: process.env.APPLE_CERT_PASSPHRASE || undefined
+        signerCert: p12Buffer,
+        signerKey: p12Buffer,
+        signerKeyPassphrase: passphrase
       };
 
       // Read the pass template

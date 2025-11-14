@@ -211,8 +211,20 @@ Optional:
 - `TWILIO_ACCOUNT_SID` - For SMS features
 - `TWILIO_AUTH_TOKEN` - For SMS features
 
+### Apple Wallet Integration (Optional)
+
+To enable Apple Wallet passes for member check-in QR codes:
+
+- `APPLE_PASS_TYPE_ID` - Your Apple Pass Type ID
+- `APPLE_TEAM_ID` - Your Apple Developer Team ID
+- `APPLE_PASS_CERT` - Base64 encoded .p12 certificate
+- `APPLE_PASS_CERT_PASSWORD` - Password for .p12 certificate
+
+⚠️ **Note**: Apple Wallet requires an active Apple Developer Program membership ($99/year). See [Apple Wallet Setup Guide](./apple-wallet-setup.md) for detailed certificate configuration instructions.
+
 ## Additional Resources
 
-- [Stripe Production Setup](./stripe-production-setup.md)
-- [Database Schema](../shared/schema.ts)
-- [API Routes](../server/routes.ts)
+- [Apple Wallet Setup Guide](./apple-wallet-setup.md) - Configure Apple Wallet passes
+- [Stripe Production Setup](./stripe-production-setup.md) - Production payment configuration
+- [Database Schema](../shared/schema.ts) - Schema definitions
+- [API Routes](../server/routes.ts) - Backend API endpoints

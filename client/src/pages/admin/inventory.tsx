@@ -22,17 +22,23 @@ import { z } from "zod";
 type InventoryItem = {
   id: number;
   name: string;
-  category: string;
-  size: string | null;
+  type: string;
+  size: string;
   quantityTotal: number;
   quantityAvailable: number;
   isActive: boolean;
-  description: string | null;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-const itemCategories = ["Robe", "Shoes", "Towel", "Locker", "Other"];
+const itemTypes = [
+  { value: "robe", label: "Robe" },
+  { value: "shoes", label: "Shoes" },
+  { value: "other", label: "Other" }
+];
+
+const itemSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '6', '7', '8', '9', '10', '11', '12', '13', '14', 'One Size'];
 
 export default function AdminInventory() {
   const { user } = useAuth();
@@ -51,12 +57,12 @@ export default function AdminInventory() {
     resolver: zodResolver(insertInventoryItemSchema),
     defaultValues: {
       name: "",
-      category: "Robe",
-      size: "",
+      type: "robe",
+      size: "One Size",
       quantityTotal: 0,
       quantityAvailable: 0,
       isActive: true,
-      description: "",
+      notes: "",
     },
   });
 
@@ -64,12 +70,12 @@ export default function AdminInventory() {
     resolver: zodResolver(insertInventoryItemSchema.partial()),
     defaultValues: {
       name: "",
-      category: "Robe",
-      size: "",
+      type: "robe",
+      size: "One Size",
       quantityTotal: 0,
       quantityAvailable: 0,
       isActive: true,
-      description: "",
+      notes: "",
     },
   });
 
@@ -143,8 +149,7 @@ export default function AdminInventory() {
   const handleCreate = (data: any) => {
     const payload = {
       ...data,
-      size: data.size || null,
-      description: data.description || null,
+      notes: data.notes || null,
     };
     createMutation.mutate(payload);
   };
@@ -153,8 +158,7 @@ export default function AdminInventory() {
     if (!editingItem) return;
     const payload = {
       ...data,
-      size: data.size || null,
-      description: data.description || null,
+      notes: data.notes || null,
     };
     updateMutation.mutate({ id: editingItem.id, data: payload });
   };
@@ -163,12 +167,12 @@ export default function AdminInventory() {
     setEditingItem(item);
     editForm.reset({
       name: item.name,
-      category: item.category,
-      size: item.size || "",
+      type: item.type,
+      size: item.size,
       quantityTotal: item.quantityTotal,
       quantityAvailable: item.quantityAvailable,
       isActive: item.isActive,
-      description: item.description || "",
+      notes: item.notes || "",
     });
   };
 
@@ -227,20 +231,20 @@ export default function AdminInventory() {
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={createForm.control}
-                          name="category"
+                          name="type"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Category</FormLabel>
+                              <FormLabel>Type</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
-                                  <SelectTrigger data-testid="select-create-category">
-                                    <SelectValue placeholder="Select category" />
+                                  <SelectTrigger data-testid="select-create-type">
+                                    <SelectValue placeholder="Select type" />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {itemCategories.map((cat) => (
-                                    <SelectItem key={cat} value={cat}>
-                                      {cat}
+                                  {itemTypes.map((type) => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -255,10 +259,21 @@ export default function AdminInventory() {
                           name="size"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Size (Optional)</FormLabel>
-                              <FormControl>
-                                <Input {...field} placeholder="L, M, S, etc." data-testid="input-create-size" />
-                              </FormControl>
+                              <FormLabel>Size</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-create-size">
+                                    <SelectValue placeholder="Select size" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {itemSizes.map((size) => (
+                                    <SelectItem key={size} value={size}>
+                                      {size}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -309,12 +324,12 @@ export default function AdminInventory() {
 
                       <FormField
                         control={createForm.control}
-                        name="description"
+                        name="notes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Description (Optional)</FormLabel>
+                            <FormLabel>Notes (Optional)</FormLabel>
                             <FormControl>
-                              <Textarea {...field} rows={3} data-testid="textarea-create-description" />
+                              <Textarea {...field} rows={3} data-testid="textarea-create-notes" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -370,7 +385,7 @@ export default function AdminInventory() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>Category</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead>Size</TableHead>
                         <TableHead>Available / Total</TableHead>
                         <TableHead>Status</TableHead>
@@ -381,8 +396,8 @@ export default function AdminInventory() {
                       {items.map((item) => (
                         <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                           <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell>{item.size || "-"}</TableCell>
+                          <TableCell className="capitalize">{item.type}</TableCell>
+                          <TableCell>{item.size}</TableCell>
                           <TableCell>
                             <span className={item.quantityAvailable === 0 ? "text-red-600" : ""}>
                               {item.quantityAvailable}
@@ -451,20 +466,20 @@ export default function AdminInventory() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
-                  name="category"
+                  name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel>Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-edit-category">
+                          <SelectTrigger data-testid="select-edit-type">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {itemCategories.map((cat) => (
-                            <SelectItem key={cat} value={cat}>
-                              {cat}
+                          {itemTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -480,9 +495,20 @@ export default function AdminInventory() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Size</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-edit-size" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-size">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {itemSizes.map((size) => (
+                            <SelectItem key={size} value={size}>
+                              {size}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -533,12 +559,12 @@ export default function AdminInventory() {
 
               <FormField
                 control={editForm.control}
-                name="description"
+                name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea {...field} rows={3} data-testid="textarea-edit-description" />
+                      <Textarea {...field} rows={3} data-testid="textarea-edit-notes" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

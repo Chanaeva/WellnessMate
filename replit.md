@@ -65,8 +65,9 @@ For development and testing purposes, use these pre-configured accounts:
 - **Authentication**: Session-based, secure password hashing (scrypt), role-based access control, password reset (email-only), and protected routes.
 - **Membership Management**: Multiple plan types, status tracking (active, inactive, expired, frozen), auto-renewal, upgrade/downgrade capabilities, one active membership per user, and 18+ age verification.
 - **Check-in System**: QR code generation, multiple check-in methods (QR scan, manual lookup by staff), real-time tracking, and day pass confirmation system. Integrates Apple Wallet for QR pass.
+- **Item Checkout System**: Front desk inventory management for tracking borrowed items (robes, shoes, towels, lockers). Admin CRUD operations for inventory, staff checkout/checkin workflows with member search, automatic availability tracking, and member dashboard display of checked-out items.
 - **Payment Integration**: Stripe for memberships and punch cards, payment method management, payment history, webhook handling, and automatic tax collection via Stripe Tax.
-- **Admin Dashboard**: Member management (CRUD, status toggle, role management), check-in monitoring, notification system, pricing/package management (CRUD for plans), and comprehensive landing page content management (footer, hero, features, benefits, partners sections are database-driven).
+- **Admin Dashboard**: Member management (CRUD, status toggle, role management), check-in monitoring, notification system, pricing/package management (CRUD for plans), inventory management (item CRUD, availability tracking), and comprehensive landing page content management (footer, hero, features, benefits, partners sections are database-driven).
 - **User Experience**: Immersive background music/sound effects, themed form placeholders, streamlined dashboard, consolidated payment/membership, promotional landing page with marketing cards.
 - **Registration Flow**: Two-step registration (account creation then membership agreement), simplified using email as primary identifier.
 
@@ -112,3 +113,39 @@ For development and testing purposes, use these pre-configured accounts:
   - Collision handling with numeric suffixes (john.doe_1, john.doe_2, etc.)
   - Staff/admin accounts marked as membership agreement completed
   - No age verification required for staff/admin accounts
+
+### Front Desk Item Checkout System (November 17, 2025)
+- **Complete Inventory Management**: Full CRUD system for tracking physical items that members can borrow (robes, shoes, towels, lockers, etc.)
+- **Database Schema** (`shared/schema.ts`):
+  - `inventory_items` table: Tracks item details, categories, sizes, total/available quantities, and active status
+  - `item_checkouts` table: Records checkout/checkin transactions with timestamps and user associations
+  - Atomic operations with row-level locking to prevent double-booking
+- **Backend Implementation** (`server/storage.ts`, `server/routes.ts`):
+  - Admin routes: POST/GET/PATCH/DELETE `/api/admin/inventory/items` for CRUD operations
+  - Staff routes: POST/GET/DELETE `/api/staff/item-checkouts` for checkout/checkin/lookup operations
+  - Member routes: GET `/api/member/item-checkouts` for viewing personal checkout history
+  - Transaction safeguards: `FOR UPDATE` row locks, availability validation, automated quantity tracking
+  - Zod schema validation on all routes with proper error handling
+- **Admin Inventory Page** (`/admin` → Inventory tab):
+  - Integrated into admin dashboard as dedicated tab (no standalone Header/Footer)
+  - Create/edit/delete inventory items with form validation
+  - Real-time availability tracking (e.g., "8/10 available")
+  - Category filtering (Robe, Shoes, Towel, Locker, Other)
+  - Active/inactive status toggle with badge indicators
+  - Comprehensive data-testid attributes for E2E testing
+- **Staff Checkout Page** (`/staff/items`):
+  - Dedicated route accessible from staff navigation
+  - Member search by email with real-time lookup
+  - Available items display with instant checkout capability
+  - Automatic inventory quantity updates on checkout/checkin
+  - Member's currently checked-out items table with one-click return
+  - Optimistic UI updates with TanStack Query cache invalidation
+- **Member Dashboard Integration**:
+  - "Items Checked Out" section displays currently borrowed items
+  - Shows item name, category, size, checkout timestamp
+  - Empty state messaging when no items checked out
+- **Technical Highlights**:
+  - Fixed checkbox onChange handlers to pass boolean values for Zod validation
+  - Removed duplicate Header/Footer structure from admin inventory component
+  - Row-level locking prevents concurrent checkout race conditions
+  - All operations properly invalidate React Query caches for real-time UI updates

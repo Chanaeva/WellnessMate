@@ -3,8 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { insertInventoryItemSchema } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import Header from "@/components/layout/header";
-import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, Package, Edit, Trash2 } from "lucide-react";
-import { Link } from "wouter";
+import { Plus, Edit, Trash2 } from "lucide-react";
 import { z } from "zod";
 
 type InventoryItem = {
@@ -177,36 +174,22 @@ export default function AdminInventory() {
 
   if (!user || user.role !== 'admin') {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-grow flex items-center justify-center">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-muted-foreground">Unauthorized. Admin access required.</p>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-muted-foreground">Unauthorized. Admin access required.</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Inventory Management</h1>
-              <p className="text-muted-foreground mt-2">
-                Manage robes, shoes, towels, and other items for member checkout
-              </p>
-            </div>
-            <Link href="/admin">
-              <Button variant="outline">Back to Admin</Button>
-            </Link>
-          </div>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Inventory Management</h2>
+        <p className="text-muted-foreground mt-2">
+          Manage robes, shoes, towels, and other items for member checkout
+        </p>
+      </div>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -347,7 +330,7 @@ export default function AdminInventory() {
                               <input 
                                 type="checkbox" 
                                 checked={field.value}
-                                onChange={field.onChange}
+                                onChange={(e) => field.onChange(e.target.checked)}
                                 className="h-4 w-4"
                                 data-testid="checkbox-create-active"
                               />
@@ -439,9 +422,6 @@ export default function AdminInventory() {
               )}
             </CardContent>
           </Card>
-        </div>
-      </main>
-      <Footer />
 
       {/* Edit Dialog */}
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
@@ -574,7 +554,7 @@ export default function AdminInventory() {
                       <input 
                         type="checkbox" 
                         checked={field.value}
-                        onChange={field.onChange}
+                        onChange={(e) => field.onChange(e.target.checked)}
                         className="h-4 w-4"
                         data-testid="checkbox-edit-active"
                       />

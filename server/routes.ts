@@ -2043,6 +2043,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin inventory management routes
+  app.get("/api/admin/inventory/items", isAdmin, async (req, res) => {
+    try {
+      const items = await storage.getAllInventoryItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/inventory/items", isAdmin, async (req, res) => {
+    try {
+      const { insertInventoryItemSchema } = await import("@shared/schema");
+      const validatedData = insertInventoryItemSchema.parse(req.body);
+      const item = await storage.createInventoryItem(validatedData);
+      res.status(201).json(item);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/inventory/items/:id", isAdmin, async (req, res) => {
+    try {
+      const { insertInventoryItemSchema } = await import("@shared/schema");
+      const id = parseInt(req.params.id);
+      const validatedData = insertInventoryItemSchema.partial().parse(req.body);
+      const item = await storage.updateInventoryItem(id, validatedData);
+      res.json(item);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/inventory/items/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteInventoryItem(id);
+      res.json({ message: "Item deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Staff checkout routes
+  const isStaffOrAdmin = (req: any, res: any, next: any) => {
+    if (req.isAuthenticated() && (req.user.role === 'staff' || req.user.role === 'admin')) {
+      return next();
+    }
+    res.status(403).json({ message: "Forbidden" });
+  };
+
+  app.get("/api/staff/inventory/items", isStaffOrAdmin, async (req, res) => {
+    try {
+      const items = await storage.getAllInventoryItems();
+      res.json(items.filter(item => item.isActive));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/staff/checkouts/active", isStaffOrAdmin, async (req, res) => {
+    try {
+      const checkouts = await storage.getActiveCheckouts();
+      res.json(checkouts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/staff/checkouts", isStaffOrAdmin, async (req, res) => {
+    try {
+      const checkoutDataSchema = z.object({
+        itemId: z.number().int().positive(),
+        userId: z.number().int().positive(),
+        notes: z.string().optional()
+      });
+      const validatedData = checkoutDataSchema.parse(req.body);
+      const checkout = await storage.checkoutItem({
+        ...validatedData,
+        checkedOutByStaffId: req.user!.id
+      });
+      res.status(201).json(checkout);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/staff/checkouts/:id/checkin", isStaffOrAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const checkinDataSchema = z.object({
+        notes: z.string().optional()
+      });
+      const validatedData = checkinDataSchema.parse(req.body);
+      const checkout = await storage.checkinItem(id, req.user!.id, validatedData.notes);
+      res.json(checkout);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Member checkout routes
+  app.get("/api/checkouts/my-items", isAuthenticated, async (req, res) => {
+    try {
+      const checkouts = await storage.getUserCheckouts(req.user!.id);
+      res.json(checkouts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Public routes for landing page
   app.get("/api/promotions", async (req, res) => {
     try {

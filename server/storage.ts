@@ -15,6 +15,8 @@ import {
   notifications, type Notification, type InsertNotification,
   landingPageContent, type LandingPageContent, type InsertLandingPageContent,
   promotions, type Promotion, type InsertPromotion,
+  inventoryItems, type InventoryItem, type InsertInventoryItem,
+  itemCheckouts, type ItemCheckout, type InsertItemCheckout,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -137,6 +139,20 @@ export interface IStorage {
   createPromotion(promotion: InsertPromotion): Promise<Promotion>;
   updatePromotion(id: number, data: Partial<Promotion>): Promise<Promotion>;
   deletePromotion(id: number): Promise<void>;
+
+  // Inventory item methods
+  getAllInventoryItems(): Promise<InventoryItem[]>;
+  getInventoryItemById(id: number): Promise<InventoryItem | undefined>;
+  createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
+  updateInventoryItem(id: number, data: Partial<InventoryItem>): Promise<InventoryItem>;
+  deleteInventoryItem(id: number): Promise<void>;
+  
+  // Item checkout methods
+  checkoutItem(data: { itemId: number, userId: number, checkedOutByStaffId: number, notes?: string }): Promise<ItemCheckout>;
+  checkinItem(checkoutId: number, checkedInByStaffId: number, notes?: string): Promise<ItemCheckout>;
+  getActiveCheckouts(): Promise<(ItemCheckout & { item?: InventoryItem, user?: User })[]>;
+  getUserCheckouts(userId: number): Promise<(ItemCheckout & { item?: InventoryItem })[]>;
+  getItemCheckoutHistory(itemId: number): Promise<(ItemCheckout & { user?: User })[]>;
   
   // Session store
   sessionStore: any;
@@ -986,6 +1002,207 @@ export class DatabaseStorage implements IStorage {
 
   async deletePromotion(id: number): Promise<void> {
     await db.delete(promotions).where(eq(promotions.id, id));
+  }
+
+  // Inventory item methods
+  async getAllInventoryItems(): Promise<InventoryItem[]> {
+    return await db.select().from(inventoryItems).orderBy(inventoryItems.type, inventoryItems.name);
+  }
+
+  async getInventoryItemById(id: number): Promise<InventoryItem | undefined> {
+    const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id));
+    return item || undefined;
+  }
+
+  async createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem> {
+    const [created] = await db
+      .insert(inventoryItems)
+      .values(item)
+      .returning();
+    return created;
+  }
+
+  async updateInventoryItem(id: number, data: Partial<InventoryItem>): Promise<InventoryItem> {
+    const [updated] = await db
+      .update(inventoryItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(inventoryItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInventoryItem(id: number): Promise<void> {
+    await db.delete(inventoryItems).where(eq(inventoryItems.id, id));
+  }
+
+  // Item checkout methods
+  async checkoutItem(data: { itemId: number, userId: number, checkedOutByStaffId: number, notes?: string }): Promise<ItemCheckout> {
+    // Use transaction to ensure atomicity
+    return await db.transaction(async (tx) => {
+      // Get item with lock
+      const [item] = await tx
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, data.itemId))
+        .for('update');
+
+      if (!item) {
+        throw new Error("Item not found");
+      }
+
+      if (!item.isActive) {
+        throw new Error("Item is not active");
+      }
+
+      if (item.quantityAvailable <= 0) {
+        throw new Error("Item not available for checkout - no items in stock");
+      }
+
+      // Decrease available quantity
+      const newQuantity = item.quantityAvailable - 1;
+      if (newQuantity < 0) {
+        throw new Error("Invalid quantity - cannot go below zero");
+      }
+
+      await tx
+        .update(inventoryItems)
+        .set({ 
+          quantityAvailable: newQuantity,
+          updatedAt: new Date()
+        })
+        .where(eq(inventoryItems.id, data.itemId));
+
+      // Create checkout record
+      const [checkout] = await tx
+        .insert(itemCheckouts)
+        .values({
+          itemId: data.itemId,
+          userId: data.userId,
+          checkedOutByStaffId: data.checkedOutByStaffId,
+          notes: data.notes,
+          status: 'checked_out'
+        })
+        .returning();
+
+      return checkout;
+    });
+  }
+
+  async checkinItem(checkoutId: number, checkedInByStaffId: number, notes?: string): Promise<ItemCheckout> {
+    // Use transaction to ensure atomicity
+    return await db.transaction(async (tx) => {
+      // Get checkout with lock
+      const [checkout] = await tx
+        .select()
+        .from(itemCheckouts)
+        .where(eq(itemCheckouts.id, checkoutId))
+        .for('update');
+
+      if (!checkout) {
+        throw new Error("Checkout not found");
+      }
+
+      if (checkout.status !== 'checked_out') {
+        throw new Error("Item already returned or not checked out");
+      }
+
+      // Get item with lock
+      const [item] = await tx
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.id, checkout.itemId))
+        .for('update');
+
+      if (!item) {
+        throw new Error("Item not found");
+      }
+
+      // Increase available quantity
+      const newQuantity = item.quantityAvailable + 1;
+      if (newQuantity > item.quantityTotal) {
+        throw new Error("Invalid quantity - cannot exceed total quantity");
+      }
+
+      await tx
+        .update(inventoryItems)
+        .set({ 
+          quantityAvailable: newQuantity,
+          updatedAt: new Date()
+        })
+        .where(eq(inventoryItems.id, checkout.itemId));
+
+      // Update checkout record
+      const [updated] = await tx
+        .update(itemCheckouts)
+        .set({
+          status: 'returned',
+          checkedInAt: new Date(),
+          checkedInByStaffId,
+          notes: notes || checkout.notes
+        })
+        .where(eq(itemCheckouts.id, checkoutId))
+        .returning();
+
+      return updated;
+    });
+  }
+
+  async getActiveCheckouts(): Promise<(ItemCheckout & { item?: InventoryItem, user?: User })[]> {
+    const checkouts = await db
+      .select()
+      .from(itemCheckouts)
+      .where(eq(itemCheckouts.status, 'checked_out'))
+      .orderBy(desc(itemCheckouts.checkedOutAt));
+
+    // Fetch related items and users
+    const enrichedCheckouts = await Promise.all(
+      checkouts.map(async (checkout) => {
+        const item = await this.getInventoryItemById(checkout.itemId);
+        const user = await this.getUserById(checkout.userId);
+        return { ...checkout, item, user };
+      })
+    );
+
+    return enrichedCheckouts;
+  }
+
+  async getUserCheckouts(userId: number): Promise<(ItemCheckout & { item?: InventoryItem })[]> {
+    const checkouts = await db
+      .select()
+      .from(itemCheckouts)
+      .where(and(
+        eq(itemCheckouts.userId, userId),
+        eq(itemCheckouts.status, 'checked_out')
+      ))
+      .orderBy(desc(itemCheckouts.checkedOutAt));
+
+    // Fetch related items
+    const enrichedCheckouts = await Promise.all(
+      checkouts.map(async (checkout) => {
+        const item = await this.getInventoryItemById(checkout.itemId);
+        return { ...checkout, item };
+      })
+    );
+
+    return enrichedCheckouts;
+  }
+
+  async getItemCheckoutHistory(itemId: number): Promise<(ItemCheckout & { user?: User })[]> {
+    const checkouts = await db
+      .select()
+      .from(itemCheckouts)
+      .where(eq(itemCheckouts.itemId, itemId))
+      .orderBy(desc(itemCheckouts.checkedOutAt));
+
+    // Fetch related users
+    const enrichedCheckouts = await Promise.all(
+      checkouts.map(async (checkout) => {
+        const user = await this.getUserById(checkout.userId);
+        return { ...checkout, user };
+      })
+    );
+
+    return enrichedCheckouts;
   }
 }
 

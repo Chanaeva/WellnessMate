@@ -500,3 +500,57 @@ export type InsertLandingPageContent = z.infer<typeof insertLandingPageContentSc
 
 export type Promotion = typeof promotions.$inferSelect;
 export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+
+// Inventory item type enum
+export const itemTypeEnum = pgEnum('item_type', ['robe', 'shoes', 'other']);
+
+// Inventory item size enum
+export const itemSizeEnum = pgEnum('item_size', ['XS', 'S', 'M', 'L', 'XL', 'XXL', '6', '7', '8', '9', '10', '11', '12', '13', '14', 'One Size']);
+
+// Checkout status enum
+export const checkoutStatusEnum = pgEnum('checkout_status', ['checked_out', 'returned', 'lost']);
+
+// Inventory items table
+export const inventoryItems = pgTable("inventory_items", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // e.g., "Terry Robe", "Spa Slippers"
+  type: itemTypeEnum("type").notNull(),
+  size: itemSizeEnum("size").notNull(),
+  quantityTotal: integer("quantity_total").notNull(), // Total items in inventory
+  quantityAvailable: integer("quantity_available").notNull(), // Currently available
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"), // Admin notes about the item
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+});
+
+// Item checkouts table
+export const itemCheckouts = pgTable("item_checkouts", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").notNull().references(() => inventoryItems.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  checkedOutByStaffId: integer("checked_out_by_staff_id").notNull().references(() => users.id),
+  checkedInByStaffId: integer("checked_in_by_staff_id").references(() => users.id),
+  checkedOutAt: timestamp("checked_out_at").notNull().defaultNow(),
+  checkedInAt: timestamp("checked_in_at"),
+  status: checkoutStatusEnum("status").notNull().default('checked_out'),
+  notes: text("notes"), // Staff notes
+});
+
+// Insert schemas for inventory
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertItemCheckoutSchema = createInsertSchema(itemCheckouts).omit({
+  id: true,
+  checkedOutAt: true,
+});
+
+// Types for inventory
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
+export type ItemCheckout = typeof itemCheckouts.$inferSelect;
+export type InsertItemCheckout = z.infer<typeof insertItemCheckoutSchema>;

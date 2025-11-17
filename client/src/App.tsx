@@ -27,11 +27,13 @@ import AdminNotifications from "@/pages/admin/notifications";
 import AdminMembershipPlans from "@/pages/admin-membership-plans";
 import LandingPageManagement from "@/pages/admin/landing-page";
 import AdminStaffManagement from "@/pages/admin/staff-management";
+import AdminInventory from "@/pages/admin/inventory";
 
 import KioskCheckIn from "@/pages/kiosk-checkin";
 import KioskMemberCreation from "@/pages/kiosk-member-creation";
 import MembershipAgreement from "@/pages/membership-agreement";
 import StaffCheckIn from "@/pages/staff-checkin";
+import StaffItems from "@/pages/staff-items";
 import { useLocation } from "wouter";
 
 // Wrapper for KioskMemberCreation to provide required props
@@ -72,6 +74,8 @@ function Router() {
 
       {/* Staff check-in - accessible to all authenticated users */}
       <ProtectedRoute path="/staff-checkin" component={StaffCheckIn} />
+      <ProtectedRoute path="/staff/check-in" component={StaffCheckIn} />
+      <ProtectedRoute path="/staff/items" component={StaffItems} />
       
       {/* Admin routes */}
       <ProtectedRoute path="/admin" component={AdminDashboard} />
@@ -80,6 +84,7 @@ function Router() {
       <ProtectedRoute path="/admin/membership-plans" component={AdminMembershipPlans} />
       <ProtectedRoute path="/admin/landing-page" component={LandingPageManagement} />
       <ProtectedRoute path="/admin/staff-management" component={AdminStaffManagement} />
+      <ProtectedRoute path="/admin/inventory" component={AdminInventory} />
 
       <Route path="/kiosk" component={KioskCheckIn} />
       <Route path="/kiosk-checkin" component={KioskCheckIn} />

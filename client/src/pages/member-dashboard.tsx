@@ -151,6 +151,12 @@ export default function MemberDashboard() {
     enabled: !!user,
   });
 
+  // Fetch checked-out items
+  const { data: checkedOutItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/checkouts/my-items"],
+    enabled: !!user,
+  });
+
   // Listen for purchase completion events from checkout page (after all queries are declared)
   useEffect(() => {
     // Listen for purchase completion events from checkout page
@@ -451,6 +457,42 @@ export default function MemberDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Checked Out Items */}
+            {checkedOutItems && checkedOutItems.length > 0 && (
+              <Card className="wellness-card">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading text-foreground flex items-center">
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Checked Out Items
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {checkedOutItems.map((checkout: any) => (
+                      <div 
+                        key={checkout.id} 
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                        data-testid={`member-checkout-${checkout.id}`}
+                      >
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {checkout.item?.name} {checkout.item?.size && `(${checkout.item.size})`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Checked out {new Date(checkout.checkedOutAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Out</Badge>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Return items to the front desk when you're done
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Plans and Packages Link - Show if no active membership */}
             {(!membership || membership.status !== "active") && (

@@ -272,24 +272,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const searchTerm = query.toLowerCase().trim();
+      let user = null;
+      let membershipId = null;
       
-      // Search by email or membership ID only (for security)
-      const users = await db
-        .select()
-        .from(usersTable)
-        .where(
-          or(
-            sql`LOWER(${usersTable.email}) = ${searchTerm}`,
-            sql`${usersTable.membershipId} = ${query.trim()}`
-          )
-        )
-        .limit(1);
-
-      if (users.length === 0) {
-        return res.status(404).json({ message: "Member not found" });
+      // Try to find by membership ID first
+      const userByMembershipId = await storage.getUserByMembershipId(query.trim());
+      if (userByMembershipId) {
+        user = userByMembershipId;
+        const membership = await storage.getMembershipByUserId(user.id);
+        membershipId = membership?.membershipId;
+      } else {
+        // If not found, try by email
+        const users = await db
+          .select()
+          .from(usersTable)
+          .where(sql`LOWER(${usersTable.email}) = ${searchTerm}`)
+          .limit(1);
+        
+        if (users.length > 0) {
+          user = users[0];
+          const membership = await storage.getMembershipByUserId(user.id);
+          membershipId = membership?.membershipId;
+        }
       }
 
-      const user = users[0];
+      if (!user) {
+        return res.status(404).json({ message: "Member not found" });
+      }
       
       // Return minimal info needed for check-in
       res.json({
@@ -297,7 +306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        membershipId: user.membershipId
+        membershipId: membershipId
       });
     } catch (error: any) {
       console.error("Kiosk member search error:", error);

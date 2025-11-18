@@ -149,3 +149,37 @@ For development and testing purposes, use these pre-configured accounts:
   - Removed duplicate Header/Footer structure from admin inventory component
   - Row-level locking prevents concurrent checkout race conditions
   - All operations properly invalidate React Query caches for real-time UI updates
+
+### Kiosk Check-In Improvements (November 18, 2025)
+- **Manual Entry Fallback**: Members can now check in using email or membership ID when QR scanning fails
+- **Backend Implementation** (`server/routes.ts`):
+  - GET `/api/kiosk/search-member?query={email|membershipId}` - Secure member lookup (email or membershipId only)
+  - Returns minimal member info: id, firstName, lastName, email, membershipId
+  - Case-insensitive email search, exact membership ID match
+  - 404 response for member not found
+- **Frontend Implementation** (`client/src/pages/kiosk-checkin.tsx`):
+  - Added manual-entry scanner mode with search input
+  - Debounced search (triggers after ≥3 characters)
+  - Visual feedback: Loading state ("Searching..."), success (green card with member info), error (red card with "Member not found")
+  - "Check In" button validates membershipId before proceeding
+  - Comprehensive data-testid attributes for E2E testing
+- **Streamlined State Machine**:
+  - Auto-resume: Success state auto-returns to "Ready to Check In" after 5 seconds
+  - Auto-resume: Error state auto-returns to "Ready to Check In" after 4 seconds
+  - Fixed day pass confirmation UI with explicit "Use Membership" and "Use Day Pass" buttons
+  - Proper scanner lifecycle management: await scanner.clear() before re-initialization
+  - Query lifecycle safeguards prevent empty/invalid searches
+- **Buy Day Pass Flow**:
+  - "Buy Day Pass" button redirects to existing member creation flow (supports day pass purchases)
+  - Simplified SelectItem components (removed nested divs/icons for accessibility)
+- **Security & Performance**:
+  - Manual search restricted to email/membershipId only (prevents broad data exposure)
+  - Query only enabled when scannerMode === 'manual-entry' and valid search term
+  - staleTime: 0 and gcTime: 0 prevent stale query caching
+  - Proper DOM cleanup prevents scanner canvas leaks
+- **E2E Testing**:
+  - ✅ Manual entry by email: Search → Display → Check-in → Success
+  - ✅ Member not found error handling with visual feedback
+  - ✅ Auto-resume functionality after success/error
+  - ✅ All kiosk navigation buttons functional
+  - ⚠️ QR scanning not testable in headless Playwright (expected limitation)

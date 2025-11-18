@@ -22,7 +22,9 @@ import {
   insertUserSchema,
   insertPromotionSchema,
   createStaffAdminSchema,
-  users as usersTable
+  users as usersTable,
+  hoursOfOperation,
+  insertHoursOfOperationSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -2017,6 +2019,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       await storage.deleteLandingPageContent(id);
       res.json({ message: "Content deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Hours of Operation routes (Admin only)
+  app.get("/api/admin/hours-of-operation", isAdmin, async (req, res) => {
+    try {
+      const hours = await db.select().from(hoursOfOperation);
+      res.json(hours);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/admin/hours-of-operation/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertHoursOfOperationSchema.parse(req.body);
+      
+      const [updated] = await db
+        .update(hoursOfOperation)
+        .set(validatedData)
+        .where(eq(hoursOfOperation.id, id))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Hours not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public hours of operation endpoint
+  app.get("/api/hours-of-operation", async (req, res) => {
+    try {
+      const hours = await db.select().from(hoursOfOperation);
+      res.json(hours);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

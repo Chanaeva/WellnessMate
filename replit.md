@@ -183,3 +183,30 @@ For development and testing purposes, use these pre-configured accounts:
   - ✅ Auto-resume functionality after success/error
   - ✅ All kiosk navigation buttons functional
   - ⚠️ QR scanning not testable in headless Playwright (expected limitation)
+
+### Weekly Hours of Operation Management (November 18, 2025)
+- **Enhanced Hours Management**: Administrators can now set different hours for each day of the week
+- **Database Schema** (`shared/schema.ts`):
+  - `hours_of_operation` table: Tracks daily schedules with day_of_week enum (Monday-Sunday)
+  - Columns: open_time, close_time, members_only_start, members_only_end, is_closed (boolean)
+  - Seeded with default hours for all 7 days
+- **Backend Implementation** (`server/routes.ts`):
+  - GET `/api/admin/hours-of-operation` - Fetch all weekly hours (admin-only)
+  - PUT `/api/admin/hours-of-operation/:id` - Update specific day hours (admin-only)
+  - GET `/api/hours-of-operation` - Public endpoint for landing page display
+  - Zod validation with insertHoursOfOperationSchema
+- **Admin UI** (`/admin/landing-page` → Settings tab):
+  - Weekly schedule editor with day-by-day cards
+  - Each day shows: open/close time, members-only hours, closed toggle
+  - Optimistic UI updates with onBlur save for time inputs
+  - Switch component for marking days as closed (hides time inputs when closed)
+  - Real-time updates with TanStack Query cache invalidation
+- **Landing Page Footer** (`/` footer):
+  - Displays weekly hours schedule instead of simple text
+  - Format: "Monday: 6:00 AM - 10:00 PM" or "Sunday: Closed"
+  - Graceful fallback to legacy format if no data
+- **E2E Testing**:
+  - ✅ Admin can update hours for each day
+  - ✅ Closed toggle works and hides time inputs
+  - ✅ Changes reflected on landing page footer
+  - ✅ Weekly schedule displays correctly for all 7 days

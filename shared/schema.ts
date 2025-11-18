@@ -554,3 +554,28 @@ export type InventoryItem = typeof inventoryItems.$inferSelect;
 export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
 export type ItemCheckout = typeof itemCheckouts.$inferSelect;
 export type InsertItemCheckout = z.infer<typeof insertItemCheckoutSchema>;
+
+// Day of week enum for hours of operation
+export const dayOfWeekEnum = pgEnum('day_of_week', ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+
+// Hours of operation table
+export const hoursOfOperation = pgTable("hours_of_operation", {
+  id: serial("id").primaryKey(),
+  dayOfWeek: dayOfWeekEnum("day_of_week").notNull().unique(),
+  openTime: text("open_time").notNull(), // e.g., "6:00 AM"
+  closeTime: text("close_time").notNull(), // e.g., "10:00 PM"
+  membersOnlyStart: text("members_only_start"), // e.g., "6:00 AM"
+  membersOnlyEnd: text("members_only_end"), // e.g., "9:00 AM"
+  isClosed: boolean("is_closed").notNull().default(false),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+// Insert schema for hours of operation
+export const insertHoursOfOperationSchema = createInsertSchema(hoursOfOperation).omit({
+  id: true,
+  updatedAt: true,
+});
+
+// Types for hours of operation
+export type HoursOfOperation = typeof hoursOfOperation.$inferSelect;
+export type InsertHoursOfOperation = z.infer<typeof insertHoursOfOperationSchema>;

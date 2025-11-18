@@ -79,12 +79,28 @@ const memberFormSchema = z.object({
 type MemberFormData = z.infer<typeof memberFormSchema>;
 
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'confirmation' | 'success' | 'error' | 'create-member'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-drop-in'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
+  const [manualSearchTerm, setManualSearchTerm] = useState("");
   const { toast } = useToast();
   const scannerRef = useRef<HTMLDivElement>(null);
+  const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Manual search query for email/membership ID lookup
+  const { data: manualSearchResults } = useQuery({
+    queryKey: ['/api/kiosk/search-member', manualSearchTerm],
+    queryFn: async () => {
+      const res = await fetch(`/api/kiosk/search-member?query=${encodeURIComponent(manualSearchTerm)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Member not found');
+      return await res.json();
+    },
+    enabled: manualSearchTerm.length >= 3 && scannerMode === 'manual-entry',
+    retry: false,
+  });
 
   const checkInMutation = useMutation({
     mutationFn: async ({ membershipId, useDayPass }: { membershipId: string; useDayPass?: boolean }) => {
@@ -101,17 +117,17 @@ export default function KioskCheckIn() {
         setScannerMode('success');
         queryClient.invalidateQueries({ queryKey: ["/api/check-ins"] });
         
-        // Auto-reset after 7 seconds to show day pass info
-        setTimeout(() => {
-          resetScanner();
-        }, 7000);
+        // Auto-resume scanning after 5 seconds
+        autoResumeTimerRef.current = setTimeout(() => {
+          resetAndResume();
+        }, 5000);
       } else {
         setScannerMode('error');
         
-        // Auto-reset after 3 seconds on error
-        setTimeout(() => {
-          resetScanner();
-        }, 3000);
+        // Auto-resume scanning after 4 seconds on error
+        autoResumeTimerRef.current = setTimeout(() => {
+          resetAndResume();
+        }, 4000);
       }
     },
     onError: (error: any) => {
@@ -121,10 +137,10 @@ export default function KioskCheckIn() {
       });
       setScannerMode('error');
       
-      // Auto-reset after 3 seconds on error
-      setTimeout(() => {
-        resetScanner();
-      }, 3000);
+      // Auto-resume scanning after 4 seconds on error
+      autoResumeTimerRef.current = setTimeout(() => {
+        resetAndResume();
+      }, 4000);
     },
   });
 
@@ -176,6 +192,12 @@ export default function KioskCheckIn() {
   };
 
   const resetScanner = () => {
+    // Clear any auto-resume timers
+    if (autoResumeTimerRef.current) {
+      clearTimeout(autoResumeTimerRef.current);
+      autoResumeTimerRef.current = null;
+    }
+    
     if (scanner) {
       scanner.clear();
       setScanner(null);
@@ -183,13 +205,33 @@ export default function KioskCheckIn() {
     setScannerMode('waiting');
     setScanResult(null);
     setPendingMembershipId(null);
+    setManualSearchTerm("");
   };
 
-  // Cleanup scanner on component unmount
+  const resetAndResume = () => {
+    if (scanner) {
+      scanner.clear();
+      setScanner(null);
+    }
+    setScanResult(null);
+    setPendingMembershipId(null);
+    setManualSearchTerm("");
+    
+    // Auto-start scanner again
+    setScannerMode('waiting');
+    setTimeout(() => {
+      initializeScanner();
+    }, 500);
+  };
+
+  // Cleanup scanner and timers on component unmount
   useEffect(() => {
     return () => {
       if (scanner) {
         scanner.clear();
+      }
+      if (autoResumeTimerRef.current) {
+        clearTimeout(autoResumeTimerRef.current);
       }
     };
   }, [scanner]);
@@ -230,16 +272,20 @@ export default function KioskCheckIn() {
             <div className="flex justify-center mb-4">
               {scannerMode === 'waiting' && <QrCode className="h-16 w-16 text-primary" />}
               {scannerMode === 'scanning' && <Camera className="h-16 w-16 text-primary animate-pulse" />}
+              {scannerMode === 'manual-entry' && <User className="h-16 w-16 text-primary" />}
               {scannerMode === 'confirmation' && <User className="h-16 w-16 text-blue-500" />}
               {scannerMode === 'success' && <CheckCircle className="h-16 w-16 text-green-500" />}
               {scannerMode === 'error' && <User className="h-16 w-16 text-red-500" />}
+              {scannerMode === 'buy-drop-in' && <Sparkles className="h-16 w-16 text-green-600" />}
             </div>
             <CardTitle className="text-3xl font-heading font-bold">
               {scannerMode === 'waiting' && 'Ready to Check In'}
               {scannerMode === 'scanning' && 'Scanning QR Code...'}
+              {scannerMode === 'manual-entry' && 'Manual Check-In'}
               {scannerMode === 'confirmation' && 'Choose Check-In Method'}
               {scannerMode === 'success' && 'Welcome Back!'}
               {scannerMode === 'error' && 'Check-In Issue'}
+              {scannerMode === 'buy-drop-in' && 'Purchase Day Pass'}
             </CardTitle>
           </CardHeader>
           
@@ -254,23 +300,53 @@ export default function KioskCheckIn() {
                   size="lg" 
                   onClick={initializeScanner}
                   className="bg-primary hover:bg-primary/90 text-white px-12 py-6 text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                  data-testid="button-scan-qr"
                 >
                   <QrCode className="h-8 w-8 mr-4" />
-                  Check In
+                  Check In with QR Code
                 </Button>
                 
-                <div className="mt-8">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    New to Wolf Mother Wellness?
-                  </p>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-4 bg-card text-muted-foreground">or</span>
+                  </div>
+                </div>
+                
+                <Button 
+                  onClick={() => setScannerMode('manual-entry')}
+                  variant="outline"
+                  size="lg"
+                  className="w-full border-2 text-lg font-semibold py-4"
+                  data-testid="button-manual-entry"
+                >
+                  <User className="h-5 w-5 mr-3" />
+                  Enter Email or Membership ID
+                </Button>
+                
+                <div className="grid grid-cols-2 gap-4 mt-6">
                   <Button 
                     onClick={() => setScannerMode('create-member')}
                     variant="outline"
                     size="lg"
-                    className="border-2 border-primary text-primary hover:bg-primary/10 text-lg font-semibold py-4 px-8"
+                    className="border-2 border-primary text-primary hover:bg-primary/10 text-base font-semibold py-3"
+                    data-testid="button-create-member"
                   >
-                    <UserPlus className="h-5 w-5 mr-3" />
-                    Create New Member
+                    <UserPlus className="h-5 w-5 mr-2" />
+                    New Member
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setScannerMode('create-member')}
+                    variant="outline"
+                    size="lg"
+                    className="border-2 border-green-600 text-green-600 hover:bg-green-50 text-base font-semibold py-3"
+                    data-testid="button-buy-drop-in"
+                  >
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Buy Day Pass
                   </Button>
                 </div>
                 
@@ -304,6 +380,70 @@ export default function KioskCheckIn() {
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Manual Entry State */}
+            {scannerMode === 'manual-entry' && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <p className="text-lg text-muted-foreground">
+                    Enter your email address or membership ID
+                  </p>
+                </div>
+                
+                <div className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="email@example.com or membership ID"
+                    value={manualSearchTerm}
+                    onChange={(e) => setManualSearchTerm(e.target.value)}
+                    className="text-lg py-6"
+                    data-testid="input-manual-search"
+                    autoFocus
+                  />
+                  
+                  {manualSearchResults && (
+                    <Card className="bg-green-50 border-green-200">
+                      <CardContent className="p-4">
+                        <div className="text-center mb-4">
+                          <h3 className="text-lg font-bold text-green-800">
+                            {manualSearchResults.firstName} {manualSearchResults.lastName}
+                          </h3>
+                          <p className="text-sm text-green-600">{manualSearchResults.email}</p>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            setPendingMembershipId(manualSearchResults.membershipId);
+                            checkInMutation.mutate({ membershipId: manualSearchResults.membershipId });
+                          }}
+                          className="w-full bg-primary hover:bg-primary/90"
+                          disabled={checkInMutation.isPending}
+                          data-testid="button-confirm-manual-checkin"
+                        >
+                          {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {manualSearchTerm.length >= 3 && !manualSearchResults && (
+                    <p className="text-center text-sm text-muted-foreground">
+                      Member not found. Please check your email or membership ID.
+                    </p>
+                  )}
+                </div>
+                
+                <div className="text-center">
+                  <Button 
+                    variant="outline" 
+                    onClick={resetScanner}
+                    className="border-primary text-primary hover:bg-primary/10"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
                   </Button>
                 </div>
               </div>

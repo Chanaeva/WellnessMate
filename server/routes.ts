@@ -263,6 +263,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Kiosk member search by email or membership ID
+  app.get("/api/kiosk/search-member", async (req, res) => {
+    try {
+      const { query } = req.query;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: "Search query required" });
+      }
+
+      const searchTerm = query.toLowerCase().trim();
+      
+      // Search by email or membership ID only (for security)
+      const users = await db
+        .select()
+        .from(usersTable)
+        .where(
+          or(
+            sql`LOWER(${usersTable.email}) = ${searchTerm}`,
+            sql`${usersTable.membershipId} = ${query.trim()}`
+          )
+        )
+        .limit(1);
+
+      if (users.length === 0) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      const user = users[0];
+      
+      // Return minimal info needed for check-in
+      res.json({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        membershipId: user.membershipId
+      });
+    } catch (error: any) {
+      console.error("Kiosk member search error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Kiosk check-in using membership ID from QR code
   app.post("/api/kiosk-check-in", async (req, res) => {
     try {

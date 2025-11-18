@@ -102,6 +102,15 @@ export default function LandingPageManagement() {
     },
   });
 
+  // Fetch hours of operation
+  const { data: hoursOfOperation = [], isLoading: isHoursLoading } = useQuery<any[]>({
+    queryKey: ['/api/admin/hours-of-operation'],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/hours-of-operation");
+      return await res.json();
+    },
+  });
+
   // Update siteSettings when footerData changes
   useEffect(() => {
     if (footerData && Array.isArray(footerData)) {
@@ -304,6 +313,28 @@ export default function LandingPageManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update hours of operation mutation
+  const updateHoursMutation = useMutation({
+    mutationFn: async (hoursData: any) => {
+      const res = await apiRequest("PUT", `/api/admin/hours-of-operation/${hoursData.id}`, hoursData);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/hours-of-operation'] });
+      toast({
+        title: "Hours Updated",
+        description: "Operating hours have been updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update hours",
         variant: "destructive",
       });
     },
@@ -1006,43 +1037,111 @@ export default function LandingPageManagement() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Clock className="h-5 w-5" />
-                    Hours of Operation
+                    Weekly Hours of Operation
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Set the hours displayed on the landing page
+                    Set the hours for each day of the week
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="hoursOfOperation">Daily Hours</Label>
-                    <Input
-                      id="hoursOfOperation"
-                      value={siteSettings.hoursOfOperation}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, hoursOfOperation: e.target.value })}
-                      placeholder="6:00 AM - 10:00 PM"
-                      data-testid="input-hours-operation"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hoursMembers">Members Only Access</Label>
-                    <Input
-                      id="hoursMembers"
-                      value={siteSettings.hoursMembers}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, hoursMembers: e.target.value })}
-                      placeholder="6:00 AM - 9:00 AM"
-                      data-testid="input-hours-members"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hoursDayPass">Day Pass Access</Label>
-                    <Input
-                      id="hoursDayPass"
-                      value={siteSettings.hoursDayPass}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, hoursDayPass: e.target.value })}
-                      placeholder="9:00 AM - 10:00 PM"
-                      data-testid="input-hours-daypass"
-                    />
-                  </div>
+                  {isHoursLoading ? (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">Loading hours...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {hoursOfOperation.map((dayHours: any) => (
+                        <div key={dayHours.id} className="border rounded-lg p-4 space-y-3" data-testid={`hours-card-${dayHours.dayOfWeek}`}>
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold capitalize">{dayHours.dayOfWeek}</h4>
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor={`closed-${dayHours.id}`} className="text-sm">Closed</Label>
+                              <Switch
+                                id={`closed-${dayHours.id}`}
+                                checked={dayHours.isClosed}
+                                onCheckedChange={(checked) => {
+                                  updateHoursMutation.mutate({
+                                    ...dayHours,
+                                    isClosed: checked
+                                  });
+                                }}
+                                data-testid={`switch-closed-${dayHours.dayOfWeek}`}
+                              />
+                            </div>
+                          </div>
+                          
+                          {!dayHours.isClosed && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor={`open-${dayHours.id}`}>Open Time</Label>
+                                <Input
+                                  id={`open-${dayHours.id}`}
+                                  value={dayHours.openTime}
+                                  onChange={(e) => {
+                                    const updatedHours = { ...dayHours, openTime: e.target.value };
+                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
+                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
+                                    );
+                                  }}
+                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
+                                  placeholder="6:00 AM"
+                                  data-testid={`input-open-${dayHours.dayOfWeek}`}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`close-${dayHours.id}`}>Close Time</Label>
+                                <Input
+                                  id={`close-${dayHours.id}`}
+                                  value={dayHours.closeTime}
+                                  onChange={(e) => {
+                                    const updatedHours = { ...dayHours, closeTime: e.target.value };
+                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
+                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
+                                    );
+                                  }}
+                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
+                                  placeholder="10:00 PM"
+                                  data-testid={`input-close-${dayHours.dayOfWeek}`}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`members-start-${dayHours.id}`}>Members Only Start</Label>
+                                <Input
+                                  id={`members-start-${dayHours.id}`}
+                                  value={dayHours.membersOnlyStart || ''}
+                                  onChange={(e) => {
+                                    const updatedHours = { ...dayHours, membersOnlyStart: e.target.value };
+                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
+                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
+                                    );
+                                  }}
+                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
+                                  placeholder="6:00 AM"
+                                  data-testid={`input-members-start-${dayHours.dayOfWeek}`}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`members-end-${dayHours.id}`}>Members Only End</Label>
+                                <Input
+                                  id={`members-end-${dayHours.id}`}
+                                  value={dayHours.membersOnlyEnd || ''}
+                                  onChange={(e) => {
+                                    const updatedHours = { ...dayHours, membersOnlyEnd: e.target.value };
+                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
+                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
+                                    );
+                                  }}
+                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
+                                  placeholder="9:00 AM"
+                                  data-testid={`input-members-end-${dayHours.dayOfWeek}`}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

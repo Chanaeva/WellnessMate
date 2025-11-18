@@ -79,6 +79,15 @@ export default function LandingPage() {
     },
   });
 
+  // Fetch weekly hours of operation
+  const { data: weeklyHours } = useQuery({
+    queryKey: ["/api/hours-of-operation"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/hours-of-operation");
+      return await res.json();
+    },
+  });
+
   // Fetch hero content
   const { data: heroContent } = useQuery({
     queryKey: ["/api/landing-content/hero"],
@@ -657,15 +666,30 @@ export default function LandingPage() {
             <div className="flex flex-col items-center">
               <Clock className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">
-                Daily Hours
+                Hours of Operation
               </h3>
-              <p className="text-muted-foreground font-body">
-                Hours of Operation: {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
-                <br />
-                Members Only Access: {footerSettings?.hoursMembers || '6:00 AM - 9:00 AM'}
-                <br />
-                Day Pass Access: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
-              </p>
+              <div className="text-muted-foreground font-body text-sm space-y-1">
+                {weeklyHours && weeklyHours.length > 0 ? (
+                  weeklyHours.map((dayHours: any) => (
+                    <div key={dayHours.id} className="flex justify-between gap-4">
+                      <span className="capitalize font-semibold">{dayHours.dayOfWeek}:</span>
+                      <span>
+                        {dayHours.isClosed 
+                          ? 'Closed' 
+                          : `${dayHours.openTime} - ${dayHours.closeTime}`}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p>
+                    Hours of Operation: {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
+                    <br />
+                    Members Only Access: {footerSettings?.hoursMembers || '6:00 AM - 9:00 AM'}
+                    <br />
+                    Day Pass Access: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col items-center">

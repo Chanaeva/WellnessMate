@@ -89,7 +89,7 @@ export default function KioskCheckIn() {
   const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Manual search query for email/membership ID lookup
-  const { data: manualSearchResults } = useQuery({
+  const { data: manualSearchResults, isError: manualSearchError, isLoading: manualSearchLoading } = useQuery({
     queryKey: ['/api/kiosk/search-member', manualSearchTerm],
     queryFn: async () => {
       const res = await fetch(`/api/kiosk/search-member?query=${encodeURIComponent(manualSearchTerm)}`, {
@@ -98,8 +98,10 @@ export default function KioskCheckIn() {
       if (!res.ok) throw new Error('Member not found');
       return await res.json();
     },
-    enabled: manualSearchTerm.length >= 3 && scannerMode === 'manual-entry',
+    enabled: scannerMode === 'manual-entry' && manualSearchTerm.trim().length >= 3,
     retry: false,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const checkInMutation = useMutation({
@@ -208,17 +210,30 @@ export default function KioskCheckIn() {
     setManualSearchTerm("");
   };
 
-  const resetAndResume = () => {
+  const resetAndResume = async () => {
+    // Clear any auto-resume timers
+    if (autoResumeTimerRef.current) {
+      clearTimeout(autoResumeTimerRef.current);
+      autoResumeTimerRef.current = null;
+    }
+    
+    // Clean up existing scanner properly
     if (scanner) {
-      scanner.clear();
+      try {
+        await scanner.clear();
+      } catch (e) {
+        console.error("Error clearing scanner:", e);
+      }
       setScanner(null);
     }
+    
+    // Reset all state
     setScanResult(null);
     setPendingMembershipId(null);
     setManualSearchTerm("");
-    
-    // Auto-start scanner again
     setScannerMode('waiting');
+    
+    // Re-initialize scanner after a delay to ensure cleanup is complete
     setTimeout(() => {
       initializeScanner();
     }, 500);
@@ -405,6 +420,12 @@ export default function KioskCheckIn() {
                     autoFocus
                   />
                   
+                  {manualSearchLoading && (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">Searching...</p>
+                    </div>
+                  )}
+                  
                   {manualSearchResults && (
                     <Card className="bg-green-50 border-green-200">
                       <CardContent className="p-4">
@@ -413,14 +434,25 @@ export default function KioskCheckIn() {
                             {manualSearchResults.firstName} {manualSearchResults.lastName}
                           </h3>
                           <p className="text-sm text-green-600">{manualSearchResults.email}</p>
+                          {manualSearchResults.membershipId && (
+                            <p className="text-xs text-green-500 mt-1">ID: {manualSearchResults.membershipId}</p>
+                          )}
                         </div>
                         <Button
                           onClick={() => {
-                            setPendingMembershipId(manualSearchResults.membershipId);
-                            checkInMutation.mutate({ membershipId: manualSearchResults.membershipId });
+                            if (manualSearchResults.membershipId) {
+                              setPendingMembershipId(manualSearchResults.membershipId);
+                              checkInMutation.mutate({ membershipId: manualSearchResults.membershipId });
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: "Member has no membership ID. Please contact staff.",
+                                variant: "destructive"
+                              });
+                            }
                           }}
                           className="w-full bg-primary hover:bg-primary/90"
-                          disabled={checkInMutation.isPending}
+                          disabled={checkInMutation.isPending || !manualSearchResults.membershipId}
                           data-testid="button-confirm-manual-checkin"
                         >
                           {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
@@ -429,10 +461,15 @@ export default function KioskCheckIn() {
                     </Card>
                   )}
                   
-                  {manualSearchTerm.length >= 3 && !manualSearchResults && (
-                    <p className="text-center text-sm text-muted-foreground">
-                      Member not found. Please check your email or membership ID.
-                    </p>
+                  {manualSearchError && manualSearchTerm.length >= 3 && (
+                    <Card className="bg-red-50 border-red-200">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-red-700 font-medium">Member not found</p>
+                        <p className="text-sm text-red-600 mt-1">
+                          Please check your email or membership ID and try again.
+                        </p>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
                 

@@ -461,24 +461,15 @@ export default function KioskMemberCreation({ onBack, onSuccess }: {
                             </FormControl>
                             <SelectContent>
                               {packageType === "membership" ? (
-                                membershipPlans.map((plan: any) => {
-                                  const Icon = getPlanIcon(plan.planType);
-                                  return (
-                                    <SelectItem key={plan.id} value={plan.id.toString()}>
-                                      <div className="flex items-center">
-                                        <Icon className="h-4 w-4 mr-2" />
-                                        {plan.name} - ${(plan.monthlyPrice / 100).toFixed(2)}/month
-                                      </div>
-                                    </SelectItem>
-                                  );
-                                })
+                                membershipPlans.map((plan: any) => (
+                                  <SelectItem key={plan.id} value={plan.id.toString()}>
+                                    {plan.name} - ${(plan.monthlyPrice / 100).toFixed(2)}/month
+                                  </SelectItem>
+                                ))
                               ) : (
                                 punchCardTemplates.map((template: any) => (
                                   <SelectItem key={template.id} value={template.id.toString()}>
-                                    <div className="flex items-center">
-                                      <Calendar className="h-4 w-4 mr-2" />
-                                      {template.name} - ${(template.totalPrice / 100).toFixed(2)}
-                                    </div>
+                                    {template.name} - ${(template.totalPrice / 100).toFixed(2)}
                                   </SelectItem>
                                 ))
                               )}

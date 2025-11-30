@@ -657,6 +657,7 @@ export default function MemberDashboard() {
                       <div
                         key={card.id}
                         className="flex items-center justify-between p-3 border rounded-lg"
+                        data-testid={`day-pass-card-${card.id}`}
                       >
                         <div className="flex-1">
                           <p className="font-medium text-sm">{card.name}</p>
@@ -692,6 +693,18 @@ export default function MemberDashboard() {
                   </div>
                 )}
               </CardContent>
+              <CardFooter className="border-t pt-4">
+                <Link href="/packages?tab=day-passes" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    data-testid="button-buy-day-passes"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Buy Day Passes
+                  </Button>
+                </Link>
+              </CardFooter>
             </Card>
 
             {/* Recent Transactions */}

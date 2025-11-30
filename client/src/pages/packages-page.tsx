@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MembershipPlan, PunchCardTemplate, Membership } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -63,6 +63,16 @@ export default function PackagesPage() {
   const { user } = useAuth();
   const [showMembershipAlert, setShowMembershipAlert] = useState(false);
   const [showMembershipExistsAlert, setShowMembershipExistsAlert] = useState(false);
+  const [activeTab, setActiveTab] = useState("memberships");
+
+  // Handle tab query parameter from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get("tab");
+    if (tabParam === "day-passes" || tabParam === "memberships") {
+      setActiveTab(tabParam);
+    }
+  }, []);
 
   // Fetch membership plans
   const { data: membershipPlans, isLoading: isPlansLoading } = useQuery<MembershipPlan[]>({
@@ -183,10 +193,10 @@ export default function PackagesPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="memberships" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-primary/10 border border-primary/20">
-            <TabsTrigger value="memberships" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200">Sacred Memberships</TabsTrigger>
-            <TabsTrigger value="day-passes" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200">Sacred Passages</TabsTrigger>
+            <TabsTrigger value="memberships" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200" data-testid="tab-memberships">Sacred Memberships</TabsTrigger>
+            <TabsTrigger value="day-passes" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary hover:bg-primary/10 transition-colors duration-200" data-testid="tab-day-passes">Sacred Passages</TabsTrigger>
           </TabsList>
 
           {/* Membership Plans Tab */}

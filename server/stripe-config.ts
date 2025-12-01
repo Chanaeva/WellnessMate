@@ -6,10 +6,15 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Debug: Log what we're seeing
 console.log('🔍 Environment Debug:', {
   isDev: isDevelopment,
+  nodeEnv: process.env.NODE_ENV,
   hasDEV_SECRET: !!process.env.DEV_STRIPE_SECRET,
   hasDEV_PUBLIC: !!process.env.DEV_STRIPE_PUBLIC,
+  hasPROD_SECRET: !!process.env.STRIPE_SECRET_KEY,
+  hasPROD_PUBLIC: !!process.env.VITE_STRIPE_PUBLIC_KEY,
   DEV_SECRET_starts: process.env.DEV_STRIPE_SECRET?.substring(0, 15),
   DEV_PUBLIC_starts: process.env.DEV_STRIPE_PUBLIC?.substring(0, 15),
+  PROD_SECRET_starts: process.env.STRIPE_SECRET_KEY?.substring(0, 15),
+  PROD_PUBLIC_starts: process.env.VITE_STRIPE_PUBLIC_KEY?.substring(0, 15),
 });
 
 // In development, prefer testing keys if available (try new names first, then old names)

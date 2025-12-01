@@ -66,6 +66,64 @@ export default function LandingPageManagement() {
     instagramHandle: '',
   });
 
+  // Hours of operation form state (local copy for editing)
+  const [hoursFormData, setHoursFormData] = useState<any[]>([]);
+  const [originalHoursData, setOriginalHoursData] = useState<any[]>([]);
+  const [hoursFormDirty, setHoursFormDirty] = useState(false);
+
+  // Normalize time string to consistent format (e.g., "8:00AM" -> "8:00 AM")
+  const normalizeTime = (time: string | null | undefined): string => {
+    if (!time) return '';
+    // Remove extra spaces, ensure space before AM/PM
+    let normalized = time.trim();
+    normalized = normalized.replace(/\s*(AM|PM)\s*/gi, ' $1');
+    normalized = normalized.trim();
+    return normalized;
+  };
+
+  // Time options for select dropdowns - using display format with value mapping
+  const timeOptions = [
+    { label: "5:00 AM", value: "5:00 AM" },
+    { label: "5:30 AM", value: "5:30 AM" },
+    { label: "6:00 AM", value: "6:00 AM" },
+    { label: "6:30 AM", value: "6:30 AM" },
+    { label: "7:00 AM", value: "7:00 AM" },
+    { label: "7:30 AM", value: "7:30 AM" },
+    { label: "8:00 AM", value: "8:00 AM" },
+    { label: "8:30 AM", value: "8:30 AM" },
+    { label: "9:00 AM", value: "9:00 AM" },
+    { label: "9:30 AM", value: "9:30 AM" },
+    { label: "10:00 AM", value: "10:00 AM" },
+    { label: "10:30 AM", value: "10:30 AM" },
+    { label: "11:00 AM", value: "11:00 AM" },
+    { label: "11:30 AM", value: "11:30 AM" },
+    { label: "12:00 PM", value: "12:00 PM" },
+    { label: "12:30 PM", value: "12:30 PM" },
+    { label: "1:00 PM", value: "1:00 PM" },
+    { label: "1:30 PM", value: "1:30 PM" },
+    { label: "2:00 PM", value: "2:00 PM" },
+    { label: "2:30 PM", value: "2:30 PM" },
+    { label: "3:00 PM", value: "3:00 PM" },
+    { label: "3:30 PM", value: "3:30 PM" },
+    { label: "4:00 PM", value: "4:00 PM" },
+    { label: "4:30 PM", value: "4:30 PM" },
+    { label: "5:00 PM", value: "5:00 PM" },
+    { label: "5:30 PM", value: "5:30 PM" },
+    { label: "6:00 PM", value: "6:00 PM" },
+    { label: "6:30 PM", value: "6:30 PM" },
+    { label: "7:00 PM", value: "7:00 PM" },
+    { label: "7:30 PM", value: "7:30 PM" },
+    { label: "8:00 PM", value: "8:00 PM" },
+    { label: "8:30 PM", value: "8:30 PM" },
+    { label: "9:00 PM", value: "9:00 PM" },
+    { label: "9:30 PM", value: "9:30 PM" },
+    { label: "10:00 PM", value: "10:00 PM" },
+    { label: "10:30 PM", value: "10:30 PM" },
+    { label: "11:00 PM", value: "11:00 PM" },
+    { label: "11:30 PM", value: "11:30 PM" },
+    { label: "12:00 AM", value: "12:00 AM" },
+  ];
+
   // Fetch landing page content
   const { data: landingPageContent = [], isLoading: isContentLoading } = useQuery<LandingPageContent[]>({
     queryKey: ["/api/admin/landing-content"],
@@ -126,6 +184,22 @@ export default function LandingPageManagement() {
       setSiteSettings(settingsObj);
     }
   }, [footerData]);
+
+  // Sync hoursFormData when hoursOfOperation query data changes (only if not dirty)
+  useEffect(() => {
+    if (hoursOfOperation && hoursOfOperation.length > 0 && !hoursFormDirty) {
+      // Normalize time values when loading from server
+      const normalizedData = hoursOfOperation.map((day: any) => ({
+        ...day,
+        openTime: normalizeTime(day.openTime),
+        closeTime: normalizeTime(day.closeTime),
+        membersOnlyStart: normalizeTime(day.membersOnlyStart),
+        membersOnlyEnd: normalizeTime(day.membersOnlyEnd),
+      }));
+      setHoursFormData(normalizedData);
+      setOriginalHoursData(JSON.parse(JSON.stringify(normalizedData)));
+    }
+  }, [hoursOfOperation, hoursFormDirty]);
 
   // Content form
   const contentForm = useForm<LandingPageContentFormData>({
@@ -318,27 +392,70 @@ export default function LandingPageManagement() {
     },
   });
 
-  // Update hours of operation mutation
-  const updateHoursMutation = useMutation({
-    mutationFn: async (hoursData: any) => {
-      const res = await apiRequest("PUT", `/api/admin/hours-of-operation/${hoursData.id}`, hoursData);
-      return await res.json();
+  // Batch save only changed hours of operation
+  const saveAllHoursMutation = useMutation({
+    mutationFn: async (changedHours: any[]) => {
+      const promises = changedHours.map(hoursData =>
+        apiRequest("PUT", `/api/admin/hours-of-operation/${hoursData.id}`, hoursData)
+      );
+      await Promise.all(promises);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/hours-of-operation'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/hours-of-operation'] });
+      setHoursFormDirty(false);
+      // Update original data to match saved data
+      setOriginalHoursData(JSON.parse(JSON.stringify(hoursFormData)));
       toast({
-        title: "Hours Updated",
-        description: "Operating hours have been updated successfully",
+        title: "Hours Saved",
+        description: "Operating hours have been saved successfully",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update hours",
+        description: error.message || "Failed to save hours",
         variant: "destructive",
       });
     },
   });
+
+  // Helper function to update a single day's hours in local form state
+  const updateHoursField = (dayId: number, field: string, value: any) => {
+    setHoursFormData(prev => 
+      prev.map(h => h.id === dayId ? { ...h, [field]: value } : h)
+    );
+    setHoursFormDirty(true);
+  };
+
+  // Cancel hours changes and reset to original data
+  const cancelHoursChanges = () => {
+    setHoursFormData(JSON.parse(JSON.stringify(originalHoursData)));
+    setHoursFormDirty(false);
+  };
+
+  // Get only the hours entries that have changed
+  const getChangedHours = () => {
+    return hoursFormData.filter((formDay, index) => {
+      const originalDay = originalHoursData[index];
+      if (!originalDay) return true;
+      return (
+        formDay.openTime !== originalDay.openTime ||
+        formDay.closeTime !== originalDay.closeTime ||
+        formDay.membersOnlyStart !== originalDay.membersOnlyStart ||
+        formDay.membersOnlyEnd !== originalDay.membersOnlyEnd ||
+        formDay.isClosed !== originalDay.isClosed
+      );
+    });
+  };
+
+  // Save only changed hours
+  const saveAllHours = () => {
+    const changedHours = getChangedHours();
+    if (changedHours.length > 0) {
+      saveAllHoursMutation.mutate(changedHours);
+    }
+  };
 
   // Form handlers
   const handleContentSubmit = (data: LandingPageContentFormData) => {
@@ -1035,13 +1152,40 @@ export default function LandingPageManagement() {
               {/* Hours of Operation */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Weekly Hours of Operation
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Set the hours for each day of the week
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        Weekly Hours of Operation
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Set the hours for each day of the week
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hoursFormDirty && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={cancelHoursChanges}
+                          data-testid="button-cancel-hours"
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                      <Button 
+                        onClick={saveAllHours} 
+                        disabled={!hoursFormDirty || saveAllHoursMutation.isPending}
+                        size="sm"
+                        data-testid="button-save-hours"
+                      >
+                        {saveAllHoursMutation.isPending ? "Saving..." : "Save Hours"}
+                      </Button>
+                    </div>
+                  </div>
+                  {hoursFormDirty && (
+                    <p className="text-sm text-amber-600 mt-2">You have unsaved changes</p>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {isHoursLoading ? (
@@ -1050,7 +1194,7 @@ export default function LandingPageManagement() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {hoursOfOperation.map((dayHours: any) => (
+                      {hoursFormData.map((dayHours: any) => (
                         <div key={dayHours.id} className="border rounded-lg p-4 space-y-3" data-testid={`hours-card-${dayHours.dayOfWeek}`}>
                           <div className="flex items-center justify-between">
                             <h4 className="font-semibold capitalize">{dayHours.dayOfWeek}</h4>
@@ -1059,12 +1203,7 @@ export default function LandingPageManagement() {
                               <Switch
                                 id={`closed-${dayHours.id}`}
                                 checked={dayHours.isClosed}
-                                onCheckedChange={(checked) => {
-                                  updateHoursMutation.mutate({
-                                    ...dayHours,
-                                    isClosed: checked
-                                  });
-                                }}
+                                onCheckedChange={(checked) => updateHoursField(dayHours.id, 'isClosed', checked)}
                                 data-testid={`switch-closed-${dayHours.dayOfWeek}`}
                               />
                             </div>
@@ -1074,67 +1213,77 @@ export default function LandingPageManagement() {
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <Label htmlFor={`open-${dayHours.id}`}>Open Time</Label>
-                                <Input
-                                  id={`open-${dayHours.id}`}
-                                  value={dayHours.openTime}
-                                  onChange={(e) => {
-                                    const updatedHours = { ...dayHours, openTime: e.target.value };
-                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
-                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
-                                    );
-                                  }}
-                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
-                                  placeholder="6:00 AM"
-                                  data-testid={`input-open-${dayHours.dayOfWeek}`}
-                                />
+                                <Select
+                                  value={dayHours.openTime || ''}
+                                  onValueChange={(value) => updateHoursField(dayHours.id, 'openTime', value)}
+                                >
+                                  <SelectTrigger id={`open-${dayHours.id}`} data-testid={`select-open-${dayHours.dayOfWeek}`}>
+                                    <SelectValue placeholder="Select time" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {timeOptions.map((time) => (
+                                      <SelectItem key={`open-${dayHours.id}-${time.value}`} value={time.value}>
+                                        {time.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor={`close-${dayHours.id}`}>Close Time</Label>
-                                <Input
-                                  id={`close-${dayHours.id}`}
-                                  value={dayHours.closeTime}
-                                  onChange={(e) => {
-                                    const updatedHours = { ...dayHours, closeTime: e.target.value };
-                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
-                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
-                                    );
-                                  }}
-                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
-                                  placeholder="10:00 PM"
-                                  data-testid={`input-close-${dayHours.dayOfWeek}`}
-                                />
+                                <Select
+                                  value={dayHours.closeTime || ''}
+                                  onValueChange={(value) => updateHoursField(dayHours.id, 'closeTime', value)}
+                                >
+                                  <SelectTrigger id={`close-${dayHours.id}`} data-testid={`select-close-${dayHours.dayOfWeek}`}>
+                                    <SelectValue placeholder="Select time" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {timeOptions.map((time) => (
+                                      <SelectItem key={`close-${dayHours.id}-${time.value}`} value={time.value}>
+                                        {time.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor={`members-start-${dayHours.id}`}>Members Only Start</Label>
-                                <Input
-                                  id={`members-start-${dayHours.id}`}
-                                  value={dayHours.membersOnlyStart || ''}
-                                  onChange={(e) => {
-                                    const updatedHours = { ...dayHours, membersOnlyStart: e.target.value };
-                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
-                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
-                                    );
-                                  }}
-                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
-                                  placeholder="6:00 AM"
-                                  data-testid={`input-members-start-${dayHours.dayOfWeek}`}
-                                />
+                                <Select
+                                  value={dayHours.membersOnlyStart || 'none'}
+                                  onValueChange={(value) => updateHoursField(dayHours.id, 'membersOnlyStart', value === 'none' ? '' : value)}
+                                >
+                                  <SelectTrigger id={`members-start-${dayHours.id}`} data-testid={`select-members-start-${dayHours.dayOfWeek}`}>
+                                    <SelectValue placeholder="Select time (optional)" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {timeOptions.map((time) => (
+                                      <SelectItem key={`members-start-${dayHours.id}-${time.value}`} value={time.value}>
+                                        {time.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                               <div className="space-y-2">
                                 <Label htmlFor={`members-end-${dayHours.id}`}>Members Only End</Label>
-                                <Input
-                                  id={`members-end-${dayHours.id}`}
-                                  value={dayHours.membersOnlyEnd || ''}
-                                  onChange={(e) => {
-                                    const updatedHours = { ...dayHours, membersOnlyEnd: e.target.value };
-                                    queryClient.setQueryData(['/api/admin/hours-of-operation'], (old: any[]) =>
-                                      old.map(h => h.id === dayHours.id ? updatedHours : h)
-                                    );
-                                  }}
-                                  onBlur={() => updateHoursMutation.mutate(dayHours)}
-                                  placeholder="9:00 AM"
-                                  data-testid={`input-members-end-${dayHours.dayOfWeek}`}
-                                />
+                                <Select
+                                  value={dayHours.membersOnlyEnd || 'none'}
+                                  onValueChange={(value) => updateHoursField(dayHours.id, 'membersOnlyEnd', value === 'none' ? '' : value)}
+                                >
+                                  <SelectTrigger id={`members-end-${dayHours.id}`} data-testid={`select-members-end-${dayHours.dayOfWeek}`}>
+                                    <SelectValue placeholder="Select time (optional)" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {timeOptions.map((time) => (
+                                      <SelectItem key={`members-end-${dayHours.id}-${time.value}`} value={time.value}>
+                                        {time.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             </div>
                           )}

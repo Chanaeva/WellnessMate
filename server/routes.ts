@@ -849,6 +849,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint for punch card templates (day passes) - for packages page
+  app.get("/api/punch-card-templates", async (req, res) => {
+    try {
+      const templates = await storage.getAllPunchCardTemplates();
+      // Filter to only return active templates
+      const activeTemplates = templates.filter(t => t.isActive);
+      res.json(activeTemplates);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Punch card routes
 
   // Get available punch card options

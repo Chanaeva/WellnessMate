@@ -18,8 +18,10 @@ import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { AddPaymentMethod } from "@/components/payment/add-payment-method";
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
+// Initialize Stripe - fetch key from backend to ensure correct environment key is used
+const stripePromise = fetch("/api/stripe/config")
+  .then((res) => res.json())
+  .then(({ publicKey }) => loadStripe(publicKey));
 
 export default function CheckoutPage() {
   const { user } = useAuth();

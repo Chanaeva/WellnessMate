@@ -66,8 +66,10 @@ import { loadStripe } from "@stripe/stripe-js";
 import { AddPaymentMethod } from "@/components/payment/add-payment-method";
 import { PaymentMethodCard } from "@/components/payment/payment-method-card";
 
-// Initialize Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY!);
+// Initialize Stripe - fetch key from backend to ensure correct environment key is used
+const stripePromise = fetch("/api/stripe/config")
+  .then((res) => res.json())
+  .then(({ publicKey }) => loadStripe(publicKey));
 
 export default function MemberDashboard() {
   const { user } = useAuth();

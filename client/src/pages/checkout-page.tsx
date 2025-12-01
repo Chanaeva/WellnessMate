@@ -17,6 +17,7 @@ import { Link, useLocation } from "wouter";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { AddPaymentMethod } from "@/components/payment/add-payment-method";
+import { CheckoutPaymentForm } from "@/components/payment/checkout-payment-form";
 
 // Initialize Stripe - fetch key from backend to ensure correct environment key is used
 const stripePromise = fetch("/api/stripe/config")
@@ -312,14 +313,35 @@ export default function CheckoutPage() {
                 <CardContent>
                   {showAddPaymentMethod ? (
                     <Elements stripe={stripePromise}>
-                      <AddPaymentMethod
-                        onSuccess={() => {
+                      <CheckoutPaymentForm
+                        items={items.map(item => ({
+                          id: item.id,
+                          type: item.type,
+                          quantity: item.quantity || 1,
+                          data: item.data
+                        }))}
+                        promoCode={promoCode}
+                        onSuccess={(paymentIntentId) => {
                           setShowAddPaymentMethod(false);
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                          const hasMembers = items.some(item => item.type === 'membership');
+                          const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
+                          
                           toast({
-                            title: "Payment Method Added",
-                            description: "You can now complete your purchase.",
+                            title: isUpgrade ? "Membership Upgraded!" : "Payment Successful!",
+                            description: isUpgrade 
+                              ? "Your membership plan has been upgraded successfully."
+                              : "Your purchase has been processed successfully.",
                           });
+                          clearCart();
+                          
+                          localStorage.setItem('purchase_completed', 'true');
+                          
+                          queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                          
+                          setLocation("/dashboard");
                         }}
                         onCancel={() => setShowAddPaymentMethod(false)}
                       />
@@ -346,20 +368,42 @@ export default function CheckoutPage() {
                         onClick={() => setShowAddPaymentMethod(true)}
                         className="w-full"
                       >
-                        Add Another Payment Method
+                        Use a Different Card
                       </Button>
                     </div>
                   ) : (
-                    <div className="text-center py-6">
-                      <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground mb-4">No payment method on file</p>
-                      <Button 
-                        variant="outline"
-                        onClick={() => setShowAddPaymentMethod(true)}
-                      >
-                        Add Payment Method
-                      </Button>
-                    </div>
+                    <Elements stripe={stripePromise}>
+                      <CheckoutPaymentForm
+                        items={items.map(item => ({
+                          id: item.id,
+                          type: item.type,
+                          quantity: item.quantity || 1,
+                          data: item.data
+                        }))}
+                        promoCode={promoCode}
+                        onSuccess={(paymentIntentId) => {
+                          const hasMembers = items.some(item => item.type === 'membership');
+                          const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
+                          
+                          toast({
+                            title: isUpgrade ? "Membership Upgraded!" : "Payment Successful!",
+                            description: isUpgrade 
+                              ? "Your membership plan has been upgraded successfully."
+                              : "Your purchase has been processed successfully.",
+                          });
+                          clearCart();
+                          
+                          localStorage.setItem('purchase_completed', 'true');
+                          
+                          queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+                          
+                          setLocation("/dashboard");
+                        }}
+                      />
+                    </Elements>
                   )}
                 </CardContent>
               </Card>

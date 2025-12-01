@@ -966,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create setup intent for adding new payment method
+  // Create setup intent for adding new payment method (standalone card storage)
   app.post("/api/stripe/setup-intent", isAuthenticated, async (req, res) => {
     try {
       const user = req.user!;
@@ -995,6 +995,223 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Failed to create setup intent:', error);
       res.status(500).json({ message: "Failed to create setup intent: " + error.message });
+    }
+  });
+
+  // Create payment intent for checkout (charges card AND saves it for future use)
+  app.post("/api/stripe/create-payment-intent", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { items, promoCode } = req.body;
+
+      if (!items || items.length === 0) {
+        return res.status(400).json({ message: "Cart items are required" });
+      }
+
+      // Calculate total from authoritative pricing
+      let subtotal = 0;
+      for (const item of items) {
+        if (item.type === 'membership') {
+          const plans = await storage.getAllMembershipPlans();
+          const plan = plans.find(p => p.planType === item.data?.planType);
+          if (!plan) {
+            return res.status(400).json({ message: `Invalid membership plan: ${item.data?.planType}` });
+          }
+          subtotal += plan.monthlyPrice;
+        } else if (item.type === 'punch_card') {
+          const templates = await storage.getAllPunchCardTemplates();
+          const template = templates.find(t => t.id === item.data?.templateId);
+          if (!template) {
+            return res.status(400).json({ message: `Invalid punch card template: ${item.data?.templateId}` });
+          }
+          const quantity = item.quantity || 1;
+          subtotal += template.totalPrice * quantity;
+        }
+      }
+
+      // Apply promo code discount if provided
+      let discount = 0;
+      if (promoCode && promoCode.code) {
+        const promotion = await storage.getPromotionByCode(promoCode.code.toUpperCase());
+        if (promotion && promotion.isActive) {
+          if (promotion.discountType === 'percentage') {
+            discount = Math.round(subtotal * (promotion.discountValue / 100));
+          } else {
+            discount = promotion.discountValue;
+          }
+        }
+      }
+
+      const totalAmount = Math.max(subtotal - discount, 0);
+
+      if (totalAmount < 50) {
+        return res.status(400).json({ message: "Minimum charge amount is $0.50" });
+      }
+
+      // Ensure user has Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: {
+            userId: user.id.toString(),
+            ...STRIPE_CONFIG.customerConfig.metadata
+          }
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomerId(user.id, customerId);
+      }
+
+      // Create PaymentIntent with setup_future_usage to save the card
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: totalAmount,
+        currency: 'usd',
+        customer: customerId,
+        setup_future_usage: 'off_session', // Save the payment method for future use
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        metadata: {
+          userId: user.id.toString(),
+          itemCount: items.length.toString(),
+        },
+      });
+
+      console.log('Created PaymentIntent:', paymentIntent.id, 'Amount:', totalAmount);
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: totalAmount
+      });
+    } catch (error: any) {
+      console.error('Failed to create payment intent:', error);
+      res.status(500).json({ message: "Failed to create payment intent: " + error.message });
+    }
+  });
+
+  // Finalize order after successful payment
+  app.post("/api/stripe/finalize-order", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { paymentIntentId, items, promoCode } = req.body;
+
+      // Verify the payment intent succeeded
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment has not been completed" });
+      }
+
+      // Save the payment method from the successful payment
+      if (paymentIntent.payment_method) {
+        const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+        
+        if (paymentMethod.card) {
+          const existingMethods = await storage.getPaymentMethodsByUserId(user.id);
+          const isDefault = existingMethods.length === 0;
+          
+          // Check if this payment method already exists
+          const existingMethod = existingMethods.find(m => m.stripePaymentMethodId === paymentMethod.id);
+          
+          if (!existingMethod) {
+            await storage.createPaymentMethod({
+              userId: user.id,
+              stripePaymentMethodId: paymentMethod.id,
+              cardLast4: paymentMethod.card.last4,
+              cardBrand: paymentMethod.card.brand,
+              cardExpMonth: paymentMethod.card.exp_month,
+              cardExpYear: paymentMethod.card.exp_year,
+              isDefault
+            });
+          }
+        }
+      }
+
+      // Process each item in the cart
+      for (const item of items) {
+        if (item.type === 'membership') {
+          // Create or update membership
+          const plans = await storage.getAllMembershipPlans();
+          const plan = plans.find(p => p.planType === item.data?.planType);
+          
+          if (plan) {
+            // Check for existing membership
+            const existingMembership = await storage.getMembershipByUserId(user.id);
+            
+            if (existingMembership) {
+              // Update existing membership
+              await storage.updateMembership(existingMembership.id, {
+                planType: plan.planType,
+                status: 'active',
+                startDate: new Date(),
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              });
+            } else {
+              // Create new membership
+              await storage.createMembership({
+                memberId: `MEM-${Date.now()}`,
+                planType: plan.planType,
+                status: 'active',
+                startDate: new Date(),
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                autoRenew: true,
+                userId: user.id
+              });
+            }
+            
+            // Create payment record
+            await storage.createPayment({
+              userId: user.id,
+              membershipId: "general-purchase",
+              amount: plan.monthlyPrice,
+              description: `${plan.name} - Monthly Membership`,
+              status: "successful",
+              method: "credit_card",
+              stripePaymentIntentId: paymentIntentId,
+              stripePaymentMethodId: paymentIntent.payment_method as string || "default"
+            });
+          }
+        } else if (item.type === 'punch_card') {
+          // Create punch card
+          const templates = await storage.getAllPunchCardTemplates();
+          const template = templates.find(t => t.id === item.data?.templateId);
+          
+          if (template) {
+            const quantity = item.quantity || 1;
+            
+            for (let i = 0; i < quantity; i++) {
+              await storage.createPunchCard({
+                userId: user.id,
+                templateId: template.id,
+                name: template.name,
+                totalPunches: template.totalPunches,
+                remainingPunches: template.totalPunches,
+                pricePerPunch: template.pricePerPunch,
+                totalPrice: template.totalPrice,
+                status: 'active'
+              });
+
+              await storage.createPayment({
+                userId: user.id,
+                membershipId: "general-purchase",
+                amount: template.totalPrice,
+                description: `${template.name} - Day Pass Package`,
+                status: "successful",
+                method: "credit_card",
+                stripePaymentIntentId: paymentIntentId,
+                stripePaymentMethodId: paymentIntent.payment_method as string || "default"
+              });
+            }
+          }
+        }
+      }
+
+      res.json({ success: true, message: "Order finalized successfully" });
+    } catch (error: any) {
+      console.error('Failed to finalize order:', error);
+      res.status(500).json({ message: "Failed to finalize order: " + error.message });
     }
   });
 

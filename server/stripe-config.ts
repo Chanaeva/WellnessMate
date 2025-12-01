@@ -63,7 +63,7 @@ if (isProduction) {
 
 // Initialize Stripe with production-ready configuration
 export const stripe = new Stripe(STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-05-28.basil",
+  apiVersion: "2024-12-18.acacia",
   typescript: true,
   telemetry: false, // Disable telemetry for production
   maxNetworkRetries: 3,

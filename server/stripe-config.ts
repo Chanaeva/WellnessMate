@@ -1,30 +1,18 @@
 import Stripe from "stripe";
 
-// Environment validation with test key support
-const isDevelopment = process.env.NODE_ENV === 'development';
+// Simplified configuration: Always use the production/live keys
+// User has requested to use only production keys for both dev and prod environments
 
-// Debug: Log what we're seeing
-console.log('🔍 Environment Debug:', {
-  isDev: isDevelopment,
+// Always use the production keys (STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY)
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const VITE_STRIPE_PUBLIC_KEY = process.env.VITE_STRIPE_PUBLIC_KEY;
+
+// Debug: Log what we're using
+console.log('🔧 Stripe Key Configuration:', {
   nodeEnv: process.env.NODE_ENV,
-  hasDEV_SECRET: !!process.env.DEV_STRIPE_SECRET,
-  hasDEV_PUBLIC: !!process.env.DEV_STRIPE_PUBLIC,
-  hasPROD_SECRET: !!process.env.STRIPE_SECRET_KEY,
-  hasPROD_PUBLIC: !!process.env.VITE_STRIPE_PUBLIC_KEY,
-  DEV_SECRET_starts: process.env.DEV_STRIPE_SECRET?.substring(0, 15),
-  DEV_PUBLIC_starts: process.env.DEV_STRIPE_PUBLIC?.substring(0, 15),
-  PROD_SECRET_starts: process.env.STRIPE_SECRET_KEY?.substring(0, 15),
-  PROD_PUBLIC_starts: process.env.VITE_STRIPE_PUBLIC_KEY?.substring(0, 15),
+  secretKeyPrefix: STRIPE_SECRET_KEY?.substring(0, 15),
+  publicKeyPrefix: VITE_STRIPE_PUBLIC_KEY?.substring(0, 15),
 });
-
-// In development, prefer testing keys if available (try new names first, then old names)
-const STRIPE_SECRET_KEY = isDevelopment && (process.env.DEV_STRIPE_SECRET || process.env.TESTING_STRIPE_SECRET_KEY)
-  ? (process.env.DEV_STRIPE_SECRET || process.env.TESTING_STRIPE_SECRET_KEY)
-  : process.env.STRIPE_SECRET_KEY;
-
-const VITE_STRIPE_PUBLIC_KEY = isDevelopment && (process.env.DEV_STRIPE_PUBLIC || process.env.TESTING_VITE_STRIPE_PUBLIC_KEY)
-  ? (process.env.DEV_STRIPE_PUBLIC || process.env.TESTING_VITE_STRIPE_PUBLIC_KEY)
-  : process.env.VITE_STRIPE_PUBLIC_KEY;
 
 const requiredStripeEnvVars = {
   STRIPE_SECRET_KEY,
@@ -38,32 +26,21 @@ for (const [key, value] of Object.entries(requiredStripeEnvVars)) {
   }
 }
 
-// Validate environment-specific keys
+// Environment flags
 const isProduction = process.env.NODE_ENV === 'production';
+const isDevelopment = process.env.NODE_ENV === 'development';
 
-if (isProduction) {
-  // Production validation
-  if (!STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
-    throw new Error('Production environment requires live Stripe secret key (sk_live_...)');
-  }
-  if (!VITE_STRIPE_PUBLIC_KEY?.startsWith('pk_live_')) {
-    console.warn('⚠️  Warning: Production environment should use live Stripe public key (pk_live_...)');
-  }
-  if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.warn('⚠️  Warning: Production environment should have STRIPE_WEBHOOK_SECRET configured');
-  }
-} else if (isDevelopment) {
-  // Development validation
-  if (STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
-    console.warn('⚠️  Warning: Using live Stripe keys in development environment');
-  } else if (STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
-    console.log('✅ Using Stripe test keys in development');
-  }
+// Log key type info
+const keyType = STRIPE_SECRET_KEY?.startsWith('sk_live_') ? 'live' : 'test';
+console.log(`✅ Using Stripe ${keyType} keys`);
+
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  console.warn('⚠️  Warning: STRIPE_WEBHOOK_SECRET not configured (webhooks may not work)');
 }
 
 // Initialize Stripe with production-ready configuration
 export const stripe = new Stripe(STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2025-05-28.basil",
   typescript: true,
   telemetry: false, // Disable telemetry for production
   maxNetworkRetries: 3,

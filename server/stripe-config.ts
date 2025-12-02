@@ -4,14 +4,19 @@ import Stripe from "stripe";
 // User has requested to use only production keys for both dev and prod environments
 
 // Always use the production keys (STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY)
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const VITE_STRIPE_PUBLIC_KEY = process.env.VITE_STRIPE_PUBLIC_KEY;
+// Trim whitespace to prevent issues with copy/paste
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim();
+const VITE_STRIPE_PUBLIC_KEY = process.env.VITE_STRIPE_PUBLIC_KEY?.trim();
 
-// Debug: Log what we're using
+// Debug: Log what we're using (including length and last 4 chars to verify correct key)
 console.log('🔧 Stripe Key Configuration:', {
   nodeEnv: process.env.NODE_ENV,
   secretKeyPrefix: STRIPE_SECRET_KEY?.substring(0, 15),
+  secretKeyLength: STRIPE_SECRET_KEY?.length,
+  secretKeyLast4: STRIPE_SECRET_KEY?.slice(-4),
   publicKeyPrefix: VITE_STRIPE_PUBLIC_KEY?.substring(0, 15),
+  publicKeyLength: VITE_STRIPE_PUBLIC_KEY?.length,
+  publicKeyLast4: VITE_STRIPE_PUBLIC_KEY?.slice(-4),
 });
 
 const requiredStripeEnvVars = {

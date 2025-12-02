@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import { stripe, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe, STRIPE_ENV_INFO } from "./stripe-config";
+import { stripe, createStripeClient, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe, STRIPE_ENV_INFO } from "./stripe-config";
 import { setupStripeWebhooks } from "./stripe-webhooks";
 import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
@@ -1048,10 +1048,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Minimum charge amount is $0.50" });
       }
 
+      // Create fresh Stripe client to ensure latest key is used
+      const freshStripe = createStripeClient();
+
       // Ensure user has Stripe customer
       let customerId = user.stripeCustomerId;
       if (!customerId) {
-        const customer = await stripe.customers.create({
+        const customer = await freshStripe.customers.create({
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
           metadata: {
@@ -1064,7 +1067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create PaymentIntent with setup_future_usage to save the card
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await freshStripe.paymentIntents.create({
         amount: totalAmount,
         currency: 'usd',
         customer: customerId,
@@ -1097,8 +1100,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const { paymentIntentId, items, promoCode } = req.body;
 
+      // Create fresh Stripe client to ensure latest key is used
+      const freshStripe = createStripeClient();
+
       // Verify the payment intent succeeded
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await freshStripe.paymentIntents.retrieve(paymentIntentId);
       
       if (paymentIntent.status !== 'succeeded') {
         return res.status(400).json({ message: "Payment has not been completed" });
@@ -1106,7 +1112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Save the payment method from the successful payment
       if (paymentIntent.payment_method) {
-        const paymentMethod = await stripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+        const paymentMethod = await freshStripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
         
         if (paymentMethod.card) {
           const existingMethods = await storage.getPaymentMethodsByUserId(user.id);

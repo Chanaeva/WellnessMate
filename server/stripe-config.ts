@@ -43,6 +43,27 @@ if (!process.env.STRIPE_WEBHOOK_SECRET) {
   console.warn('⚠️  Warning: STRIPE_WEBHOOK_SECRET not configured (webhooks may not work)');
 }
 
+// Function to create a fresh Stripe client (reads env var at call time)
+export function createStripeClient(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  console.log('🔑 Creating Stripe client with key ending in:', key.slice(-4));
+  return new Stripe(key, {
+    apiVersion: "2025-05-28.basil",
+    typescript: true,
+    telemetry: false,
+    maxNetworkRetries: 3,
+    timeout: 30000,
+    appInfo: {
+      name: "Wolf Mother Wellness",
+      version: "1.0.0",
+      url: "https://wolfmotherwellness.com",
+    },
+  });
+}
+
 // Initialize Stripe with production-ready configuration
 export const stripe = new Stripe(STRIPE_SECRET_KEY!, {
   apiVersion: "2025-05-28.basil",

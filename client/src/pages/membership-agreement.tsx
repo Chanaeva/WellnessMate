@@ -523,7 +523,7 @@ export default function MembershipAgreement() {
                       • Shower before entering saunas or cold plunge pools
                     </li>
                     <li>
-                      • Maximum 20 minutes in saunas, 5 minutes in cold plunge
+                      • Maximum 20 minutes in saunas, 15 minutes in cold plunge
                     </li>
                     <li>
                       • No glass containers, electronics, or photography in wet

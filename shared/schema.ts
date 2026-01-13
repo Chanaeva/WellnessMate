@@ -17,9 +17,15 @@ export const users = pgTable("users", {
   role: roleEnum("role").notNull().default('member'),
   stripeCustomerId: text("stripe_customer_id"),
   
+  // Staff/Admin first-login password setup
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
+  passwordSetAt: timestamp("password_set_at"),
+  lastLoginAt: timestamp("last_login_at"),
+  
   // Membership Agreement fields
   membershipAgreementCompleted: boolean("membership_agreement_completed").default(false),
   membershipAgreementDate: timestamp("membership_agreement_date"),
+  membershipAgreementData: jsonb("membership_agreement_data"), // Stores full agreement for PDF generation
   emergencyContact: text("emergency_contact"),
   emergencyPhone: text("emergency_phone"),
   dateOfBirth: date("date_of_birth"),
@@ -63,6 +69,7 @@ export const memberships = pgTable("memberships", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   autoRenew: boolean("auto_renew").notNull().default(true),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -96,7 +103,13 @@ export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   membershipId: text("membership_id"),
-  amount: integer("amount").notNull(), // Stored in cents
+  amount: integer("amount").notNull(), // Stored in cents (final amount after discount)
+  originalAmount: integer("original_amount"), // Original amount before discount (in cents)
+  discountAmount: integer("discount_amount"), // Discount amount in cents
+  discountType: text("discount_type"), // 'percentage' or 'fixed'
+  discountValue: integer("discount_value"), // The discount value (percentage or cents)
+  discountReason: text("discount_reason"), // Staff notes for the discount
+  discountAppliedBy: integer("discount_applied_by").references(() => users.id), // Staff who applied discount
   description: text("description").notNull(),
   status: paymentStatusEnum("status").notNull(),
   method: paymentMethodEnum("method").notNull(),
@@ -130,6 +143,8 @@ export const membershipPlans = pgTable("membership_plans", {
   availableFrom: timestamp("available_from"),
   availableUntil: timestamp("available_until"),
   expiresAt: timestamp("expires_at"), // Optional expiration date for the package
+  stripeProductId: text("stripe_product_id"),
+  stripePriceId: text("stripe_price_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -510,6 +525,9 @@ export const itemSizeEnum = pgEnum('item_size', ['XS', 'S', 'M', 'L', 'XL', 'XXL
 // Checkout status enum
 export const checkoutStatusEnum = pgEnum('checkout_status', ['checked_out', 'returned', 'lost']);
 
+// Checkout payment status enum
+export const checkoutPaymentStatusEnum = pgEnum('checkout_payment_status', ['not_charged', 'charged', 'failed']);
+
 // Inventory items table
 export const inventoryItems = pgTable("inventory_items", {
   id: serial("id").primaryKey(),
@@ -518,6 +536,7 @@ export const inventoryItems = pgTable("inventory_items", {
   size: itemSizeEnum("size").notNull(),
   quantityTotal: integer("quantity_total").notNull(), // Total items in inventory
   quantityAvailable: integer("quantity_available").notNull(), // Currently available
+  priceInCents: integer("price_in_cents").notNull().default(0), // Price to charge for checkout
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"), // Admin notes about the item
   createdAt: timestamp("created_at").defaultNow(),
@@ -535,6 +554,11 @@ export const itemCheckouts = pgTable("item_checkouts", {
   checkedInAt: timestamp("checked_in_at"),
   status: checkoutStatusEnum("status").notNull().default('checked_out'),
   notes: text("notes"), // Staff notes
+  // Payment tracking fields
+  paymentStatus: checkoutPaymentStatusEnum("payment_status").notNull().default('not_charged'),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  chargedAmountCents: integer("charged_amount_cents"),
+  chargedAt: timestamp("charged_at"),
 });
 
 // Insert schemas for inventory
@@ -562,10 +586,10 @@ export const dayOfWeekEnum = pgEnum('day_of_week', ['monday', 'tuesday', 'wednes
 export const hoursOfOperation = pgTable("hours_of_operation", {
   id: serial("id").primaryKey(),
   dayOfWeek: dayOfWeekEnum("day_of_week").notNull().unique(),
-  openTime: text("open_time").notNull(), // e.g., "6:00 AM"
-  closeTime: text("close_time").notNull(), // e.g., "10:00 PM"
-  membersOnlyStart: text("members_only_start"), // e.g., "6:00 AM"
-  membersOnlyEnd: text("members_only_end"), // e.g., "9:00 AM"
+  openTime: text("open_time").notNull(), // Member access start time, e.g., "6:00 AM"
+  closeTime: text("close_time").notNull(), // Member access end time, e.g., "10:00 PM"
+  dayPassStart: text("day_pass_start"), // Day pass access start time, e.g., "9:00 AM"
+  dayPassEnd: text("day_pass_end"), // Day pass access end time, e.g., "10:00 PM"
   isClosed: boolean("is_closed").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
@@ -579,3 +603,34 @@ export const insertHoursOfOperationSchema = createInsertSchema(hoursOfOperation)
 // Types for hours of operation
 export type HoursOfOperation = typeof hoursOfOperation.$inferSelect;
 export type InsertHoursOfOperation = z.infer<typeof insertHoursOfOperationSchema>;
+
+// Login events table for tracking staff/admin logins
+export const loginEvents = pgTable("login_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  wasSuccessful: boolean("was_successful").notNull().default(true),
+});
+
+// Insert schema for login events
+export const insertLoginEventSchema = createInsertSchema(loginEvents).omit({
+  id: true,
+  occurredAt: true,
+});
+
+// Types for login events
+export type LoginEvent = typeof loginEvents.$inferSelect;
+export type InsertLoginEvent = z.infer<typeof insertLoginEventSchema>;
+
+// Schema for updating staff/admin users
+export const updateStaffAdminSchema = z.object({
+  email: z.string().email().optional(),
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  phoneNumber: z.string().optional(),
+  role: z.enum(['staff', 'admin']).optional(),
+  password: z.string().min(6).optional(),
+  mustChangePassword: z.boolean().optional(),
+});

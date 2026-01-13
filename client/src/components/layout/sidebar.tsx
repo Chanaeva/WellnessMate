@@ -18,11 +18,15 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ className }: SidebarProps) => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { logoutMutation } = useAuth();
 
   const handleLogout = () => {
-    logoutMutation.mutate();
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        setLocation("/");
+      }
+    });
   };
 
   const navItems = [

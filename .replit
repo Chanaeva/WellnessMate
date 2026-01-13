@@ -15,66 +15,6 @@ run = ["npm", "run", "start"]
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 33195
-externalPort = 9000
-
-[[ports]]
-localPort = 33919
-externalPort = 8008
-
-[[ports]]
-localPort = 34245
-externalPort = 6000
-
-[[ports]]
-localPort = 35813
-externalPort = 8080
-
-[[ports]]
-localPort = 37707
-externalPort = 8081
-
-[[ports]]
-localPort = 37727
-externalPort = 5173
-
-[[ports]]
-localPort = 39287
-externalPort = 8099
-
-[[ports]]
-localPort = 39401
-externalPort = 3001
-
-[[ports]]
-localPort = 39595
-externalPort = 3002
-
-[[ports]]
-localPort = 42409
-externalPort = 8000
-
-[[ports]]
-localPort = 43025
-externalPort = 3003
-
-[[ports]]
-localPort = 43241
-externalPort = 5000
-
-[[ports]]
-localPort = 43741
-externalPort = 3000
-
-[[ports]]
-localPort = 44673
-externalPort = 6800
-
-[[ports]]
-localPort = 45741
-externalPort = 4200
-
 [workflows]
 runButton = "Project"
 
@@ -98,3 +38,9 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_stripe:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+TESTING_VITE_STRIPE_PUBLIC_KEY = "pk_test_51RbkmYR0SNvBUUcpSOrImOrNr0R2PVQzlssVKpolhqPr3uT9oJThjwp2adHUJ5j8nUDeFjVWjlkGbXx4deKK59gs00RfsZAePs"
+TESTING_STRIPE_SECRET_KEY = "sk_test_51RbkmYR0SNvBUUcpaZ69E20RYRabLW10A91KI9Cnj3igUFm79O5F4aFQGRLm08WtcZY5ScluVByfSfRdqX8fcDhC00Yerx4kEk"

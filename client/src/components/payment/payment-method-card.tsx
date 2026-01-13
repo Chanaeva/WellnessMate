@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { CreditCard, Trash2, Star, StarOff, Loader2 } from "lucide-react";
+import { CreditCard, Trash2, Star, Loader2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface PaymentMethod {
@@ -106,29 +106,30 @@ export function PaymentMethodCard({
 
   return (
     <Card 
-      className={`bg-slate-800/50 border-slate-700 transition-all duration-200 hover:bg-slate-800/70 ${
-        isSelected ? 'ring-2 ring-amber-500 border-amber-500' : ''
+      className={`bg-white border-gray-200 transition-all duration-200 hover:bg-gray-50 ${
+        isSelected ? 'ring-2 ring-primary border-primary' : ''
       } ${onSelect ? 'cursor-pointer' : ''}`}
       onClick={() => onSelect?.(paymentMethod)}
+      data-testid={`payment-method-card-${paymentMethod.id}`}
     >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="text-slate-300">
+            <div className="text-gray-600">
               {getCardIcon(paymentMethod.cardBrand)}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-white font-medium">
+                <span className="text-gray-900 font-medium">
                   {formatCardBrand(paymentMethod.cardBrand)} •••• {paymentMethod.cardLast4}
                 </span>
                 {paymentMethod.isDefault && (
-                  <Badge variant="secondary" className="bg-amber-600/20 text-amber-300 border-amber-600/30">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
                     Default
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-gray-500">
                 Expires {paymentMethod.cardExpMonth.toString().padStart(2, '0')}/{paymentMethod.cardExpYear}
               </p>
             </div>
@@ -145,12 +146,14 @@ export function PaymentMethodCard({
                     handleSetDefault();
                   }}
                   disabled={isSettingDefault}
-                  className="text-slate-400 hover:text-amber-400"
+                  className="text-gray-500 hover:text-primary"
+                  title="Set as default"
+                  data-testid={`button-set-default-${paymentMethod.id}`}
                 >
                   {isSettingDefault ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <StarOff className="h-4 w-4" />
+                    <Star className="h-4 w-4" />
                   )}
                 </Button>
               )}
@@ -162,7 +165,8 @@ export function PaymentMethodCard({
                     size="sm"
                     onClick={(e) => e.stopPropagation()}
                     disabled={isDeleting}
-                    className="text-slate-400 hover:text-red-400"
+                    className="text-gray-500 hover:text-red-500"
+                    data-testid={`button-delete-payment-method-${paymentMethod.id}`}
                   >
                     {isDeleting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -171,15 +175,15 @@ export function PaymentMethodCard({
                     )}
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="bg-slate-800 border-slate-700">
+                <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-white">Remove Payment Method</AlertDialogTitle>
-                    <AlertDialogDescription className="text-slate-400">
+                    <AlertDialogTitle>Remove Payment Method</AlertDialogTitle>
+                    <AlertDialogDescription>
                       Are you sure you want to remove this payment method? This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="border-slate-600 text-slate-300 hover:bg-slate-700">
+                    <AlertDialogCancel>
                       Cancel
                     </AlertDialogCancel>
                     <AlertDialogAction

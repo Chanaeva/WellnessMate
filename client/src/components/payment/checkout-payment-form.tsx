@@ -69,9 +69,17 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel }: C
   });
 
   const finalizeOrderMutation = useMutation({
-    mutationFn: async (paymentIntentId: string) => {
+    mutationFn: async (data: { 
+      paymentIntentId: string; 
+      subscriptionId?: string; 
+      type?: string;
+      invoiceId?: string;
+    }) => {
       const res = await apiRequest("POST", "/api/stripe/finalize-order", {
-        paymentIntentId,
+        paymentIntentId: data.paymentIntentId,
+        subscriptionId: data.subscriptionId,
+        type: data.type,
+        invoiceId: data.invoiceId,
         items: items.map(item => ({
           type: item.type,
           quantity: item.quantity || 1,
@@ -98,13 +106,75 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel }: C
     setCardError(null);
 
     try {
-      const { clientSecret, paymentIntentId } = await createPaymentIntentMutation.mutateAsync();
+      const checkoutData = await createPaymentIntentMutation.mutateAsync();
+      const { 
+        clientSecret, 
+        paymentIntentId, 
+        subscriptionId, 
+        type, 
+        invoiceId,
+        alreadyPaid,
+        requiresPaymentMethod,
+        subscriptionStatus,
+      } = checkoutData;
+      
+      // Case 1: Payment was already completed with saved card
+      if (alreadyPaid && subscriptionStatus === 'active') {
+        console.log('Subscription already paid with saved card, finalizing...');
+        await finalizeOrderMutation.mutateAsync({
+          paymentIntentId: 'saved_card_payment',
+          subscriptionId,
+          type: 'subscription',
+          invoiceId,
+        });
+        
+        queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+        onSuccess(subscriptionId || 'saved_card_payment');
+        return;
+      }
       
       const cardNumberElement = elements.getElement(CardNumberElement);
       if (!cardNumberElement) {
         throw new Error("Card number element not found");
       }
 
+      // Case 2: SetupIntent flow - need to collect card first, then complete subscription
+      if (type === 'subscription_setup' || requiresPaymentMethod) {
+        console.log('Using SetupIntent to collect card...');
+        
+        const { error: setupError, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
+          payment_method: {
+            card: cardNumberElement,
+          }
+        });
+
+        if (setupError) {
+          setCardError(setupError.message || "Card setup failed");
+          throw new Error(setupError.message);
+        }
+
+        if (setupIntent?.status === 'succeeded' && setupIntent.payment_method) {
+          console.log('Card setup succeeded, completing subscription...');
+          
+          // Now complete the subscription with the saved payment method
+          await finalizeOrderMutation.mutateAsync({
+            paymentIntentId: setupIntent.payment_method as string,
+            subscriptionId,
+            type: 'subscription_setup_complete',
+            invoiceId,
+          });
+          
+          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+          onSuccess(subscriptionId || setupIntent.id);
+          return;
+        } else {
+          throw new Error(`Card setup was not completed. Status: ${setupIntent?.status}`);
+        }
+      }
+
+      // Case 3: Normal PaymentIntent flow
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardNumberElement,
@@ -118,12 +188,28 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel }: C
 
       if (paymentIntent?.status === 'succeeded') {
         // Finalize the order (create membership/punch cards, save payment method)
-        await finalizeOrderMutation.mutateAsync(paymentIntentId);
+        try {
+          await finalizeOrderMutation.mutateAsync({
+            paymentIntentId,
+            subscriptionId,
+            type,
+            invoiceId,
+          });
+        } catch (finalizeError: any) {
+          console.error('Finalize order failed:', finalizeError);
+          toast({
+            title: "Payment Received",
+            description: "Your payment was processed but there was an issue activating your membership. Please contact support.",
+            variant: "destructive",
+          });
+          throw finalizeError;
+        }
         
         queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
         onSuccess(paymentIntentId);
       } else {
-        throw new Error("Payment was not completed");
+        throw new Error(`Payment was not completed. Status: ${paymentIntent?.status}`);
       }
     } catch (error: any) {
       toast({

@@ -7,6 +7,8 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
+import PDFDocument from "pdfkit";
+import Twilio from "twilio";
 
 declare global {
   namespace Express {
@@ -39,7 +41,9 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24, // 1 day
-      secure: process.env.NODE_ENV === "production"
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      httpOnly: true
     }
   };
 
@@ -178,21 +182,59 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+  app.post("/api/login", async (req, res, next) => {
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] as string || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    passport.authenticate("local", async (err: Error | null, user: SelectUser | false, info: { message: string } | undefined) => {
       if (err) return next(err);
+      
       if (!user) {
+        // Record failed login attempt if we can identify the user by email
+        try {
+          const attemptedUser = await storage.getUserByEmail(req.body.email);
+          if (attemptedUser && (attemptedUser.role === 'staff' || attemptedUser.role === 'admin')) {
+            await storage.createLoginEvent({
+              userId: attemptedUser.id,
+              ipAddress,
+              userAgent,
+              wasSuccessful: false,
+            });
+          }
+        } catch (e) {
+          // Ignore login event errors
+        }
         return res.status(401).json({ message: "Invalid username or password" });
       }
       
-      req.login(user, (err) => {
+      req.login(user, async (err) => {
         if (err) return next(err);
+        
+        // Record successful login for staff/admin users
+        if (user.role === 'staff' || user.role === 'admin') {
+          try {
+            await storage.createLoginEvent({
+              userId: user.id,
+              ipAddress,
+              userAgent,
+              wasSuccessful: true,
+            });
+            await storage.updateUserLastLogin(user.id);
+          } catch (e) {
+            console.error('Failed to record login event:', e);
+          }
+        }
+        
         // Remove password from response
         const { password, ...userWithoutPassword } = user;
         
         // Determine redirect based on user role and status
         let redirectTo = "/dashboard";
-        if (userWithoutPassword.role === "admin") {
+        
+        // Check if user must change password (staff/admin first login)
+        if (user.mustChangePassword && (user.role === 'staff' || user.role === 'admin')) {
+          redirectTo = "/set-password";
+        } else if (userWithoutPassword.role === "admin") {
           redirectTo = "/admin";
         } else if (userWithoutPassword.role === "staff") {
           redirectTo = "/staff/check-in";
@@ -222,6 +264,53 @@ export function setupAuth(app: Express) {
     res.json(userWithoutPassword);
   });
 
+  // Staff/Admin: Set password on first login
+  app.post("/api/set-password", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    const user = req.user!;
+    
+    // Only allow staff/admin users who must change password
+    if (!user.mustChangePassword || (user.role !== 'staff' && user.role !== 'admin')) {
+      return res.status(400).json({ message: "Password change not required" });
+    }
+
+    try {
+      const { password, confirmPassword } = req.body;
+      
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: "Passwords do not match" });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      
+      await storage.updateStaffAdmin(user.id, {
+        password: hashedPassword,
+        mustChangePassword: false,
+      });
+
+      // Determine redirect based on role
+      let redirectTo = "/staff/check-in";
+      if (user.role === 'admin') {
+        redirectTo = "/admin";
+      }
+
+      res.json({ 
+        message: "Password set successfully",
+        redirectTo
+      });
+    } catch (error: any) {
+      console.error("Set password error:", error);
+      res.status(500).json({ message: "Failed to set password" });
+    }
+  });
+
   // Submit membership agreement
   app.post("/api/membership-agreement", async (req, res, next) => {
     if (!req.isAuthenticated()) {
@@ -232,10 +321,11 @@ export function setupAuth(app: Express) {
       const userId = req.user!.id;
       const agreementData = req.body;
       
-      // Update the user with agreement completion and data
+      // Update the user with agreement completion and data (store full agreement for PDF generation)
       await storage.updateUser(userId, {
         membershipAgreementCompleted: true,
         membershipAgreementDate: new Date(),
+        membershipAgreementData: agreementData, // Store full agreement data for PDF
         emergencyContact: agreementData.emergencyContact,
         emergencyPhone: agreementData.emergencyPhone,
         dateOfBirth: agreementData.dateOfBirth,
@@ -252,6 +342,114 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // Download membership agreement as PDF
+  app.get("/api/membership-agreement/pdf", async (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    try {
+      const user = req.user!;
+      
+      if (!user.membershipAgreementCompleted) {
+        return res.status(400).json({ message: "No membership agreement found" });
+      }
+
+      // Create a PDF document
+      const doc = new PDFDocument({ margin: 50 });
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=Wolf_Mother_Wellness_Agreement_${user.firstName}_${user.lastName}.pdf`);
+      
+      // Pipe PDF to response
+      doc.pipe(res);
+
+      // PDF Header
+      doc.fontSize(24).font('Helvetica-Bold').text('Wolf Mother Wellness', { align: 'center' });
+      doc.fontSize(16).font('Helvetica').text('Membership Agreement & Waiver', { align: 'center' });
+      doc.moveDown();
+      
+      // Horizontal line
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+
+      // Member Information Section
+      doc.fontSize(14).font('Helvetica-Bold').text('Member Information');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Name: ${user.firstName} ${user.lastName}`);
+      doc.text(`Email: ${user.email}`);
+      doc.text(`Phone: ${user.phoneNumber || 'Not provided'}`);
+      doc.text(`Date of Birth: ${user.dateOfBirth || 'Not provided'}`);
+      doc.text(`Address: ${user.address || 'Not provided'}`);
+      doc.moveDown();
+
+      // Emergency Contact Section
+      doc.fontSize(14).font('Helvetica-Bold').text('Emergency Contact');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Contact Name: ${user.emergencyContact || 'Not provided'}`);
+      doc.text(`Contact Phone: ${user.emergencyPhone || 'Not provided'}`);
+      doc.moveDown();
+
+      // Agreement Date
+      doc.fontSize(14).font('Helvetica-Bold').text('Agreement Details');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Membership Type: ${user.preferredMembershipType || 'Standard'}`);
+      doc.text(`Agreement Date: ${user.membershipAgreementDate ? new Date(user.membershipAgreementDate).toLocaleDateString() : 'Not available'}`);
+      doc.moveDown();
+
+      // Acknowledgments Section
+      doc.fontSize(14).font('Helvetica-Bold').text('Acknowledgments & Agreements');
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica');
+      
+      const acknowledgments = [
+        'I certify that I am in good physical health and have no medical conditions that would prevent safe participation.',
+        'I have consulted with a healthcare provider if I have any health concerns.',
+        'I understand and accept the inherent risks of thermal wellness activities.',
+        'I confirm I am not pregnant or will notify staff if I become pregnant.',
+        'I voluntarily choose to participate in thermal wellness activities.',
+        'I assume all risks associated with using the facilities.',
+        'I release Wolf Mother Wellness from liability for any injuries.',
+        'I agree to follow all facility rules and guidelines.',
+        'I will behave respectfully toward staff and other members.',
+        'I acknowledge the privacy policy and consent to necessary emergency medical treatment.',
+        'I confirm I am 18 years of age or older.'
+      ];
+
+      acknowledgments.forEach((ack, index) => {
+        doc.text(`${index + 1}. ${ack}`);
+        doc.moveDown(0.3);
+      });
+
+      doc.moveDown();
+
+      // Signature Section
+      doc.fontSize(14).font('Helvetica-Bold').text('Digital Signature');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Signed by: ${user.firstName} ${user.lastName}`);
+      doc.text(`Date: ${user.membershipAgreementDate ? new Date(user.membershipAgreementDate).toLocaleDateString() : new Date().toLocaleDateString()}`);
+      doc.text('This document was signed electronically and is legally binding.');
+      
+      doc.moveDown(2);
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+      doc.fontSize(9).font('Helvetica').fillColor('gray');
+      doc.text('Wolf Mother Wellness - Thermal Wellness Center', { align: 'center' });
+      doc.text('This agreement is valid as of the signature date above.', { align: 'center' });
+
+      // Finalize the PDF
+      doc.end();
+    } catch (error: any) {
+      console.log(`PDF generation error: ${error.message}`);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
   // Password reset request endpoint
   app.post("/api/password-reset-request", async (req, res, next) => {
     try {
@@ -261,12 +459,19 @@ export function setupAuth(app: Express) {
       const user = await storage.getUserByEmail(email);
       if (!user) {
         // Don't reveal if email exists for security
-        return res.status(200).json({ message: "If an account with that email exists, a reset link has been sent." });
+        return res.status(200).json({ message: "If an account with that email or phone exists, a reset code has been sent." });
       }
 
-      // Generate secure reset token
-      const token = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+      // Check if user has a phone number for SMS
+      if (!user.phoneNumber) {
+        console.log(`Password reset requested for user ${user.id} but no phone number on file`);
+        return res.status(200).json({ message: "If an account with that email or phone exists, a reset code has been sent." });
+      }
+
+      // Generate a 6-digit reset code (easier for SMS)
+      const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const token = resetCode; // Use the code as the token
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes for SMS codes
 
       // Store reset token
       await storage.createPasswordResetToken({
@@ -276,12 +481,36 @@ export function setupAuth(app: Express) {
         used: false
       });
 
-      // For now, just return success (email would be sent here with SendGrid)
-      res.status(200).json({ 
-        message: "If an account with that email exists, a reset link has been sent.",
-        // In development, include the token for testing
-        ...(process.env.NODE_ENV === 'development' && { resetToken: token })
-      });
+      // Send SMS via Twilio
+      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+      if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+        console.error("Twilio credentials not configured");
+        return res.status(500).json({ message: "SMS service not configured. Please contact support." });
+      }
+
+      try {
+        const twilioClient = Twilio(twilioAccountSid, twilioAuthToken);
+        
+        await twilioClient.messages.create({
+          body: `Your Wolf Mother Wellness password reset code is: ${resetCode}. This code expires in 15 minutes.`,
+          from: twilioPhoneNumber,
+          to: user.phoneNumber
+        });
+
+        console.log(`Password reset SMS sent to ${user.phoneNumber} for user ${user.id}`);
+        
+        res.status(200).json({ 
+          message: "A password reset code has been sent to your phone.",
+          // Return partial phone for UI display
+          phoneLastFour: user.phoneNumber.slice(-4)
+        });
+      } catch (smsError: any) {
+        console.error("Failed to send SMS:", smsError.message);
+        return res.status(500).json({ message: "Failed to send reset code. Please try again or contact support." });
+      }
     } catch (error) {
       next(error);
     }

@@ -27,7 +27,8 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
     clearCart, 
     applyPromoCode,
     removePromoCode,
-    setCartOpenCallback 
+    setCartOpenCallback,
+    setCartCloseCallback
   } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const [promoInput, setPromoInput] = useState("");
@@ -93,11 +94,15 @@ export function CartSidebar({ trigger }: CartSidebarProps) {
     });
   };
 
-  // Set up cart open callback
+  // Set up cart open and close callbacks
   useEffect(() => {
     setCartOpenCallback(() => () => setIsOpen(true));
-    return () => setCartOpenCallback(null);
-  }, [setCartOpenCallback]);
+    setCartCloseCallback(() => () => setIsOpen(false));
+    return () => {
+      setCartOpenCallback(null);
+      setCartCloseCallback(null);
+    };
+  }, [setCartOpenCallback, setCartCloseCallback]);
 
   const defaultTrigger = (
     <Button variant="outline" size="sm" className="relative">

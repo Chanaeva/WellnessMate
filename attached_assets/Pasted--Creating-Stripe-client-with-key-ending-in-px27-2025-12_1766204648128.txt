@@ -1,0 +1,137 @@
+🔑 Creating Stripe client with key ending in: px27
+2025-12-19 21:59:41.97
+1e49fd90
+User
+active: true,
+2025-12-19 21:59:41.97
+1e49fd90
+User
+Verified Stripe price exists: {
+2025-12-19 21:59:41.97
+1e49fd90
+User
+priceId: 'price_1SgGGBByyckQw7mFHSr4GzyN',
+2025-12-19 21:59:41.97
+1e49fd90
+User
+}
+2025-12-19 21:59:41.97
+1e49fd90
+User
+unitAmount: 6500
+2025-12-19 21:59:41.97
+1e49fd90
+User
+productId: 'prod_TdXK8iU5MQzGms',
+2025-12-19 21:59:41.97
+1e49fd90
+User
+priceId: 'price_1SgGGBByyckQw7mFHSr4GzyN',
+2025-12-19 21:59:41.97
+1e49fd90
+User
+planName: 'Foundling Member',
+2025-12-19 21:59:41.97
+1e49fd90
+User
+userId: 106
+2025-12-19 21:59:41.97
+1e49fd90
+User
+planType: 'basic',
+2025-12-19 21:59:41.97
+1e49fd90
+User
+customerId: 'cus_TdY2OQkXjgFtPR',
+2025-12-19 21:59:41.97
+1e49fd90
+User
+Creating Stripe subscription: {
+2025-12-19 21:59:41.97
+1e49fd90
+User
+}
+2025-12-19 21:59:43.50
+1e49fd90
+User
+}
+2025-12-19 21:59:43.50
+1e49fd90
+User
+invoiceId: 'in_1SgHKUByyckQw7mFkVBXY89r',
+2025-12-19 21:59:43.50
+1e49fd90
+User
+paymentIntentStatus: undefined,
+2025-12-19 21:59:43.50
+1e49fd90
+User
+invoiceStatus: 'open',
+2025-12-19 21:59:43.50
+1e49fd90
+User
+hasClientSecret: false
+2025-12-19 21:59:43.50
+1e49fd90
+User
+Initial invoice state: {
+2025-12-19 21:59:43.50
+1e49fd90
+User
+No payment intent found, attempting to finalize invoice...
+2025-12-19 21:59:43.50
+1e49fd90
+User
+paymentIntentId: undefined,
+2025-12-19 21:59:43.70
+1e49fd90
+User
+paymentIntentStatus: undefined,
+2025-12-19 21:59:43.70
+1e49fd90
+User
+subscriptionId: 'sub_1SgHKUByyckQw7mF3dg3x6c9',
+2025-12-19 21:59:43.70
+1e49fd90
+User
+invoiceId: 'in_1SgHKUByyckQw7mFkVBXY89r',
+2025-12-19 21:59:43.70
+1e49fd90
+User
+}
+2025-12-19 21:59:43.70
+1e49fd90
+User
+paymentIntentId: undefined
+2025-12-19 21:59:43.70
+1e49fd90
+User
+invoiceStatus: 'open',
+2025-12-19 21:59:43.70
+1e49fd90
+User
+}
+2025-12-19 21:59:43.70
+1e49fd90
+User
+Retrieved invoice payment intent: {
+2025-12-19 21:59:43.70
+1e49fd90
+User
+Missing payment intent client secret after all attempts: {
+2025-12-19 21:59:43.70
+1e49fd90
+User
+paymentIntentId: undefined,
+2025-12-19 21:59:43.70
+1e49fd90
+User
+hasClientSecret: false
+2025-12-19 21:59:43.73
+1e49fd90
+User
+3:59:43 AM [express] POST /api/stripe/create-payment-intent 500 in 2193ms :: {"message":"Failed to c…
+2025-12-19 22:02:06.70
+45371ea9
+System
+system: received signal terminated

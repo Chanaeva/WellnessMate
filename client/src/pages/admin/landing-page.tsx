@@ -185,6 +185,17 @@ export default function LandingPageManagement() {
     }
   }, [footerData]);
 
+  // Day order for sorting (Sunday first, Saturday last)
+  const dayOrder: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+
   // Sync hoursFormData when hoursOfOperation query data changes (only if not dirty)
   useEffect(() => {
     if (hoursOfOperation && hoursOfOperation.length > 0 && !hoursFormDirty) {
@@ -193,11 +204,17 @@ export default function LandingPageManagement() {
         ...day,
         openTime: normalizeTime(day.openTime),
         closeTime: normalizeTime(day.closeTime),
-        membersOnlyStart: normalizeTime(day.membersOnlyStart),
-        membersOnlyEnd: normalizeTime(day.membersOnlyEnd),
+        dayPassStart: normalizeTime(day.dayPassStart),
+        dayPassEnd: normalizeTime(day.dayPassEnd),
       }));
-      setHoursFormData(normalizedData);
-      setOriginalHoursData(JSON.parse(JSON.stringify(normalizedData)));
+      // Sort by day of week
+      const sortedData = normalizedData.sort((a: any, b: any) => {
+        const dayA = dayOrder[a.dayOfWeek?.toLowerCase()] ?? 7;
+        const dayB = dayOrder[b.dayOfWeek?.toLowerCase()] ?? 7;
+        return dayA - dayB;
+      });
+      setHoursFormData(sortedData);
+      setOriginalHoursData(JSON.parse(JSON.stringify(sortedData)));
     }
   }, [hoursOfOperation, hoursFormDirty]);
 
@@ -442,8 +459,8 @@ export default function LandingPageManagement() {
       return (
         formDay.openTime !== originalDay.openTime ||
         formDay.closeTime !== originalDay.closeTime ||
-        formDay.membersOnlyStart !== originalDay.membersOnlyStart ||
-        formDay.membersOnlyEnd !== originalDay.membersOnlyEnd ||
+        formDay.dayPassStart !== originalDay.dayPassStart ||
+        formDay.dayPassEnd !== originalDay.dayPassEnd ||
         formDay.isClosed !== originalDay.isClosed
       );
     });
@@ -1212,7 +1229,7 @@ export default function LandingPageManagement() {
                           {!dayHours.isClosed && (
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label htmlFor={`open-${dayHours.id}`}>Open Time</Label>
+                                <Label htmlFor={`open-${dayHours.id}`}>Member Open</Label>
                                 <Select
                                   value={dayHours.openTime || ''}
                                   onValueChange={(value) => updateHoursField(dayHours.id, 'openTime', value)}
@@ -1230,7 +1247,7 @@ export default function LandingPageManagement() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor={`close-${dayHours.id}`}>Close Time</Label>
+                                <Label htmlFor={`close-${dayHours.id}`}>Member Close</Label>
                                 <Select
                                   value={dayHours.closeTime || ''}
                                   onValueChange={(value) => updateHoursField(dayHours.id, 'closeTime', value)}
@@ -1248,18 +1265,18 @@ export default function LandingPageManagement() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor={`members-start-${dayHours.id}`}>Members Only Start</Label>
+                                <Label htmlFor={`daypass-start-${dayHours.id}`}>Day Pass Start</Label>
                                 <Select
-                                  value={dayHours.membersOnlyStart || 'none'}
-                                  onValueChange={(value) => updateHoursField(dayHours.id, 'membersOnlyStart', value === 'none' ? '' : value)}
+                                  value={dayHours.dayPassStart || 'none'}
+                                  onValueChange={(value) => updateHoursField(dayHours.id, 'dayPassStart', value === 'none' ? '' : value)}
                                 >
-                                  <SelectTrigger id={`members-start-${dayHours.id}`} data-testid={`select-members-start-${dayHours.dayOfWeek}`}>
+                                  <SelectTrigger id={`daypass-start-${dayHours.id}`} data-testid={`select-daypass-start-${dayHours.dayOfWeek}`}>
                                     <SelectValue placeholder="Select time (optional)" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {timeOptions.map((time) => (
-                                      <SelectItem key={`members-start-${dayHours.id}-${time.value}`} value={time.value}>
+                                      <SelectItem key={`daypass-start-${dayHours.id}-${time.value}`} value={time.value}>
                                         {time.label}
                                       </SelectItem>
                                     ))}
@@ -1267,18 +1284,18 @@ export default function LandingPageManagement() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor={`members-end-${dayHours.id}`}>Members Only End</Label>
+                                <Label htmlFor={`daypass-end-${dayHours.id}`}>Day Pass End</Label>
                                 <Select
-                                  value={dayHours.membersOnlyEnd || 'none'}
-                                  onValueChange={(value) => updateHoursField(dayHours.id, 'membersOnlyEnd', value === 'none' ? '' : value)}
+                                  value={dayHours.dayPassEnd || 'none'}
+                                  onValueChange={(value) => updateHoursField(dayHours.id, 'dayPassEnd', value === 'none' ? '' : value)}
                                 >
-                                  <SelectTrigger id={`members-end-${dayHours.id}`} data-testid={`select-members-end-${dayHours.dayOfWeek}`}>
+                                  <SelectTrigger id={`daypass-end-${dayHours.id}`} data-testid={`select-daypass-end-${dayHours.dayOfWeek}`}>
                                     <SelectValue placeholder="Select time (optional)" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {timeOptions.map((time) => (
-                                      <SelectItem key={`members-end-${dayHours.id}-${time.value}`} value={time.value}>
+                                      <SelectItem key={`daypass-end-${dayHours.id}-${time.value}`} value={time.value}>
                                         {time.label}
                                       </SelectItem>
                                     ))}

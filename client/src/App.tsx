@@ -34,6 +34,8 @@ import KioskMemberCreation from "@/pages/kiosk-member-creation";
 import MembershipAgreement from "@/pages/membership-agreement";
 import StaffCheckIn from "@/pages/staff-checkin";
 import StaffItems from "@/pages/staff-items";
+import AdminSetup from "@/pages/admin-setup";
+import SetPassword from "@/pages/set-password";
 import { useLocation } from "wouter";
 
 // Wrapper for KioskMemberCreation to provide required props
@@ -55,11 +57,13 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/setup" component={AdminSetup} />
       <ProtectedRoute path="/membership-agreement" component={MembershipAgreement} />
       <Route path="/admin-login" component={AdminLogin} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <ProtectedRoute path="/set-password" component={SetPassword} />
       
       {/* Member routes */}
       <ProtectedRoute path="/dashboard" component={MemberDashboard} />

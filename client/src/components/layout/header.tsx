@@ -16,7 +16,7 @@ import logoBlack from "@assets/WM Emblem Black.png";
 import logoTransparent from "@assets/WM Emblem BLK transparent.png";
 
 const Header = () => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logoutMutation } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -32,7 +32,11 @@ const Header = () => {
   };
 
   const handleLogout = () => {
-    logoutMutation.mutate();
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        setLocation("/");
+      }
+    });
   };
 
   const navLinks = isAdmin ? [

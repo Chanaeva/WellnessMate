@@ -33,6 +33,7 @@ interface CheckInResponse {
   success?: boolean;
   requiresConfirmation?: boolean;
   member?: {
+    id?: number;
     firstName: string;
     lastName: string;
     membershipType?: string;
@@ -119,10 +120,10 @@ export default function KioskCheckIn() {
         setScannerMode('success');
         queryClient.invalidateQueries({ queryKey: ["/api/check-ins"] });
         
-        // Auto-resume scanning after 5 seconds
+        // Auto-resume scanning after 30 seconds to allow time for item checkout
         autoResumeTimerRef.current = setTimeout(() => {
           resetAndResume();
-        }, 5000);
+        }, 30000);
       } else {
         setScannerMode('error');
         
@@ -602,6 +603,7 @@ export default function KioskCheckIn() {
                       </div>
                     </div>
                   )}
+
                 </div>
                 
                 <div className="flex items-center justify-center text-sm text-muted-foreground">

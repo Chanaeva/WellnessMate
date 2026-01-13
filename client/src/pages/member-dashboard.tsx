@@ -33,6 +33,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import MemberCard from "@/components/dashboard/member-card";
 import { Link } from "wouter";
 import {
@@ -59,6 +65,8 @@ import {
   Shield,
   DollarSign,
   AlertTriangle,
+  FileText,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";
@@ -157,6 +165,17 @@ export default function MemberDashboard() {
   const { data: checkedOutItems = [] } = useQuery<any[]>({
     queryKey: ["/api/checkouts/my-items"],
     enabled: !!user,
+  });
+  
+  // Fetch billing info from Stripe (for correct next billing date)
+  const { data: billingInfo } = useQuery<{
+    nextBillingDate: string;
+    source: string;
+    subscriptionStatus?: string;
+    cancelAtPeriodEnd?: boolean;
+  }>({
+    queryKey: ["/api/membership/billing-info"],
+    enabled: !!user && !!membership,
   });
 
   // Listen for purchase completion events from checkout page (after all queries are declared)
@@ -395,8 +414,11 @@ export default function MemberDashboard() {
 
   // Calculate membership status and information
   const membershipStatus = membership?.status || "inactive";
-  const membershipEndDate = membership
-    ? new Date(membership.endDate)
+  
+  // Use billing info from Stripe if available, otherwise fall back to database endDate
+  const nextBillingDateStr = billingInfo?.nextBillingDate || membership?.endDate;
+  const membershipEndDate = nextBillingDateStr
+    ? new Date(nextBillingDateStr)
     : new Date();
   const formattedEndDate = membership
     ? format(membershipEndDate, "MMMM d, yyyy")
@@ -492,6 +514,34 @@ export default function MemberDashboard() {
                   <p className="text-sm text-muted-foreground mt-4">
                     Return items to the front desk when you're done
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Membership Agreement Download - Show if agreement is completed */}
+            {user?.membershipAgreementCompleted && (
+              <Card className="wellness-card">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading text-foreground flex items-center">
+                    <FileText className="h-5 w-5 mr-2" />
+                    Membership Agreement
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Download a copy of your signed membership agreement and waiver.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      window.open('/api/membership-agreement/pdf', '_blank');
+                    }}
+                    className="flex items-center"
+                    data-testid="download-agreement-pdf"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -760,6 +810,50 @@ export default function MemberDashboard() {
               </CardContent>
             </Card>
 
+            {/* Saved Payment Methods */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Saved Payment Methods
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {paymentMethods && paymentMethods.length > 0 ? (
+                  <div className="space-y-3">
+                    {paymentMethods.map((method) => (
+                      <PaymentMethodCard
+                        key={method.id}
+                        paymentMethod={method}
+                        showActions={true}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-2">
+                      No saved payment methods
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Add a card to make purchases easier
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter className="border-t pt-4">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowAddPaymentMethod(true)}
+                  data-testid="button-add-payment-method"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Card
+                </Button>
+              </CardFooter>
+            </Card>
+
             {/* External Links Section */}
             <Card>
               <CardContent className="p-6">
@@ -958,6 +1052,24 @@ export default function MemberDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Payment Method Dialog */}
+      <Dialog open={showAddPaymentMethod} onOpenChange={setShowAddPaymentMethod}>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Add Payment Method</DialogTitle>
+          </DialogHeader>
+          <Elements stripe={stripePromise}>
+            <AddPaymentMethod
+              onSuccess={() => {
+                setShowAddPaymentMethod(false);
+                refetchPaymentMethods();
+              }}
+              onCancel={() => setShowAddPaymentMethod(false)}
+            />
+          </Elements>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

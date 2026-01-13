@@ -72,11 +72,22 @@ export default function MembershipAgreement() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  // Format user's DOB from database format (YYYY-MM-DD) to display format (MM/DD/YYYY)
+  const formatDateForInput = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "";
+    // The database stores dates in YYYY-MM-DD format, convert to MM/DD/YYYY
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return `${match[2]}/${match[3]}/${match[1]}`;
+    }
+    return dateStr;
+  };
+
   const [formData, setFormData] = useState<MembershipAgreementData>({
     emergencyContact: "",
     emergencyPhone: "",
-    dateOfBirth: "",
-    address: "",
+    dateOfBirth: formatDateForInput(user?.dateOfBirth),
+    address: user?.address || "",
     membershipType: "essential",
     medicalClearance: false,
     consultedProvider: false,
@@ -123,6 +134,27 @@ export default function MembershipAgreement() {
     value: any,
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDateOfBirthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    
+    // Remove all non-numeric characters
+    const numbersOnly = value.replace(/\D/g, '');
+    
+    // Auto-format as MM/DD/YYYY
+    let formatted = '';
+    if (numbersOnly.length > 0) {
+      formatted = numbersOnly.substring(0, 2);
+    }
+    if (numbersOnly.length > 2) {
+      formatted += '/' + numbersOnly.substring(2, 4);
+    }
+    if (numbersOnly.length > 4) {
+      formatted += '/' + numbersOnly.substring(4, 8);
+    }
+    
+    handleInputChange("dateOfBirth", formatted);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -255,14 +287,28 @@ export default function MembershipAgreement() {
                   <Label htmlFor="dateOfBirth">Date of Birth *</Label>
                   <Input
                     id="dateOfBirth"
-                    type="date"
+                    type="text"
+                    placeholder="MM/DD/YYYY"
                     value={formData.dateOfBirth}
-                    onChange={(e) =>
-                      handleInputChange("dateOfBirth", e.target.value)
-                    }
+                    onChange={handleDateOfBirthChange}
+                    maxLength={10}
                     required
+                    data-testid="input-dob"
                   />
                 </div>
+              </div>
+              <div>
+                <Label htmlFor="address">Address *</Label>
+                <Textarea
+                  id="address"
+                  placeholder="123 Tiber River Way, Rome"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange("address", e.target.value)}
+                  required
+                  data-testid="input-address"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="emergencyContact">Emergency Contact *</Label>
                   <Input
@@ -273,6 +319,7 @@ export default function MembershipAgreement() {
                       handleInputChange("emergencyContact", e.target.value)
                     }
                     required
+                    data-testid="input-emergency-contact"
                   />
                 </div>
                 <div>
@@ -285,18 +332,9 @@ export default function MembershipAgreement() {
                       handleInputChange("emergencyPhone", e.target.value)
                     }
                     required
+                    data-testid="input-emergency-phone"
                   />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="address">Address *</Label>
-                <Textarea
-                  id="address"
-                  placeholder="123 Tiber River Way, Rome"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange("address", e.target.value)}
-                  required
-                />
               </div>
             </CardContent>
           </Card>

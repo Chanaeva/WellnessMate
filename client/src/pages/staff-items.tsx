@@ -9,11 +9,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, ShoppingCart, ArrowLeft, Search, User, Calendar } from "lucide-react";
+import { Package, ShoppingCart, ArrowLeft, Search, User, Calendar, CreditCard, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
+import { StaffItemPaymentDialog } from "@/components/payment/staff-item-payment-form";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+// Stripe setup - fetch the public key from the server
+const stripePromise = fetch('/api/stripe/config')
+  .then(res => res.json())
+  .then(({ publicKey }) => loadStripe(publicKey));
 
 type InventoryItem = {
   id: number;
@@ -22,6 +30,7 @@ type InventoryItem = {
   size: string | null;
   quantityTotal: number;
   quantityAvailable: number;
+  priceInCents: number;
   isActive: boolean;
   description: string | null;
 };
@@ -48,6 +57,9 @@ type ItemCheckout = {
   checkedInAt: string | null;
   status: string;
   notes: string | null;
+  paymentStatus: 'not_charged' | 'charged' | 'failed';
+  chargedAmountCents: number | null;
+  chargedAt: string | null;
   item?: InventoryItem;
   user?: {
     id: number;
@@ -57,15 +69,301 @@ type ItemCheckout = {
   };
 };
 
-export default function StaffItems() {
+type PaymentStatus = {
+  hasPaymentMethod: boolean;
+  paymentMethod: {
+    cardLast4: string;
+    cardBrand: string;
+  } | null;
+};
+
+type PaymentDialogData = {
+  checkoutId: number;
+  itemName: string;
+  priceInCents: number;
+  memberName: string;
+  userId: number;
+};
+
+type StaffItemsProps = {
+  embedded?: boolean;
+};
+
+// Stripe element styles
+const elementOptions = {
+  style: {
+    base: {
+      fontSize: '16px',
+      color: '#1f2937',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      lineHeight: '1.5',
+      '::placeholder': {
+        color: '#6b7280',
+      },
+    },
+    invalid: {
+      color: '#ef4444',
+    },
+  },
+};
+
+interface InlinePaymentFormProps {
+  userId: number;
+  itemId: number;
+  quantity: number;
+  totalPriceCents: number;
+  memberName: string;
+  itemName: string;
+  onSuccess: (paymentIntentId: string) => void;
+  onCancel: () => void;
+  isCheckoutPending: boolean;
+  savedPaymentMethod?: {
+    cardLast4: string;
+    cardBrand: string;
+  } | null;
+}
+
+function InlinePaymentFormContent({
+  userId,
+  itemId,
+  quantity,
+  totalPriceCents,
+  memberName,
+  itemName,
+  onSuccess,
+  onCancel,
+  isCheckoutPending,
+  savedPaymentMethod,
+}: InlinePaymentFormProps) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [useSavedCard, setUseSavedCard] = useState(!!savedPaymentMethod);
+
+  const createPaymentIntentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/staff/item-checkout-payment-intent", {
+        userId,
+        itemId,
+        quantity,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create payment");
+      }
+      return await res.json();
+    },
+  });
+
+  const chargeSavedCardMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/staff/item-checkout-charge-saved", {
+        userId,
+        itemId,
+        quantity,
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to charge saved card");
+      }
+      return await res.json();
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    setCardError(null);
+
+    try {
+      if (useSavedCard && savedPaymentMethod) {
+        // Charge the saved card directly
+        const result = await chargeSavedCardMutation.mutateAsync();
+        if (result.paymentIntentId) {
+          onSuccess(result.paymentIntentId);
+        } else {
+          throw new Error("Payment was not completed");
+        }
+      } else {
+        // Use new card via Stripe Elements
+        if (!stripe || !elements) {
+          return;
+        }
+
+        const { clientSecret } = await createPaymentIntentMutation.mutateAsync();
+        
+        const cardNumberElement = elements.getElement(CardNumberElement);
+        if (!cardNumberElement) {
+          throw new Error("Card element not found");
+        }
+
+        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardNumberElement,
+          }
+        });
+
+        if (error) {
+          setCardError(error.message || "Payment failed");
+          throw new Error(error.message);
+        }
+
+        if (paymentIntent?.status === 'succeeded') {
+          onSuccess(paymentIntent.id);
+        } else {
+          throw new Error("Payment was not completed");
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "Payment Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const isLoading = isProcessing || createPaymentIntentMutation.isPending || chargeSavedCardMutation.isPending || isCheckoutPending;
+
+  const formatCardBrand = (brand: string) => {
+    const brands: Record<string, string> = {
+      visa: 'Visa',
+      mastercard: 'Mastercard',
+      amex: 'American Express',
+      discover: 'Discover',
+    };
+    return brands[brand.toLowerCase()] || brand;
+  };
+
+  return (
+    <Card className="border-blue-300 bg-blue-50/50 dark:bg-blue-900/20">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-blue-600" />
+            Payment Details
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isLoading}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <CardDescription>
+          Charging ${(totalPriceCents / 100).toFixed(2)} for {quantity}x {itemName}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {savedPaymentMethod && (
+            <div className="space-y-3">
+              <div 
+                className={`p-3 border rounded-md cursor-pointer transition-colors ${useSavedCard ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 hover:border-gray-300'}`}
+                onClick={() => setUseSavedCard(true)}
+                data-testid="option-saved-card"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${useSavedCard ? 'border-blue-500' : 'border-gray-300'}`}>
+                    {useSavedCard && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Use saved card</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {formatCardBrand(savedPaymentMethod.cardBrand)} ending in {savedPaymentMethod.cardLast4}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div 
+                className={`p-3 border rounded-md cursor-pointer transition-colors ${!useSavedCard ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 hover:border-gray-300'}`}
+                onClick={() => setUseSavedCard(false)}
+                data-testid="option-new-card"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${!useSavedCard ? 'border-blue-500' : 'border-gray-300'}`}>
+                    {!useSavedCard && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                  </div>
+                  <p className="font-medium text-sm">Enter new card</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!useSavedCard && (
+            <>
+              <div className="space-y-2">
+                <Label>Card Number</Label>
+                <div className="border rounded-md p-3 bg-white dark:bg-slate-900">
+                  <CardNumberElement options={elementOptions} />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Expiry</Label>
+                  <div className="border rounded-md p-3 bg-white dark:bg-slate-900">
+                    <CardExpiryElement options={elementOptions} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>CVC</Label>
+                  <div className="border rounded-md p-3 bg-white dark:bg-slate-900">
+                    <CardCvcElement options={elementOptions} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {cardError && (
+            <p className="text-sm text-red-600">{cardError}</p>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={(!useSavedCard && !stripe) || isLoading}
+            data-testid="button-process-payment"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Pay $${(totalPriceCents / 100).toFixed(2)} & Checkout`
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InlinePaymentForm(props: InlinePaymentFormProps) {
+  return (
+    <Elements stripe={stripePromise}>
+      <InlinePaymentFormContent {...props} />
+    </Elements>
+  );
+}
+
+export default function StaffItems({ embedded = false }: StaffItemsProps) {
   const [activeTab, setActiveTab] = useState("checkout");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string>("");
+  const [quantity, setQuantity] = useState<number>(1);
   const [checkoutNotes, setCheckoutNotes] = useState("");
   const [checkinDialog, setCheckinDialog] = useState<ItemCheckout | null>(null);
   const [checkinNotes, setCheckinNotes] = useState("");
+  const [paymentDialog, setPaymentDialog] = useState<PaymentDialogData | null>(null);
+  const [memberPaymentStatus, setMemberPaymentStatus] = useState<Record<number, PaymentStatus>>({});
+  const [showInlinePayment, setShowInlinePayment] = useState(false);
+  const [selectedMemberPaymentInfo, setSelectedMemberPaymentInfo] = useState<PaymentStatus | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -74,6 +372,12 @@ export default function StaffItems() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Reset payment info when member changes
+  useEffect(() => {
+    setShowInlinePayment(false);
+    setSelectedMemberPaymentInfo(null);
+  }, [selectedMember]);
 
   const { data: items = [], isLoading: itemsLoading } = useQuery<InventoryItem[]>({
     queryKey: ['/api/staff/inventory/items'],
@@ -98,21 +402,24 @@ export default function StaffItems() {
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: async (data: { itemId: number; userId: number; notes?: string }) => {
+    mutationFn: async (data: { itemId: number; userId: number; notes?: string; quantity?: number; paymentIntentId?: string }) => {
       const response = await apiRequest("POST", "/api/staff/checkouts", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const qty = data.quantity || 1;
       toast({
         title: "Item Checked Out",
-        description: "Item has been checked out successfully",
+        description: `${qty} item${qty > 1 ? 's' : ''} checked out successfully${data.charged ? ` - $${(data.chargedAmount / 100).toFixed(2)} charged` : ''}`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/staff/inventory/items'] });
       queryClient.invalidateQueries({ queryKey: ['/api/staff/checkouts/active'] });
       setSelectedMember(null);
       setSelectedItemId("");
+      setQuantity(1);
       setCheckoutNotes("");
       setSearchTerm("");
+      setShowInlinePayment(false);
     },
     onError: (error: any) => {
       toast({
@@ -149,7 +456,80 @@ export default function StaffItems() {
     }
   });
 
-  const handleCheckout = () => {
+  const chargeMutation = useMutation({
+    mutationFn: async (data: { checkoutId: number; userId: number }) => {
+      const response = await apiRequest("POST", `/api/staff/checkouts/${data.checkoutId}/charge`, {});
+      return { ...(await response.json()), userId: data.userId };
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Charge Successful",
+        description: `$${(data.amountCharged / 100).toFixed(2)} has been charged to the member's card`,
+      });
+      if (data.userId) {
+        setMemberPaymentStatus(prev => {
+          const updated = { ...prev };
+          delete updated[data.userId];
+          return updated;
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/staff/checkouts/active'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Charge Failed",
+        description: error.message || "Unable to charge the member",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const fetchPaymentStatus = async (userId: number): Promise<PaymentStatus> => {
+    if (memberPaymentStatus[userId]) {
+      return memberPaymentStatus[userId];
+    }
+    
+    try {
+      const response = await fetch(`/api/staff/members/${userId}/payment-status`, {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const status = await response.json();
+        setMemberPaymentStatus(prev => ({ ...prev, [userId]: status }));
+        return status;
+      }
+    } catch (error) {
+      console.error("Failed to fetch payment status:", error);
+    }
+    
+    return { hasPaymentMethod: false, paymentMethod: null };
+  };
+
+  const handleChargeClick = async (checkout: ItemCheckout) => {
+    if (!checkout.user || !checkout.item) return;
+    
+    const userId = checkout.userId;
+    const paymentStatus = await fetchPaymentStatus(userId);
+    
+    if (paymentStatus.hasPaymentMethod) {
+      chargeMutation.mutate({ checkoutId: checkout.id, userId });
+    } else {
+      setPaymentDialog({
+        checkoutId: checkout.id,
+        itemName: `${checkout.item.name}${checkout.item.size ? ` (${checkout.item.size})` : ''}`,
+        priceInCents: checkout.item.priceInCents,
+        memberName: `${checkout.user.firstName} ${checkout.user.lastName}`,
+        userId: checkout.userId,
+      });
+    }
+  };
+
+  // Get the selected item details
+  const selectedItem = items.find(item => item.id.toString() === selectedItemId);
+  const itemHasPrice = selectedItem && selectedItem.priceInCents > 0;
+  const totalPrice = selectedItem ? selectedItem.priceInCents * quantity : 0;
+
+  const handleCheckout = async () => {
     if (!selectedMember || !selectedItemId) {
       toast({
         title: "Missing Information",
@@ -159,10 +539,33 @@ export default function StaffItems() {
       return;
     }
 
+    // If item has a price, fetch payment status and show inline payment form
+    if (itemHasPrice) {
+      const paymentStatus = await fetchPaymentStatus(selectedMember.id);
+      setSelectedMemberPaymentInfo(paymentStatus);
+      setShowInlinePayment(true);
+      return;
+    }
+
+    // For free items, proceed directly to checkout
     checkoutMutation.mutate({
       itemId: parseInt(selectedItemId),
       userId: selectedMember.id,
+      quantity: quantity,
       notes: checkoutNotes || undefined
+    });
+  };
+
+  // Handle checkout with payment (called after payment is processed)
+  const handleCheckoutWithPayment = (paymentIntentId: string) => {
+    if (!selectedMember || !selectedItemId) return;
+    
+    checkoutMutation.mutate({
+      itemId: parseInt(selectedItemId),
+      userId: selectedMember.id,
+      quantity: quantity,
+      notes: checkoutNotes || undefined,
+      paymentIntentId: paymentIntentId
     });
   };
 
@@ -177,10 +580,10 @@ export default function StaffItems() {
 
   const availableItems = items.filter(item => item.isActive && item.quantityAvailable > 0);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+  const content = (
+    <>
+      {!embedded && (
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Package className="h-8 w-8" />
@@ -197,8 +600,9 @@ export default function StaffItems() {
             </Button>
           </Link>
         </div>
+      )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="checkout" data-testid="tab-checkout">
               <ShoppingCart className="h-4 w-4 mr-2" />
@@ -300,7 +704,11 @@ export default function StaffItems() {
 
                 <div className="space-y-2">
                   <Label htmlFor="item-select">Select Item</Label>
-                  <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+                  <Select value={selectedItemId} onValueChange={(value) => {
+                    setSelectedItemId(value);
+                    setQuantity(1);
+                    setShowInlinePayment(false);
+                  }}>
                     <SelectTrigger id="item-select" data-testid="select-item">
                       <SelectValue placeholder="Choose an item..." />
                     </SelectTrigger>
@@ -308,11 +716,56 @@ export default function StaffItems() {
                       {availableItems.map((item) => (
                         <SelectItem key={item.id} value={item.id.toString()} data-testid={`select-item-option-${item.id}`}>
                           {item.name} {item.size && `(${item.size})`} - {item.quantityAvailable} available
+                          {item.priceInCents > 0 && ` - $${(item.priceInCents / 100).toFixed(2)}`}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Quantity Field */}
+                {selectedItem && (
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Select 
+                      value={quantity.toString()} 
+                      onValueChange={(value) => {
+                        setQuantity(parseInt(value));
+                        setShowInlinePayment(false);
+                      }}
+                    >
+                      <SelectTrigger id="quantity" data-testid="select-quantity">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: Math.min(selectedItem.quantityAvailable, 10) }, (_, i) => i + 1).map((num) => (
+                          <SelectItem key={num} value={num.toString()} data-testid={`select-quantity-option-${num}`}>
+                            {num}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Price Display */}
+                {selectedItem && itemHasPrice && (
+                  <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400">
+                            {quantity} x ${(selectedItem.priceInCents / 100).toFixed(2)}
+                          </p>
+                          <p className="font-semibold text-lg text-slate-900 dark:text-white" data-testid="text-total-price">
+                            Total: ${(totalPrice / 100).toFixed(2)}
+                          </p>
+                        </div>
+                        <CreditCard className="h-6 w-6 text-blue-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="checkout-notes">Notes (Optional)</Label>
@@ -326,14 +779,32 @@ export default function StaffItems() {
                   />
                 </div>
 
-                <Button 
-                  onClick={handleCheckout}
-                  disabled={!selectedMember || !selectedItemId || checkoutMutation.isPending}
-                  className="w-full"
-                  data-testid="button-checkout-item"
-                >
-                  {checkoutMutation.isPending ? "Checking Out..." : "Checkout Item"}
-                </Button>
+                {/* Inline Payment Form for priced items */}
+                {showInlinePayment && selectedMember && selectedItem && itemHasPrice && (
+                  <InlinePaymentForm
+                    userId={selectedMember.id}
+                    itemId={selectedItem.id}
+                    quantity={quantity}
+                    totalPriceCents={totalPrice}
+                    memberName={`${selectedMember.firstName} ${selectedMember.lastName}`}
+                    itemName={`${selectedItem.name}${selectedItem.size ? ` (${selectedItem.size})` : ''}`}
+                    onSuccess={handleCheckoutWithPayment}
+                    onCancel={() => setShowInlinePayment(false)}
+                    isCheckoutPending={checkoutMutation.isPending}
+                    savedPaymentMethod={selectedMemberPaymentInfo?.paymentMethod}
+                  />
+                )}
+
+                {!showInlinePayment && (
+                  <Button 
+                    onClick={handleCheckout}
+                    disabled={!selectedMember || !selectedItemId || checkoutMutation.isPending}
+                    className="w-full"
+                    data-testid="button-checkout-item"
+                  >
+                    {checkoutMutation.isPending ? "Checking Out..." : itemHasPrice ? `Checkout & Pay $${(totalPrice / 100).toFixed(2)}` : "Checkout Item"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -362,9 +833,10 @@ export default function StaffItems() {
                         <TableRow>
                           <TableHead>Item</TableHead>
                           <TableHead>Member</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead>Payment</TableHead>
                           <TableHead>Checked Out</TableHead>
-                          <TableHead>Notes</TableHead>
-                          <TableHead>Action</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -377,25 +849,54 @@ export default function StaffItems() {
                               {checkout.user?.firstName} {checkout.user?.lastName}
                             </TableCell>
                             <TableCell>
+                              {checkout.item?.priceInCents && checkout.item.priceInCents > 0 
+                                ? `$${(checkout.item.priceInCents / 100).toFixed(2)}` 
+                                : <span className="text-slate-400">Free</span>}
+                            </TableCell>
+                            <TableCell>
+                              {checkout.paymentStatus === 'charged' ? (
+                                <Badge variant="default" className="bg-green-600">
+                                  Charged ${checkout.chargedAmountCents ? (checkout.chargedAmountCents / 100).toFixed(2) : ''}
+                                </Badge>
+                              ) : checkout.paymentStatus === 'failed' ? (
+                                <Badge variant="destructive">Failed</Badge>
+                              ) : checkout.item?.priceInCents && checkout.item.priceInCents > 0 ? (
+                                <Badge variant="secondary">Not Charged</Badge>
+                              ) : (
+                                <span className="text-slate-400">N/A</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                                 <Calendar className="h-4 w-4" />
                                 {new Date(checkout.checkedOutAt).toLocaleDateString()}
                               </div>
                             </TableCell>
-                            <TableCell className="max-w-xs truncate">
-                              {checkout.notes || "-"}
-                            </TableCell>
                             <TableCell>
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setCheckinDialog(checkout);
-                                  setCheckinNotes("");
-                                }}
-                                data-testid={`button-checkin-${checkout.id}`}
-                              >
-                                Check In
-                              </Button>
+                              <div className="flex gap-2">
+                                {checkout.item?.priceInCents && checkout.item.priceInCents > 0 && checkout.paymentStatus !== 'charged' && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleChargeClick(checkout)}
+                                    disabled={chargeMutation.isPending}
+                                    data-testid={`button-charge-${checkout.id}`}
+                                  >
+                                    <CreditCard className="h-3 w-3 mr-1" />
+                                    {chargeMutation.isPending ? "Charging..." : "Charge"}
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setCheckinDialog(checkout);
+                                    setCheckinNotes("");
+                                  }}
+                                  data-testid={`button-checkin-${checkout.id}`}
+                                >
+                                  Check In
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -407,7 +908,6 @@ export default function StaffItems() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
 
       <Dialog open={!!checkinDialog} onOpenChange={(open) => !open && setCheckinDialog(null)}>
         <DialogContent data-testid="dialog-checkin">
@@ -448,6 +948,38 @@ export default function StaffItems() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {paymentDialog && (
+        <StaffItemPaymentDialog
+          open={!!paymentDialog}
+          checkoutId={paymentDialog.checkoutId}
+          itemName={paymentDialog.itemName}
+          priceInCents={paymentDialog.priceInCents}
+          memberName={paymentDialog.memberName}
+          onSuccess={() => {
+            setMemberPaymentStatus(prev => {
+              const updated = { ...prev };
+              delete updated[paymentDialog.userId];
+              return updated;
+            });
+            setPaymentDialog(null);
+            queryClient.invalidateQueries({ queryKey: ['/api/staff/checkouts/active'] });
+          }}
+          onClose={() => setPaymentDialog(null)}
+        />
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-6">{content}</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {content}
+      </div>
     </div>
   );
 }

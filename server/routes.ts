@@ -40,6 +40,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ publicKey: STRIPE_ENV_INFO.publicKey });
   });
 
+  // ============================================
+  // ONE-TIME ADMIN SETUP ROUTES (for production)
+  // ============================================
+  
+  // Check if initial admin setup is needed
+  app.get("/api/setup/status", async (req, res) => {
+    try {
+      const adminCount = await db.select({ count: sql<number>`count(*)` })
+        .from(usersTable)
+        .where(eq(usersTable.role, 'admin'));
+      
+      const hasAdmin = Number(adminCount[0]?.count || 0) > 0;
+      res.json({ setupRequired: !hasAdmin, hasAdmin });
+    } catch (error) {
+      console.error("Error checking setup status:", error);
+      res.status(500).json({ message: "Failed to check setup status" });
+    }
+  });
+
+  // Create the first admin account (only works when no admins exist)
+  // Uses a transaction with atomic check to prevent race conditions
+  app.post("/api/setup/admin", async (req, res) => {
+    try {
+      // Validate input first (before transaction)
+      const setupSchema = z.object({
+        email: z.string().email("Please enter a valid email address"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+      });
+
+      const adminData = setupSchema.parse(req.body);
+      
+      // Hash password before transaction
+      const hashedPassword = await hashPassword(adminData.password);
+      
+      // Generate username from email
+      const baseUsername = adminData.email.split('@')[0].toLowerCase();
+
+      // Use a transaction to atomically check and create admin
+      const result = await db.transaction(async (tx) => {
+        // Check if any admin exists (within transaction)
+        const adminCount = await tx.select({ count: sql<number>`count(*)` })
+          .from(usersTable)
+          .where(eq(usersTable.role, 'admin'));
+        
+        if (Number(adminCount[0]?.count || 0) > 0) {
+          throw new Error("ADMIN_EXISTS");
+        }
+
+        // Check if email already exists
+        const existingEmail = await tx.select()
+          .from(usersTable)
+          .where(eq(usersTable.email, adminData.email))
+          .limit(1);
+        
+        if (existingEmail.length > 0) {
+          throw new Error("EMAIL_EXISTS");
+        }
+
+        // Check for unique username within transaction
+        let username = baseUsername;
+        let counter = 1;
+        while (true) {
+          const existingUsername = await tx.select()
+            .from(usersTable)
+            .where(eq(usersTable.username, username))
+            .limit(1);
+          
+          if (existingUsername.length === 0) break;
+          username = `${baseUsername}_${counter}`;
+          counter++;
+        }
+
+        // Insert the admin user
+        const [newAdmin] = await tx.insert(usersTable).values({
+          email: adminData.email,
+          password: hashedPassword,
+          firstName: adminData.firstName,
+          lastName: adminData.lastName,
+          username: username,
+          role: 'admin',
+        }).returning();
+
+        return newAdmin;
+      });
+
+      console.log(`✅ Initial admin account created: ${adminData.email}`);
+
+      const { password, ...adminWithoutPassword } = result;
+      res.status(201).json({
+        message: "Admin account created successfully! You can now log in.",
+        user: adminWithoutPassword,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0]?.message || "Validation failed" });
+      }
+      if (error.message === "ADMIN_EXISTS") {
+        return res.status(409).json({ 
+          message: "Admin setup already completed. This endpoint is disabled." 
+        });
+      }
+      if (error.message === "EMAIL_EXISTS") {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+      console.error("Error creating initial admin:", error);
+      res.status(500).json({ message: "Failed to create admin account" });
+    }
+  });
+
   // Authenticated routes middleware
   const isAuthenticated = (req: any, res: any, next: any) => {
     if (req.isAuthenticated()) {
@@ -99,6 +210,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin-only: Update staff or admin account
+  app.patch("/api/admin/users/:id", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id, 10);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser || (existingUser.role !== 'staff' && existingUser.role !== 'admin')) {
+        return res.status(404).json({ message: "Staff/Admin user not found" });
+      }
+
+      const updateData: any = {};
+      
+      if (req.body.email !== undefined && req.body.email !== existingUser.email) {
+        const emailTaken = await storage.getUserByEmail(req.body.email);
+        if (emailTaken && emailTaken.id !== userId) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
+        updateData.email = req.body.email;
+      }
+      
+      if (req.body.firstName !== undefined) updateData.firstName = req.body.firstName;
+      if (req.body.lastName !== undefined) updateData.lastName = req.body.lastName;
+      if (req.body.phoneNumber !== undefined) updateData.phoneNumber = req.body.phoneNumber;
+      if (req.body.role !== undefined && (req.body.role === 'staff' || req.body.role === 'admin')) {
+        updateData.role = req.body.role;
+      }
+      if (req.body.mustChangePassword !== undefined) updateData.mustChangePassword = req.body.mustChangePassword;
+      
+      if (req.body.password) {
+        updateData.password = await hashPassword(req.body.password);
+      }
+
+      const updatedUser = await storage.updateStaffAdmin(userId, updateData);
+      const { password, ...userWithoutPassword } = updatedUser;
+      
+      res.json({
+        message: "User updated successfully",
+        user: userWithoutPassword,
+      });
+    } catch (error) {
+      console.error("Error updating staff/admin account:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Admin-only: Delete staff or admin account
+  app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id, 10);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: "Invalid user ID" });
+      }
+
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser || (existingUser.role !== 'staff' && existingUser.role !== 'admin')) {
+        return res.status(404).json({ message: "Staff/Admin user not found" });
+      }
+
+      // Prevent admin from deleting themselves
+      if (userId === req.user!.id) {
+        return res.status(400).json({ message: "You cannot delete your own account" });
+      }
+
+      await storage.deleteStaffAdmin(userId);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting staff/admin account:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Admin-only: Get staff login history
+  app.get("/api/admin/login-events", isAdmin, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
+      
+      let events;
+      if (userId) {
+        events = await storage.getLoginEventsByUserId(userId, limit);
+        const eventsWithUser = await Promise.all(
+          events.map(async (event) => {
+            const user = await storage.getUser(event.userId);
+            const { password, ...userWithoutPassword } = user || {};
+            return { ...event, user: userWithoutPassword };
+          })
+        );
+        res.json(eventsWithUser);
+      } else {
+        events = await storage.getAllStaffLoginEvents(limit);
+        const eventsWithoutPasswords = events.map(({ user, ...event }) => ({
+          ...event,
+          user: user ? { ...user, password: undefined } : undefined,
+        }));
+        res.json(eventsWithoutPasswords);
+      }
+    } catch (error) {
+      console.error("Error fetching login events:", error);
+      res.status(500).json({ message: "Failed to fetch login events" });
+    }
+  });
+
   // Get membership for current user
   app.get("/api/membership", isAuthenticated, async (req, res) => {
     try {
@@ -109,6 +325,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(membership);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
+    }
+  });
+  
+  // Get subscription billing info from Stripe
+  app.get("/api/membership/billing-info", isAuthenticated, async (req, res) => {
+    try {
+      const membership = await storage.getMembershipByUserId(req.user!.id);
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found" });
+      }
+      
+      // If there's no Stripe subscription, return the database endDate
+      if (!membership.stripeSubscriptionId) {
+        return res.json({
+          nextBillingDate: membership.endDate,
+          source: 'database'
+        });
+      }
+      
+      // Fetch subscription from Stripe to get the actual next billing date
+      try {
+        const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+        
+        if (subscription.status === 'active' || subscription.status === 'trialing') {
+          // Type assertion for current_period_end since Stripe types don't always expose it
+          const currentPeriodEnd = (subscription as any).current_period_end as number;
+          const nextBillingDate = new Date(currentPeriodEnd * 1000).toISOString().split('T')[0];
+          return res.json({
+            nextBillingDate,
+            source: 'stripe',
+            subscriptionStatus: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end
+          });
+        } else {
+          // Subscription not active, return database date
+          return res.json({
+            nextBillingDate: membership.endDate,
+            source: 'database',
+            subscriptionStatus: subscription.status
+          });
+        }
+      } catch (stripeError: any) {
+        console.error("Error fetching Stripe subscription:", stripeError.message);
+        // Fall back to database date if Stripe fails
+        return res.json({
+          nextBillingDate: membership.endDate,
+          source: 'database',
+          error: stripeError.message
+        });
+      }
+    } catch (error: any) {
+      console.error("Billing info error:", error);
+      res.status(500).json({ message: "Failed to get billing info: " + error.message });
     }
   });
 
@@ -124,8 +393,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // If there's a Stripe subscription, cancel it first
+      if (membership.stripeSubscriptionId) {
+        try {
+          await stripe.subscriptions.cancel(membership.stripeSubscriptionId);
+          console.log(`Cancelled Stripe subscription: ${membership.stripeSubscriptionId}`);
+        } catch (stripeError: any) {
+          // Log but don't fail if Stripe cancellation fails (subscription might already be cancelled)
+          console.error("Stripe subscription cancellation error:", stripeError.message);
+          // Only fail if it's not a "subscription not found" error
+          if (stripeError.code !== 'resource_missing') {
+            throw stripeError;
+          }
+        }
+      }
+
       // Update membership status to cancelled
-      await storage.updateMembership(membership.id.toString(), { 
+      await storage.updateMembership(membership.membershipId, { 
         status: 'inactive',
         endDate: new Date().toISOString().split('T')[0] // Set end date to now for immediate cancellation
       });
@@ -221,12 +505,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update membership plan (Admin only)
+  // Update membership plan (Admin only) - auto-syncs with Stripe
   app.put("/api/admin/membership-plans/:id", isAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertMembershipPlanSchema.partial().parse(req.body);
-      const plan = await storage.updateMembershipPlan(id, validatedData);
+      let plan = await storage.updateMembershipPlan(id, validatedData);
+      
+      // Auto-sync with Stripe
+      try {
+        const freshStripe = createStripeClient();
+        let productId = plan.stripeProductId;
+        let priceId = plan.stripePriceId;
+        
+        // Create or update Stripe Product
+        if (!productId) {
+          const product = await freshStripe.products.create({
+            name: plan.name,
+            description: plan.description,
+            metadata: {
+              planType: plan.planType,
+              planId: plan.id.toString(),
+            },
+          });
+          productId = product.id;
+        } else {
+          // Update existing product
+          await freshStripe.products.update(productId, {
+            name: plan.name,
+            description: plan.description,
+          });
+        }
+        
+        // Check if price changed and create new price if needed
+        if (priceId) {
+          const existingPrice = await freshStripe.prices.retrieve(priceId);
+          if (existingPrice.unit_amount !== plan.monthlyPrice) {
+            // Archive old price and create new one
+            await freshStripe.prices.update(priceId, { active: false });
+            const newPrice = await freshStripe.prices.create({
+              product: productId,
+              unit_amount: plan.monthlyPrice,
+              currency: 'usd',
+              recurring: { interval: 'month' },
+              metadata: {
+                planType: plan.planType,
+                planId: plan.id.toString(),
+              },
+            });
+            priceId = newPrice.id;
+          }
+        } else {
+          // Create new price
+          const price = await freshStripe.prices.create({
+            product: productId,
+            unit_amount: plan.monthlyPrice,
+            currency: 'usd',
+            recurring: { interval: 'month' },
+            metadata: {
+              planType: plan.planType,
+              planId: plan.id.toString(),
+            },
+          });
+          priceId = price.id;
+        }
+        
+        // Update plan with Stripe IDs (only update the specific fields)
+        plan = await storage.updateMembershipPlan(plan.id, {
+          stripeProductId: productId,
+          stripePriceId: priceId,
+        });
+        console.log('Plan synced with Stripe:', { productId, priceId });
+      } catch (stripeError: any) {
+        console.error('Failed to sync with Stripe:', stripeError.message);
+      }
+      
       res.json(plan);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -247,14 +600,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create or update membership plan (admin-only endpoint)
+  // Create or update membership plan (admin-only endpoint) - auto-syncs with Stripe
   app.post("/api/admin/membership-plans", isAdmin, async (req, res) => {
     console.log('POST /api/admin/membership-plans hit with body:', req.body);
     try {
       const validatedData = insertMembershipPlanSchema.parse(req.body);
       console.log('Validated data:', validatedData);
-      const plan = await storage.createOrUpdateMembershipPlan(validatedData);
+      let plan = await storage.createOrUpdateMembershipPlan(validatedData);
       console.log('Created plan:', plan);
+      
+      // Auto-sync with Stripe
+      try {
+        const freshStripe = createStripeClient();
+        let productId = plan.stripeProductId;
+        let priceId = plan.stripePriceId;
+        
+        // Create Stripe Product if it doesn't exist
+        if (!productId) {
+          const product = await freshStripe.products.create({
+            name: plan.name,
+            description: plan.description,
+            metadata: {
+              planType: plan.planType,
+              planId: plan.id.toString(),
+            },
+          });
+          productId = product.id;
+        }
+        
+        // Create Stripe Price if it doesn't exist
+        if (!priceId) {
+          const price = await freshStripe.prices.create({
+            product: productId,
+            unit_amount: plan.monthlyPrice,
+            currency: 'usd',
+            recurring: { interval: 'month' },
+            metadata: {
+              planType: plan.planType,
+              planId: plan.id.toString(),
+            },
+          });
+          priceId = price.id;
+        }
+        
+        // Update plan with Stripe IDs (only update the specific fields)
+        plan = await storage.updateMembershipPlan(plan.id, {
+          stripeProductId: productId,
+          stripePriceId: priceId,
+        });
+        console.log('Plan synced with Stripe:', { productId, priceId });
+      } catch (stripeError: any) {
+        console.error('Failed to sync with Stripe:', stripeError.message);
+        // Don't fail the request, just log the error - admin can manually sync later
+      }
+      
       res.status(201).json(plan);
     } catch (error) {
       console.error('Membership plan creation error:', error);
@@ -450,6 +849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         member: {
+          id: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
           membershipType: membershipType,
@@ -465,6 +865,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         message: "System error. Please see staff for assistance." 
       });
+    }
+  });
+
+  // Kiosk: Get available inventory items for member self-checkout
+  app.get("/api/kiosk/inventory-items", async (req, res) => {
+    try {
+      const items = await storage.getAllInventoryItems();
+      // Only return active items with available quantity
+      const availableItems = items.filter(item => item.isActive && item.quantityAvailable > 0);
+      res.json(availableItems);
+    } catch (error: any) {
+      console.error("Kiosk inventory items error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Kiosk: Member self-checkout item (no payment for free items, or with saved card)
+  app.post("/api/kiosk/checkout-item", async (req, res) => {
+    try {
+      const checkoutDataSchema = z.object({
+        userId: z.number().int().positive(),
+        itemId: z.number().int().positive(),
+      });
+      const validatedData = checkoutDataSchema.parse(req.body);
+      
+      // Verify the user exists
+      const user = await storage.getUser(validatedData.userId);
+      if (!user) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+      
+      // Get the item
+      const items = await storage.getAllInventoryItems();
+      const item = items.find(i => i.id === validatedData.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      if (!item.isActive || item.quantityAvailable <= 0) {
+        return res.status(400).json({ message: "Item is not available" });
+      }
+      
+      // If item has a price, check for saved payment method
+      if (item.priceInCents && item.priceInCents > 0) {
+        // Get user's payment methods
+        const paymentMethods = await storage.getPaymentMethodsByUserId(validatedData.userId);
+        const defaultMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
+        
+        if (!user.stripeCustomerId || !defaultMethod) {
+          return res.status(400).json({ 
+            message: "No payment method on file. Please see staff for assistance.",
+            requiresPayment: true,
+            priceInCents: item.priceInCents
+          });
+        }
+        
+        // Attempt to charge the card first before creating checkout
+        try {
+          const freshStripe = createStripeClient();
+          const paymentIntent = await freshStripe.paymentIntents.create({
+            amount: item.priceInCents,
+            currency: 'usd',
+            customer: user.stripeCustomerId,
+            payment_method: defaultMethod.stripePaymentMethodId,
+            off_session: true,
+            confirm: true,
+            description: `Kiosk item checkout: ${item.name}${item.size ? ` (${item.size})` : ''}`,
+            metadata: {
+              itemId: item.id.toString(),
+              userId: validatedData.userId.toString(),
+              itemName: item.name,
+              source: 'kiosk'
+            }
+          });
+          
+          // Payment succeeded - now create checkout record
+          const checkout = await storage.checkoutItem({
+            itemId: validatedData.itemId,
+            userId: validatedData.userId,
+            checkedOutByStaffId: validatedData.userId,
+            notes: "Self-checkout via kiosk"
+          });
+          
+          // Update checkout with payment info
+          await storage.updateCheckoutPayment(checkout.id, {
+            paymentStatus: 'charged',
+            stripePaymentIntentId: paymentIntent.id,
+            chargedAmountCents: paymentIntent.amount,
+          });
+          
+          res.status(201).json({
+            success: true,
+            checkout,
+            charged: true,
+            amountCharged: item.priceInCents,
+            message: `${item.name} checked out successfully! $${(item.priceInCents / 100).toFixed(2)} charged to your card.`
+          });
+        } catch (stripeError: any) {
+          console.error("Kiosk checkout payment error:", stripeError);
+          // Payment failed before checkout was created - no cleanup needed
+          const errorMessage = stripeError.code === 'authentication_required' 
+            ? "Card requires authentication. Please see staff for assistance."
+            : stripeError.code === 'card_declined'
+            ? "Card was declined. Please see staff for assistance."
+            : "Payment failed. Please see staff for assistance.";
+          
+          return res.status(400).json({ 
+            success: false,
+            message: errorMessage,
+            requiresStaffAssistance: true
+          });
+        }
+      } else {
+        // Free item - just checkout without payment (use userId as staff ID for self-checkout)
+        const checkout = await storage.checkoutItem({
+          itemId: validatedData.itemId,
+          userId: validatedData.userId,
+          checkedOutByStaffId: validatedData.userId,
+          notes: "Self-checkout via kiosk (free item)"
+        });
+        
+        res.status(201).json({
+          success: true,
+          checkout,
+          charged: false,
+          message: `${item.name} checked out successfully!`
+        });
+      }
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Kiosk checkout error:", error);
+      res.status(400).json({ message: error.message });
     }
   });
 
@@ -799,6 +1333,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync membership plans with Stripe Products/Prices
+  app.post("/api/admin/membership-plans/sync-stripe", isAdmin, async (req, res) => {
+    try {
+      const freshStripe = createStripeClient();
+      const plans = await storage.getAllMembershipPlans();
+      const results = [];
+
+      for (const plan of plans) {
+        try {
+          let productId = plan.stripeProductId;
+          let priceId = plan.stripePriceId;
+
+          // Create or update Stripe Product
+          if (!productId) {
+            const product = await freshStripe.products.create({
+              name: plan.name,
+              description: plan.description,
+              metadata: {
+                planType: plan.planType,
+                planId: plan.id.toString(),
+              },
+            });
+            productId = product.id;
+          } else {
+            // Update existing product
+            await freshStripe.products.update(productId, {
+              name: plan.name,
+              description: plan.description,
+            });
+          }
+
+          // Create new Stripe Price (prices are immutable, so we create a new one if price changed)
+          // Check if we need a new price
+          let needNewPrice = !priceId;
+          if (priceId) {
+            const existingPrice = await freshStripe.prices.retrieve(priceId);
+            if (existingPrice.unit_amount !== plan.monthlyPrice) {
+              // Price changed, archive old one and create new
+              await freshStripe.prices.update(priceId, { active: false });
+              needNewPrice = true;
+            }
+          }
+
+          if (needNewPrice) {
+            const price = await freshStripe.prices.create({
+              product: productId,
+              unit_amount: plan.monthlyPrice,
+              currency: 'usd',
+              recurring: { interval: 'month' },
+              metadata: {
+                planType: plan.planType,
+                planId: plan.id.toString(),
+              },
+            });
+            priceId = price.id;
+          }
+
+          // Update database with Stripe IDs
+          await storage.updateMembershipPlan(plan.id, {
+            ...plan,
+            stripeProductId: productId,
+            stripePriceId: priceId,
+          });
+
+          results.push({ planId: plan.id, planType: plan.planType, productId, priceId, status: 'synced' });
+        } catch (error: any) {
+          results.push({ planId: plan.id, planType: plan.planType, status: 'error', error: error.message });
+        }
+      }
+
+      res.json({ message: 'Stripe sync completed', results });
+    } catch (error: any) {
+      console.error('Failed to sync with Stripe:', error);
+      res.status(500).json({ message: "Failed to sync with Stripe: " + error.message });
+    }
+  });
+
   // Admin punch card template management
   app.get("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
     try {
@@ -998,7 +1609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create payment intent for checkout (charges card AND saves it for future use)
+  // Create checkout session - uses Subscriptions for memberships, PaymentIntent for day passes
   app.post("/api/stripe/create-payment-intent", isAuthenticated, async (req, res) => {
     try {
       const user = req.user!;
@@ -1008,47 +1619,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cart items are required" });
       }
 
-      // Calculate total from authoritative pricing
-      let subtotal = 0;
-      for (const item of items) {
-        if (item.type === 'membership') {
-          const plans = await storage.getAllMembershipPlans();
-          const plan = plans.find(p => p.planType === item.data?.planType);
-          if (!plan) {
-            return res.status(400).json({ message: `Invalid membership plan: ${item.data?.planType}` });
-          }
-          subtotal += plan.monthlyPrice;
-        } else if (item.type === 'punch_card') {
-          const templates = await storage.getAllPunchCardTemplates();
-          const template = templates.find(t => t.id === item.data?.templateId);
-          if (!template) {
-            return res.status(400).json({ message: `Invalid punch card template: ${item.data?.templateId}` });
-          }
-          const quantity = item.quantity || 1;
-          subtotal += template.totalPrice * quantity;
-        }
+      // Separate memberships from day passes
+      const membershipItems = items.filter((i: any) => i.type === 'membership');
+      const dayPassItems = items.filter((i: any) => i.type === 'punch_card');
+
+      // For now, only allow one type per checkout to simplify
+      if (membershipItems.length > 0 && dayPassItems.length > 0) {
+        return res.status(400).json({ 
+          message: "Please checkout memberships and day passes separately" 
+        });
       }
 
-      // Apply promo code discount if provided
-      let discount = 0;
-      if (promoCode && promoCode.code) {
-        const promotion = await storage.getPromotionByCode(promoCode.code.toUpperCase());
-        if (promotion && promotion.isActive) {
-          if (promotion.discountType === 'percentage') {
-            discount = Math.round(subtotal * (promotion.discountValue / 100));
-          } else {
-            discount = promotion.discountValue;
-          }
-        }
-      }
-
-      const totalAmount = Math.max(subtotal - discount, 0);
-
-      if (totalAmount < 50) {
-        return res.status(400).json({ message: "Minimum charge amount is $0.50" });
-      }
-
-      // Create fresh Stripe client to ensure latest key is used
       const freshStripe = createStripeClient();
 
       // Ensure user has Stripe customer
@@ -1066,31 +1647,290 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeCustomerId(user.id, customerId);
       }
 
-      // Create PaymentIntent with setup_future_usage to save the card
-      const paymentIntent = await freshStripe.paymentIntents.create({
-        amount: totalAmount,
-        currency: 'usd',
-        customer: customerId,
-        setup_future_usage: 'off_session', // Save the payment method for future use
-        automatic_payment_methods: {
-          enabled: true,
-        },
-        metadata: {
-          userId: user.id.toString(),
-          itemCount: items.length.toString(),
-        },
-      });
+      // MEMBERSHIPS: Use Stripe Subscriptions with SetupIntent-first flow
+      if (membershipItems.length > 0) {
+        const item = membershipItems[0];
+        const plans = await storage.getAllMembershipPlans();
+        const plan = plans.find(p => p.planType === item.data?.planType);
+        
+        if (!plan) {
+          return res.status(400).json({ message: `Invalid membership plan: ${item.data?.planType}` });
+        }
 
-      console.log('Created PaymentIntent:', paymentIntent.id, 'Amount:', totalAmount);
+        if (!plan.stripePriceId) {
+          return res.status(400).json({ 
+            message: "Membership plan not configured for payments. Admin needs to sync with Stripe." 
+          });
+        }
 
-      res.json({ 
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-        amount: totalAmount
-      });
+        // Check if user already has an active subscription for this plan
+        const existingMembership = await storage.getMembershipByUserId(user.id);
+        if (existingMembership?.stripeSubscriptionId) {
+          // Check if subscription is active in Stripe
+          try {
+            const existingSub = await freshStripe.subscriptions.retrieve(existingMembership.stripeSubscriptionId);
+            if (existingSub.status === 'active' || existingSub.status === 'trialing') {
+              return res.status(400).json({ 
+                message: "You already have an active subscription. Please manage it from your dashboard." 
+              });
+            }
+          } catch (e) {
+            // Subscription doesn't exist anymore, proceed
+          }
+        }
+
+        // Verify price exists in Stripe before creating subscription
+        try {
+          const stripePrice = await freshStripe.prices.retrieve(plan.stripePriceId);
+          console.log('Verified Stripe price exists:', {
+            priceId: stripePrice.id,
+            active: stripePrice.active,
+            productId: stripePrice.product,
+            unitAmount: stripePrice.unit_amount,
+          });
+          
+          if (!stripePrice.active) {
+            console.error('Stripe price is inactive:', plan.stripePriceId);
+            return res.status(400).json({ 
+              message: "This membership plan is currently unavailable. Please contact support." 
+            });
+          }
+        } catch (priceError: any) {
+          console.error('Stripe price verification failed:', {
+            error: priceError.message,
+            code: priceError.code,
+            priceId: plan.stripePriceId,
+          });
+          return res.status(400).json({ 
+            message: `Membership plan configuration error: ${priceError.message}. Please contact support.` 
+          });
+        }
+
+        // Check for saved payment method - if user has one, we can use it for the subscription
+        const savedPaymentMethods = await storage.getPaymentMethodsByUserId(user.id);
+        const defaultPaymentMethod = savedPaymentMethods.find(pm => pm.isDefault) || savedPaymentMethods[0];
+        
+        console.log('Creating Stripe subscription:', {
+          customerId,
+          priceId: plan.stripePriceId,
+          planType: plan.planType,
+          planName: plan.name,
+          userId: user.id,
+          hasDefaultPaymentMethod: !!defaultPaymentMethod,
+        });
+
+        // If user has a saved payment method, attach it to customer and use for subscription
+        let paymentMethodToUse: string | undefined;
+        
+        if (defaultPaymentMethod?.stripePaymentMethodId) {
+          try {
+            // Ensure payment method is attached to customer
+            await freshStripe.paymentMethods.attach(defaultPaymentMethod.stripePaymentMethodId, {
+              customer: customerId,
+            });
+          } catch (attachError: any) {
+            // May already be attached, that's fine
+            if (attachError.code !== 'resource_already_exists') {
+              console.log('Payment method already attached or error:', attachError.message);
+            }
+          }
+          
+          // Set as customer's default payment method
+          await freshStripe.customers.update(customerId, {
+            invoice_settings: {
+              default_payment_method: defaultPaymentMethod.stripePaymentMethodId,
+            },
+          });
+          
+          paymentMethodToUse = defaultPaymentMethod.stripePaymentMethodId;
+          console.log('Using saved payment method:', paymentMethodToUse);
+        }
+
+        let subscription;
+        try {
+          const subscriptionParams: any = {
+            customer: customerId,
+            items: [{ price: plan.stripePriceId }],
+            collection_method: 'charge_automatically',
+            payment_behavior: 'default_incomplete',
+            payment_settings: {
+              payment_method_types: ['card'],
+              save_default_payment_method: 'on_subscription',
+            },
+            expand: ['latest_invoice.payment_intent'],
+            metadata: {
+              userId: user.id.toString(),
+              planType: plan.planType,
+              planId: plan.id.toString(),
+            },
+          };
+          
+          // If we have a saved payment method, use it as default
+          if (paymentMethodToUse) {
+            subscriptionParams.default_payment_method = paymentMethodToUse;
+          }
+          
+          subscription = await freshStripe.subscriptions.create(subscriptionParams);
+        } catch (stripeError: any) {
+          console.error('Stripe subscription creation failed:', {
+            error: stripeError.message,
+            code: stripeError.code,
+            type: stripeError.type,
+            priceId: plan.stripePriceId,
+            customerId,
+          });
+          return res.status(400).json({ 
+            message: `Failed to create subscription: ${stripeError.message}. Please contact support.` 
+          });
+        }
+
+        let invoice = subscription.latest_invoice as any;
+        let paymentIntent = invoice?.payment_intent;
+
+        console.log('Subscription created with invoice:', {
+          subscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
+          invoiceId: invoice?.id,
+          invoiceStatus: invoice?.status,
+          paymentIntentId: paymentIntent?.id,
+          paymentIntentStatus: paymentIntent?.status,
+          hasClientSecret: !!paymentIntent?.client_secret,
+          defaultPaymentMethod: subscription.default_payment_method,
+        });
+
+        // If we have a PaymentIntent client secret, return it for confirmation
+        if (paymentIntent?.client_secret) {
+          console.log('Returning invoice PaymentIntent for confirmation');
+          return res.json({
+            type: 'subscription',
+            clientSecret: paymentIntent.client_secret,
+            subscriptionId: subscription.id,
+            paymentIntentId: paymentIntent.id,
+            amount: plan.monthlyPrice,
+          });
+        }
+
+        // If invoice is open but no PaymentIntent, try to pay it with the saved payment method
+        if (paymentMethodToUse && invoice?.id && invoice.status === 'open') {
+          console.log('Attempting to pay open invoice with saved payment method...');
+          
+          try {
+            const paidInvoice = await freshStripe.invoices.pay(invoice.id, {
+              payment_method: paymentMethodToUse,
+            });
+            
+            console.log('Invoice paid successfully:', {
+              invoiceId: paidInvoice.id,
+              status: paidInvoice.status,
+            });
+            
+            // Retrieve updated subscription
+            const updatedSubscription = await freshStripe.subscriptions.retrieve(subscription.id);
+            
+            return res.json({
+              type: 'subscription',
+              subscriptionId: subscription.id,
+              subscriptionStatus: updatedSubscription.status,
+              invoiceId: paidInvoice.id,
+              amount: plan.monthlyPrice,
+              alreadyPaid: true, // Flag indicating payment was processed with saved card
+            });
+          } catch (payError: any) {
+            console.error('Failed to pay invoice with saved method:', {
+              error: payError.message,
+              code: payError.code,
+            });
+            // Continue to fallback flow
+          }
+        }
+
+        // Fallback: Create a SetupIntent so user can provide payment method
+        // This handles the case where no saved payment method exists
+        console.log('No payment method available, returning SetupIntent for card collection...');
+        
+        const setupIntent = await freshStripe.setupIntents.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          metadata: {
+            userId: user.id.toString(),
+            subscriptionId: subscription.id,
+            planType: plan.planType,
+            flow: 'subscription_setup',
+          },
+        });
+        
+        return res.json({
+          type: 'subscription_setup',
+          clientSecret: setupIntent.client_secret,
+          subscriptionId: subscription.id,
+          amount: plan.monthlyPrice,
+          requiresPaymentMethod: true, // Flag indicating card collection is needed first
+        });
+      }
+
+      // DAY PASSES: Use one-time PaymentIntent
+      if (dayPassItems.length > 0) {
+        let subtotal = 0;
+        for (const item of dayPassItems) {
+          const templates = await storage.getAllPunchCardTemplates();
+          // Support both templateId and id (frontend passes whole template object with .id)
+          const templateId = item.data?.templateId || item.data?.id;
+          const template = templates.find(t => t.id === templateId);
+          if (!template) {
+            return res.status(400).json({ message: `Invalid day pass: ${templateId}` });
+          }
+          const quantity = item.quantity || 1;
+          subtotal += template.totalPrice * quantity;
+        }
+
+        // Apply promo code discount if provided
+        let discount = 0;
+        if (promoCode && promoCode.code) {
+          const promotion = await storage.getPromotionByCode(promoCode.code.toUpperCase());
+          if (promotion && promotion.isActive && promotion.discountValue !== null) {
+            if (promotion.discountType === 'percentage') {
+              discount = Math.round(subtotal * (promotion.discountValue / 100));
+            } else {
+              discount = promotion.discountValue;
+            }
+          }
+        }
+
+        const totalAmount = Math.max(subtotal - discount, 0);
+
+        if (totalAmount < 50) {
+          return res.status(400).json({ message: "Minimum charge amount is $0.50" });
+        }
+
+        const paymentIntent = await freshStripe.paymentIntents.create({
+          amount: totalAmount,
+          currency: 'usd',
+          customer: customerId,
+          setup_future_usage: 'off_session',
+          automatic_payment_methods: {
+            enabled: true,
+          },
+          metadata: {
+            userId: user.id.toString(),
+            itemCount: dayPassItems.length.toString(),
+            type: 'day_pass',
+          },
+        });
+
+        console.log('Created PaymentIntent for day passes:', paymentIntent.id, 'Amount:', totalAmount);
+
+        return res.json({
+          type: 'payment_intent',
+          clientSecret: paymentIntent.client_secret,
+          paymentIntentId: paymentIntent.id,
+          amount: totalAmount,
+        });
+      }
+
+      return res.status(400).json({ message: "No valid items in cart" });
     } catch (error: any) {
-      console.error('Failed to create payment intent:', error);
-      res.status(500).json({ message: "Failed to create payment intent: " + error.message });
+      console.error('Failed to create checkout:', error);
+      res.status(500).json({ message: "Failed to create checkout: " + error.message });
     }
   });
 
@@ -1098,27 +1938,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/stripe/finalize-order", isAuthenticated, async (req, res) => {
     try {
       const user = req.user!;
-      const { paymentIntentId, items, promoCode } = req.body;
+      const { paymentIntentId, subscriptionId, items, promoCode, type } = req.body;
 
-      // Create fresh Stripe client to ensure latest key is used
+      console.log('Finalize order request:', { paymentIntentId, subscriptionId, type, userId: user.id });
+
       const freshStripe = createStripeClient();
-
-      // Verify the payment intent succeeded
-      const paymentIntent = await freshStripe.paymentIntents.retrieve(paymentIntentId);
       
-      if (paymentIntent.status !== 'succeeded') {
-        return res.status(400).json({ message: "Payment has not been completed" });
-      }
+      // Track resolved payment identifiers for recording payments
+      let resolvedPaymentMethodId: string | undefined;
+      let resolvedPaymentIntentId: string | undefined;
+      
+      // Helper to resolve payment identifiers from a subscription's invoice
+      const resolvePaymentIdsFromSubscription = async (subId: string): Promise<{ intentId: string; methodId: string } | null> => {
+        try {
+          const sub = await freshStripe.subscriptions.retrieve(subId, {
+            expand: ['latest_invoice.payment_intent'],
+          });
+          const invoice = sub.latest_invoice as any;
+          const pi = invoice?.payment_intent;
+          
+          if (!pi || !pi.id) {
+            console.log('No payment intent on invoice');
+            return null;
+          }
+          
+          const methodId = pi.payment_method as string || sub.default_payment_method as string;
+          
+          if (!methodId) {
+            console.log('No payment method found on payment intent or subscription');
+            return null;
+          }
+          
+          return { intentId: pi.id, methodId };
+        } catch (e: any) {
+          console.error('Failed to resolve payment IDs from subscription:', e.message);
+          return null;
+        }
+      };
 
-      // Save the payment method from the successful payment
-      if (paymentIntent.payment_method) {
-        const paymentMethod = await freshStripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
+      // Handle subscription_setup_complete flow - card was collected via SetupIntent
+      if (type === 'subscription_setup_complete' && subscriptionId) {
+        console.log('Completing subscription with new payment method:', { 
+          paymentMethodId: paymentIntentId, // In this flow, paymentIntentId is actually the payment_method ID
+          subscriptionId,
+          userId: user.id 
+        });
         
+        const paymentMethodId = paymentIntentId;
+        
+        // Ensure customer has the payment method and it's set as default
+        let customerId = user.stripeCustomerId;
+        if (!customerId) {
+          const customer = await freshStripe.customers.create({
+            email: user.email,
+            name: `${user.firstName} ${user.lastName}`,
+          });
+          customerId = customer.id;
+          await storage.updateUserStripeCustomerId(user.id, customerId);
+        }
+        
+        // Attach payment method to customer
+        try {
+          await freshStripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+        } catch (attachError: any) {
+          if (attachError.code !== 'resource_already_exists') {
+            console.log('Payment method already attached or error:', attachError.message);
+          }
+        }
+        
+        // Set as customer's default
+        await freshStripe.customers.update(customerId, {
+          invoice_settings: { default_payment_method: paymentMethodId },
+        });
+        
+        // Update subscription to use this payment method
+        await freshStripe.subscriptions.update(subscriptionId, {
+          default_payment_method: paymentMethodId,
+        });
+        
+        // Save the payment method locally
+        const paymentMethod = await freshStripe.paymentMethods.retrieve(paymentMethodId);
         if (paymentMethod.card) {
           const existingMethods = await storage.getPaymentMethodsByUserId(user.id);
           const isDefault = existingMethods.length === 0;
-          
-          // Check if this payment method already exists
           const existingMethod = existingMethods.find(m => m.stripePaymentMethodId === paymentMethod.id);
           
           if (!existingMethod) {
@@ -1133,56 +2035,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         }
+        
+        // Now pay the subscription's pending invoice (only if still open and not already paid)
+        const subscriptionForInvoice = await freshStripe.subscriptions.retrieve(subscriptionId, {
+          expand: ['latest_invoice.payment_intent'],
+        });
+        
+        const invoiceForPayment = subscriptionForInvoice.latest_invoice as any;
+        console.log('Invoice state for SetupIntent completion:', {
+          invoiceId: invoiceForPayment?.id,
+          invoiceStatus: invoiceForPayment?.status,
+          paymentIntentStatus: invoiceForPayment?.payment_intent?.status,
+          invoicePaymentMethod: invoiceForPayment?.payment_intent?.payment_method,
+          expectedPaymentMethod: paymentMethodId,
+        });
+        
+        // Only pay if invoice is still open and hasn't been paid yet
+        if (invoiceForPayment?.id && invoiceForPayment.status === 'open') {
+          // Check if the PaymentIntent is already succeeded (avoid duplicate charge)
+          const existingPiStatus = invoiceForPayment.payment_intent?.status;
+          if (existingPiStatus !== 'succeeded') {
+            console.log('Paying subscription invoice with collected card:', invoiceForPayment.id);
+            await freshStripe.invoices.pay(invoiceForPayment.id, { payment_method: paymentMethodId });
+          } else {
+            console.log('Invoice PaymentIntent already succeeded, skipping manual pay');
+          }
+        } else if (invoiceForPayment?.status === 'paid') {
+          console.log('Invoice already paid, continuing to activation');
+        }
+        
+        // Resolve payment identifiers from the subscription's invoice
+        const setupIds = await resolvePaymentIdsFromSubscription(subscriptionId);
+        if (setupIds) {
+          resolvedPaymentIntentId = setupIds.intentId;
+          resolvedPaymentMethodId = setupIds.methodId;
+        } else {
+          // Fallback: use the payment method we just attached
+          resolvedPaymentMethodId = paymentMethodId;
+          resolvedPaymentIntentId = invoiceForPayment?.payment_intent?.id || `setup_${subscriptionId}`;
+          console.log('Using fallback payment IDs for SetupIntent flow:', { 
+            resolvedPaymentMethodId, 
+            resolvedPaymentIntentId 
+          });
+        }
+        
+        // Continue to activate membership below
       }
+      
+      // Handle saved card payment flow - already paid during create-payment-intent
+      if (paymentIntentId === 'saved_card_payment' && subscriptionId) {
+        console.log('Finalizing saved card subscription:', { subscriptionId, userId: user.id });
+        
+        // Use the helper to resolve payment identifiers
+        const savedCardIds = await resolvePaymentIdsFromSubscription(subscriptionId);
+        
+        if (savedCardIds) {
+          resolvedPaymentIntentId = savedCardIds.intentId;
+          resolvedPaymentMethodId = savedCardIds.methodId;
+          console.log('Resolved payment IDs from saved card subscription:', {
+            resolvedPaymentIntentId,
+            resolvedPaymentMethodId,
+          });
+        } else {
+          // Fallback: create reference identifiers for tracking
+          console.error('Could not resolve payment IDs for saved card subscription - using fallback references');
+          resolvedPaymentIntentId = `saved_card_${subscriptionId}`;
+          resolvedPaymentMethodId = `subscription_${subscriptionId}`;
+        }
+      } else if (type !== 'subscription_setup_complete') {
+        // Normal PaymentIntent flow - verify payment succeeded
+        const paymentIntent = await freshStripe.paymentIntents.retrieve(paymentIntentId);
+        console.log('Payment intent status:', paymentIntent.status);
+        
+        if (paymentIntent.status !== 'succeeded') {
+          return res.status(400).json({ message: "Payment has not been completed" });
+        }
+        
+        // Set resolved identifiers from the PaymentIntent
+        resolvedPaymentIntentId = paymentIntent.id;
+        resolvedPaymentMethodId = paymentIntent.payment_method as string | undefined;
 
-      // Process each item in the cart
-      for (const item of items) {
-        if (item.type === 'membership') {
-          // Create or update membership
-          const plans = await storage.getAllMembershipPlans();
-          const plan = plans.find(p => p.planType === item.data?.planType);
+        // Save the payment method from the successful payment
+        if (paymentIntent.payment_method) {
+          const paymentMethod = await freshStripe.paymentMethods.retrieve(paymentIntent.payment_method as string);
           
-          if (plan) {
-            // Check for existing membership
-            const existingMembership = await storage.getMembershipByUserId(user.id);
+          if (paymentMethod.card) {
+            const existingMethods = await storage.getPaymentMethodsByUserId(user.id);
+            const isDefault = existingMethods.length === 0;
             
-            if (existingMembership) {
-              // Update existing membership
-              await storage.updateMembership(existingMembership.id, {
-                planType: plan.planType,
-                status: 'active',
-                startDate: new Date(),
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-              });
-            } else {
-              // Create new membership
-              await storage.createMembership({
-                memberId: `MEM-${Date.now()}`,
-                planType: plan.planType,
-                status: 'active',
-                startDate: new Date(),
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                autoRenew: true,
-                userId: user.id
+            const existingMethod = existingMethods.find(m => m.stripePaymentMethodId === paymentMethod.id);
+            
+            if (!existingMethod) {
+              await storage.createPaymentMethod({
+                userId: user.id,
+                stripePaymentMethodId: paymentMethod.id,
+                cardLast4: paymentMethod.card.last4,
+                cardBrand: paymentMethod.card.brand,
+                cardExpMonth: paymentMethod.card.exp_month,
+                cardExpYear: paymentMethod.card.exp_year,
+                isDefault
               });
             }
+          }
+        }
+      }
+
+      // Handle SUBSCRIPTION (membership) orders
+      if ((type === 'subscription' || type === 'subscription_setup_complete') && subscriptionId) {
+        console.log('Finalizing subscription order:', { subscriptionId, paymentIntentId, userId: user.id });
+        
+        // Retry logic for subscription retrieval (Stripe might need a moment to process)
+        let subscription;
+        let lastError;
+        const maxRetries = 3;
+        const retryDelay = 1000; // 1 second
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            subscription = await freshStripe.subscriptions.retrieve(subscriptionId);
+            console.log('Retrieved subscription (attempt', attempt, '):', { 
+              id: subscription.id, 
+              status: subscription.status,
+              currentPeriodEnd: (subscription as any).current_period_end
+            });
+            break; // Success, exit loop
+          } catch (subError: any) {
+            lastError = subError;
+            console.error(`Failed to retrieve subscription (attempt ${attempt}/${maxRetries}):`, subError.message, subError.code);
             
-            // Create payment record
-            await storage.createPayment({
-              userId: user.id,
-              membershipId: "general-purchase",
-              amount: plan.monthlyPrice,
-              description: `${plan.name} - Monthly Membership`,
-              status: "successful",
-              method: "credit_card",
-              stripePaymentIntentId: paymentIntentId,
-              stripePaymentMethodId: paymentIntent.payment_method as string || "default"
+            if (attempt < maxRetries) {
+              // Wait before retrying
+              await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+            }
+          }
+        }
+        
+        if (!subscription) {
+          console.error('All subscription retrieval attempts failed:', lastError?.message);
+          return res.status(400).json({ 
+            message: `Failed to retrieve subscription after ${maxRetries} attempts: ${lastError?.message}. The payment was processed but membership activation failed. Please contact support with subscription ID: ${subscriptionId}` 
+          });
+        }
+        
+        // Guard: Check subscription is in a valid state for activation
+        // After paying the invoice, subscription might still be incomplete - that's OK for manual flow
+        const validStatuses = ['active', 'trialing', 'incomplete'];
+        if (!validStatuses.includes(subscription.status)) {
+          console.error('Subscription in unexpected state:', { 
+            status: subscription.status, 
+            subscriptionId,
+            paymentIntentId 
+          });
+          return res.status(400).json({ 
+            message: `Subscription is in '${subscription.status}' state and cannot be activated yet. If your payment was successful, please wait a moment and refresh. Contact support if this persists.` 
+          });
+        }
+        
+        const planType = subscription.metadata?.planType as any;
+        console.log('Subscription metadata:', subscription.metadata);
+        
+        const plans = await storage.getAllMembershipPlans();
+        console.log('Available plans:', plans.map(p => ({ id: p.id, planType: p.planType, name: p.name })));
+        
+        const plan = plans.find(p => p.planType === planType);
+
+        if (!plan) {
+          console.error('Plan not found for planType:', planType);
+          return res.status(400).json({ 
+            message: `Membership plan '${planType}' not found. Please contact support.` 
+          });
+        }
+
+        if (plan) {
+          const existingMembership = await storage.getMembershipByUserId(user.id);
+          
+          // Calculate end date from subscription period (current_period_end is on the raw subscription object)
+          const currentPeriodEnd = (subscription as any).current_period_end;
+          const endDate = currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const startDate = new Date().toISOString().split('T')[0];
+          
+          if (existingMembership) {
+            await storage.updateMembership(existingMembership.membershipId, {
+              planType: plan.planType,
+              status: 'active',
+              startDate,
+              endDate,
+              stripeSubscriptionId: subscriptionId,
+              autoRenew: true,
+            });
+          } else {
+            await storage.createMembership({
+              membershipId: `MEM-${Date.now()}`,
+              planType: plan.planType,
+              status: 'active',
+              startDate,
+              endDate,
+              autoRenew: true,
+              stripeSubscriptionId: subscriptionId,
+              userId: user.id
             });
           }
-        } else if (item.type === 'punch_card') {
-          // Create punch card
+          
+          // Use the already-resolved payment identifiers (set earlier in the flow)
+          // Fall back to subscription defaults only if not already resolved
+          const finalPaymentIntentId = resolvedPaymentIntentId || paymentIntentId || `sub_${subscriptionId}`;
+          const finalPaymentMethodId = resolvedPaymentMethodId || subscription.default_payment_method as string || `sub_method_${subscriptionId}`;
+          
+          console.log('Recording subscription payment with identifiers:', {
+            finalPaymentIntentId,
+            finalPaymentMethodId,
+            resolvedPaymentIntentId,
+            resolvedPaymentMethodId,
+          });
+          
+          await storage.createPayment({
+            userId: user.id,
+            membershipId: subscriptionId,
+            amount: plan.monthlyPrice,
+            description: `${plan.name} - Monthly Subscription`,
+            status: "successful",
+            method: "credit_card",
+            stripePaymentIntentId: finalPaymentIntentId,
+            stripePaymentMethodId: finalPaymentMethodId
+          });
+        }
+
+        return res.json({ success: true, message: "Subscription activated successfully" });
+      }
+
+      // Handle DAY PASS (one-time) orders
+      for (const item of items) {
+        if (item.type === 'punch_card') {
           const templates = await storage.getAllPunchCardTemplates();
-          const template = templates.find(t => t.id === item.data?.templateId);
+          // Support both templateId and id (frontend passes whole template object with .id)
+          const templateId = item.data?.templateId || item.data?.id;
+          const template = templates.find(t => t.id === templateId);
           
           if (template) {
             const quantity = item.quantity || 1;
@@ -1201,13 +2288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               await storage.createPayment({
                 userId: user.id,
-                membershipId: "general-purchase",
+                membershipId: "day-pass-purchase",
                 amount: template.totalPrice,
                 description: `${template.name} - Day Pass Package`,
                 status: "successful",
                 method: "credit_card",
-                stripePaymentIntentId: paymentIntentId,
-                stripePaymentMethodId: paymentIntent.payment_method as string || "default"
+                stripePaymentIntentId: resolvedPaymentIntentId || paymentIntentId,
+                stripePaymentMethodId: resolvedPaymentMethodId || "default"
               });
             }
           }
@@ -1838,7 +2925,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const validatedData = insertNotificationSchema.parse(req.body);
+      const body = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+        endDate: req.body.endDate ? new Date(req.body.endDate) : null
+      };
+      const validatedData = insertNotificationSchema.parse(body);
       const notification = await storage.createNotification(validatedData);
       res.status(201).json(notification);
     } catch (error) {
@@ -1857,7 +2949,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const id = parseInt(req.params.id);
-      const notification = await storage.updateNotification(id, req.body);
+      const body = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : (req.body.endDate === null ? null : undefined)
+      };
+      const notification = await storage.updateNotification(id, body);
       res.json(notification);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1910,10 +3007,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else if (item.type === 'punch_card') {
           // Fetch authoritative punch card template pricing from database
           const templates = await storage.getAllPunchCardTemplates();
-          const template = templates.find(t => t.id === item.data?.templateId);
+          // Support both templateId and id (frontend passes whole template object with .id)
+          const templateId = item.data?.templateId || item.data?.id;
+          const template = templates.find(t => t.id === templateId);
           
           if (!template) {
-            return res.status(400).json({ message: `Invalid punch card template: ${item.data?.templateId}` });
+            return res.status(400).json({ message: `Invalid punch card template: ${templateId}` });
           }
           
           itemPrice = template.totalPrice;
@@ -1952,10 +3051,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Calculate discount based on type
-          if (promotion.discountType === 'percentage') {
-            discount = Math.round(subtotal * (promotion.discountValue / 100));
-          } else if (promotion.discountType === 'fixed_amount') {
-            discount = Math.min(promotion.discountValue, subtotal); // Cap discount at subtotal
+          if (promotion.discountValue !== null) {
+            if (promotion.discountType === 'percentage') {
+              discount = Math.round(subtotal * (promotion.discountValue / 100));
+            } else if (promotion.discountType === 'fixed_amount') {
+              discount = Math.min(promotion.discountValue, subtotal); // Cap discount at subtotal
+            }
           }
 
           validatedPromo = promotion;
@@ -1982,7 +3083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata.promoCode = validatedPromo.code;
         metadata.promoId = validatedPromo.id.toString();
         metadata.discountType = validatedPromo.discountType;
-        metadata.discountValue = validatedPromo.discountValue.toString();
+        metadata.discountValue = validatedPromo.discountValue !== null ? validatedPromo.discountValue.toString() : '0';
       }
 
       // Create payment intent with Stripe using server-calculated amount
@@ -2067,8 +3168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "successful",
         method: "credit_card",
         stripePaymentIntentId: paymentIntent.id,
-        stripePaymentMethodId: paymentMethodId,
-        promoCode: validatedPromo?.code || undefined
+        stripePaymentMethodId: paymentMethodId
       });
 
       res.json({ success: true, message: "Purchase completed successfully", paymentIntentId: paymentIntent.id });
@@ -2432,6 +3532,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(403).json({ message: "Forbidden" });
   };
 
+  // Staff member search for item checkout
+  app.get("/api/staff/search-members", isStaffOrAdmin, async (req, res) => {
+    try {
+      const { query } = req.query;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ message: "Search query required" });
+      }
+
+      const searchTerm = query.toLowerCase().trim();
+      
+      // Search users by name, email, or phone
+      const users = await db
+        .select()
+        .from(usersTable)
+        .where(
+          or(
+            sql`LOWER(${usersTable.firstName}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(${usersTable.lastName}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(${usersTable.email}) LIKE ${`%${searchTerm}%`}`,
+            sql`${usersTable.phoneNumber} LIKE ${`%${searchTerm}%`}`
+          )
+        )
+        .limit(10);
+
+      // For each user, get their membership info
+      const results = await Promise.all(users.map(async (user) => {
+        const membership = await storage.getMembershipByUserId(user.id);
+        
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          membership: membership ? {
+            membershipId: membership.membershipId,
+            planType: membership.planType,
+            status: membership.status,
+          } : null,
+        };
+      }));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Staff member search error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/staff/inventory/items", isStaffOrAdmin, async (req, res) => {
     try {
       const items = await storage.getAllInventoryItems();
@@ -2455,19 +3604,187 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const checkoutDataSchema = z.object({
         itemId: z.number().int().positive(),
         userId: z.number().int().positive(),
-        notes: z.string().optional()
+        quantity: z.number().int().positive().default(1),
+        notes: z.string().optional(),
+        paymentIntentId: z.string().optional(),
       });
       const validatedData = checkoutDataSchema.parse(req.body);
-      const checkout = await storage.checkoutItem({
-        ...validatedData,
-        checkedOutByStaffId: req.user!.id
+      const quantity = validatedData.quantity || 1;
+      
+      // Get the item to check availability and price
+      const item = await storage.getInventoryItemById(validatedData.itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      if (item.quantityAvailable < quantity) {
+        return res.status(400).json({ message: `Only ${item.quantityAvailable} available` });
+      }
+      
+      // Create checkout records for each quantity
+      const checkouts = [];
+      for (let i = 0; i < quantity; i++) {
+        const checkout = await storage.checkoutItem({
+          itemId: validatedData.itemId,
+          userId: validatedData.userId,
+          notes: validatedData.notes,
+          checkedOutByStaffId: req.user!.id
+        });
+        
+        // If payment was made, update the checkout with payment info
+        if (validatedData.paymentIntentId && item.priceInCents > 0) {
+          await storage.updateCheckoutPayment(checkout.id, {
+            paymentStatus: 'charged',
+            stripePaymentIntentId: validatedData.paymentIntentId,
+            chargedAmountCents: item.priceInCents,
+          });
+        }
+        
+        checkouts.push(checkout);
+      }
+      
+      res.status(201).json({
+        checkouts,
+        quantity,
+        charged: !!validatedData.paymentIntentId,
+        chargedAmount: validatedData.paymentIntentId ? item.priceInCents * quantity : 0,
       });
-      res.status(201).json(checkout);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       res.status(400).json({ message: error.message });
+    }
+  });
+  
+  // Create payment intent for item checkout (before creating checkout record)
+  app.post("/api/staff/item-checkout-payment-intent", isStaffOrAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        userId: z.number().int().positive(),
+        itemId: z.number().int().positive(),
+        quantity: z.number().int().positive().default(1),
+      });
+      const { userId, itemId, quantity } = schema.parse(req.body);
+      
+      const item = await storage.getInventoryItemById(itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      if (item.priceInCents <= 0) {
+        return res.status(400).json({ message: "This item has no price" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const totalAmount = item.priceInCents * quantity;
+      
+      const freshStripe = createStripeClient();
+      const paymentIntent = await freshStripe.paymentIntents.create({
+        amount: totalAmount,
+        currency: 'usd',
+        description: `Item checkout: ${quantity}x ${item.name}${item.size ? ` (${item.size})` : ''} for ${user.firstName} ${user.lastName}`,
+        metadata: {
+          userId: userId.toString(),
+          itemId: itemId.toString(),
+          quantity: quantity.toString(),
+          type: 'item_checkout',
+        },
+      });
+      
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error: any) {
+      console.error("Create item checkout payment intent error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Charge saved payment method for item checkout
+  app.post("/api/staff/item-checkout-charge-saved", isStaffOrAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        userId: z.number().int().positive(),
+        itemId: z.number().int().positive(),
+        quantity: z.number().int().positive().default(1),
+      });
+      const { userId, itemId, quantity } = schema.parse(req.body);
+      
+      const item = await storage.getInventoryItemById(itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      if (item.priceInCents <= 0) {
+        return res.status(400).json({ message: "This item has no price" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get user's saved payment method
+      const paymentMethods = await storage.getPaymentMethodsByUserId(userId);
+      const defaultMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
+      
+      if (!defaultMethod || !defaultMethod.stripePaymentMethodId) {
+        return res.status(400).json({ message: "No saved payment method found for this member" });
+      }
+      
+      // Get or create Stripe customer
+      let stripeCustomerId = user.stripeCustomerId;
+      const freshStripe = createStripeClient();
+      
+      if (!stripeCustomerId) {
+        // Create a new Stripe customer
+        const customer = await freshStripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: { userId: userId.toString() },
+        });
+        stripeCustomerId = customer.id;
+        await storage.updateUser(userId, { stripeCustomerId });
+      }
+      
+      const totalAmount = item.priceInCents * quantity;
+      
+      // Create and confirm payment intent using saved payment method
+      const paymentIntent = await freshStripe.paymentIntents.create({
+        amount: totalAmount,
+        currency: 'usd',
+        customer: stripeCustomerId,
+        payment_method: defaultMethod.stripePaymentMethodId,
+        off_session: true,
+        confirm: true,
+        description: `Item checkout: ${quantity}x ${item.name}${item.size ? ` (${item.size})` : ''} for ${user.firstName} ${user.lastName}`,
+        metadata: {
+          userId: userId.toString(),
+          itemId: itemId.toString(),
+          quantity: quantity.toString(),
+          type: 'item_checkout',
+        },
+      });
+      
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment failed. Card may need re-authentication." });
+      }
+      
+      res.json({ 
+        paymentIntentId: paymentIntent.id,
+        amountCharged: totalAmount,
+      });
+    } catch (error: any) {
+      console.error("Charge saved card for item checkout error:", error);
+      
+      // Handle specific Stripe errors
+      if (error.code === 'authentication_required') {
+        return res.status(400).json({ message: "Card requires authentication. Please use a new card." });
+      }
+      
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -2485,6 +3802,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Check if a member has a saved payment method (for staff checkout UI)
+  app.get("/api/staff/members/:userId/payment-status", isStaffOrAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const paymentMethods = await storage.getPaymentMethodsByUserId(userId);
+      const defaultMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
+
+      res.json({
+        hasPaymentMethod: !!defaultMethod,
+        paymentMethod: defaultMethod ? {
+          cardLast4: defaultMethod.cardLast4,
+          cardBrand: defaultMethod.cardBrand,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("Payment status check error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create payment intent for one-time card payment during checkout
+  app.post("/api/staff/checkouts/:id/create-payment-intent", isStaffOrAdmin, async (req, res) => {
+    try {
+      const checkoutId = parseInt(req.params.id);
+      
+      const checkout = await storage.getCheckoutById(checkoutId);
+      if (!checkout) {
+        return res.status(404).json({ message: "Checkout not found" });
+      }
+
+      if (checkout.paymentStatus === 'charged') {
+        return res.status(400).json({ message: "This checkout has already been charged" });
+      }
+
+      if (!checkout.item) {
+        return res.status(400).json({ message: "Item not found for this checkout" });
+      }
+
+      const priceInCents = checkout.item.priceInCents;
+      if (!priceInCents || priceInCents <= 0) {
+        return res.status(400).json({ message: "This item has no price set" });
+      }
+
+      const freshStripe = createStripeClient();
+
+      // Create a payment intent without confirming (will be confirmed on frontend with card details)
+      const paymentIntent = await freshStripe.paymentIntents.create({
+        amount: priceInCents,
+        currency: 'usd',
+        description: `Item checkout: ${checkout.item.name} (${checkout.item.size})`,
+        metadata: {
+          checkoutId: checkoutId.toString(),
+          itemId: checkout.itemId.toString(),
+          userId: checkout.userId.toString(),
+          itemName: checkout.item.name,
+        }
+      });
+
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        amount: priceInCents,
+      });
+    } catch (error: any) {
+      console.error("Create payment intent error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Confirm one-time payment for checkout (called after Stripe Elements confirms)
+  app.post("/api/staff/checkouts/:id/confirm-payment", isStaffOrAdmin, async (req, res) => {
+    try {
+      const checkoutId = parseInt(req.params.id);
+      const { paymentIntentId } = req.body;
+
+      if (!paymentIntentId) {
+        return res.status(400).json({ message: "Payment intent ID required" });
+      }
+
+      const checkout = await storage.getCheckoutById(checkoutId);
+      if (!checkout) {
+        return res.status(404).json({ message: "Checkout not found" });
+      }
+
+      const freshStripe = createStripeClient();
+      const paymentIntent = await freshStripe.paymentIntents.retrieve(paymentIntentId);
+
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: `Payment not successful: ${paymentIntent.status}` });
+      }
+
+      // Update checkout with payment info
+      const updatedCheckout = await storage.updateCheckoutPayment(checkoutId, {
+        paymentStatus: 'charged',
+        stripePaymentIntentId: paymentIntentId,
+        chargedAmountCents: paymentIntent.amount,
+      });
+
+      res.json({
+        success: true,
+        checkout: updatedCheckout,
+        amountCharged: paymentIntent.amount,
+      });
+    } catch (error: any) {
+      console.error("Confirm payment error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Charge a checkout item to the member's payment method
+  app.post("/api/staff/checkouts/:id/charge", isStaffOrAdmin, async (req, res) => {
+    try {
+      const checkoutId = parseInt(req.params.id);
+      
+      // Get the checkout with item and user details
+      const checkout = await storage.getCheckoutById(checkoutId);
+      if (!checkout) {
+        return res.status(404).json({ message: "Checkout not found" });
+      }
+
+      // Check if already charged
+      if (checkout.paymentStatus === 'charged') {
+        return res.status(400).json({ message: "This checkout has already been charged" });
+      }
+
+      // Get the item to check price
+      if (!checkout.item) {
+        return res.status(400).json({ message: "Item not found for this checkout" });
+      }
+
+      const priceInCents = checkout.item.priceInCents;
+      if (!priceInCents || priceInCents <= 0) {
+        return res.status(400).json({ message: "This item has no price set" });
+      }
+
+      // Get the user to find their Stripe customer
+      if (!checkout.user) {
+        return res.status(400).json({ message: "User not found for this checkout" });
+      }
+
+      if (!checkout.user.stripeCustomerId) {
+        return res.status(400).json({ message: "Member does not have a payment method on file" });
+      }
+
+      // Get user's default payment method
+      const paymentMethods = await storage.getPaymentMethodsByUserId(checkout.userId);
+      const defaultMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
+      
+      if (!defaultMethod) {
+        return res.status(400).json({ message: "Member does not have a payment method on file" });
+      }
+
+      const freshStripe = createStripeClient();
+
+      // Create and confirm a payment intent
+      const paymentIntent = await freshStripe.paymentIntents.create({
+        amount: priceInCents,
+        currency: 'usd',
+        customer: checkout.user.stripeCustomerId,
+        payment_method: defaultMethod.stripePaymentMethodId,
+        off_session: true,
+        confirm: true,
+        description: `Item checkout: ${checkout.item.name} (${checkout.item.size})`,
+        metadata: {
+          checkoutId: checkoutId.toString(),
+          itemId: checkout.itemId.toString(),
+          userId: checkout.userId.toString(),
+          itemName: checkout.item.name,
+        }
+      });
+
+      // Update checkout with payment info
+      const updatedCheckout = await storage.updateCheckoutPayment(checkoutId, {
+        paymentStatus: 'charged',
+        stripePaymentIntentId: paymentIntent.id,
+        chargedAmountCents: priceInCents,
+      });
+
+      res.json({
+        success: true,
+        checkout: updatedCheckout,
+        amountCharged: priceInCents,
+        paymentIntentId: paymentIntent.id,
+      });
+    } catch (error: any) {
+      console.error("Checkout charge error:", error);
+      
+      // Handle Stripe-specific errors
+      if (error.type === 'StripeCardError') {
+        // Update checkout with failed status
+        const checkoutId = parseInt(req.params.id);
+        await storage.updateCheckoutPayment(checkoutId, {
+          paymentStatus: 'failed',
+        });
+        return res.status(400).json({ message: `Payment failed: ${error.message}` });
+      }
+      
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -2567,8 +4090,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kiosk member creation endpoint
   app.post("/api/kiosk/create-member-payment", async (req, res) => {
     try {
-      const { memberData, packageData } = req.body;
-      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData });
+      const { memberData, packageData, discountData } = req.body;
+      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData, discountData });
       
       // Validate the request data
       const memberFormSchema = z.object({
@@ -2589,11 +4112,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email already exists" });
       }
       
-      // Create payment intent
+      // Calculate final amount with discount
+      const originalPrice = packageData.originalPrice || packageData.price;
+      let finalAmount = packageData.finalPrice || packageData.price;
+      let discountDescription = '';
+      
+      if (discountData && discountData.amountCents > 0) {
+        finalAmount = Math.max(0, originalPrice - discountData.amountCents);
+        const discountLabel = discountData.type === 'percentage' 
+          ? `${discountData.value}% off` 
+          : `$${(discountData.amountCents / 100).toFixed(2)} off`;
+        discountDescription = ` (${discountLabel}${discountData.reason ? ` - ${discountData.reason}` : ''})`;
+      }
+      
+      // Create payment intent with discounted amount
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(packageData.price * 100), // Convert to cents
+        amount: Math.round(finalAmount), // Final price after discount in cents
         currency: 'usd',
-        description: `${packageData.name} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
+        description: `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
         automatic_payment_methods: {
           enabled: true,
         },
@@ -2605,6 +4141,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           packageType: validatedMemberData.packageType,
           packageId: validatedMemberData.packageId,
           packageName: packageData.name,
+          originalAmount: originalPrice.toString(),
+          discountType: discountData?.type || '',
+          discountValue: discountData?.value?.toString() || '',
+          discountAmount: discountData?.amountCents?.toString() || '',
+          discountReason: discountData?.reason || '',
         },
       });
       
@@ -2621,8 +4162,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Confirm member creation after successful payment
   app.post("/api/kiosk/confirm-member-creation", async (req, res) => {
     try {
-      const { paymentIntentId, memberData, packageData } = req.body;
-      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, memberData, packageData });
+      const { paymentIntentId, memberData, packageData, agreementData, discountData } = req.body;
+      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, memberData, packageData, agreementData, discountData });
+      
+      // Validate agreement data
+      const agreementSchema = z.object({
+        dateOfBirth: z.string().min(1, "Date of birth is required"),
+        address: z.string().min(1, "Address is required"),
+        emergencyContact: z.string().min(1, "Emergency contact is required"),
+        emergencyPhone: z.string().min(1, "Emergency phone is required"),
+        healthConfirmation: z.boolean().refine(val => val === true, "Health confirmation required"),
+        riskAcknowledgment: z.boolean().refine(val => val === true, "Risk acknowledgment required"),
+        liabilityWaiver: z.boolean().refine(val => val === true, "Liability waiver required"),
+        rulesAcceptance: z.boolean().refine(val => val === true, "Rules acceptance required"),
+        ageConfirmation: z.boolean().refine(val => val === true, "Age confirmation required"),
+      });
+      
+      const validatedAgreement = agreementSchema.parse(agreementData);
+      console.log('✅ Validated agreement data:', validatedAgreement);
       
       // Verify payment was successful
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -2631,7 +4188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Payment not completed" });
       }
       
-      // Create the member account
+      // Create the member account with agreement data
       const salt = randomBytes(16).toString('hex');
       const tempPassword = Math.random().toString(36).slice(-8);
       const key = await scryptAsync(tempPassword, salt, 64) as Buffer;
@@ -2644,7 +4201,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: memberData.lastName,
         phoneNumber: memberData.phoneNumber || undefined,
         role: 'member',
-        membershipAgreementCompleted: false, // They'll need to complete agreement on first login
+        // Agreement is completed during kiosk registration
+        membershipAgreementCompleted: true,
+        membershipAgreementDate: new Date(),
+        membershipAgreementData: agreementData,
+        dateOfBirth: agreementData?.dateOfBirth,
+        address: agreementData?.address,
+        emergencyContact: agreementData?.emergencyContact,
+        emergencyPhone: agreementData?.emergencyPhone,
       });
       
       // Create membership or punch card based on package type
@@ -2674,12 +4238,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Record the payment
+      // Calculate final amount and discount info
+      const originalAmount = packageData.originalPrice || packageData.price;
+      const finalAmount = packageData.finalPrice || packageData.price;
+      const hasDiscount = discountData && discountData.amountCents > 0;
+      
+      // Record the payment with discount information
       await storage.createPayment({
         userId: newUser.id,
         membershipId: memberData.packageType === 'membership' ? `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}` : 'punch-card',
-        amount: packageData.price,
-        description: `${packageData.name} - Kiosk Purchase`,
+        amount: finalAmount, // Final amount after discount
+        originalAmount: hasDiscount ? originalAmount : null,
+        discountAmount: hasDiscount ? discountData.amountCents : null,
+        discountType: hasDiscount ? discountData.type : null,
+        discountValue: hasDiscount ? discountData.value : null,
+        discountReason: hasDiscount ? discountData.reason : null,
+        description: `${packageData.name} - Kiosk Purchase${hasDiscount ? ` (${discountData.type === 'percentage' ? discountData.value + '%' : '$' + (discountData.amountCents/100).toFixed(2)} discount)` : ''}`,
         status: 'successful',
         method: 'credit_card',
         stripePaymentIntentId: paymentIntent.id,

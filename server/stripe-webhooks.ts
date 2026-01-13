@@ -121,7 +121,7 @@ const handleCheckoutSessionCompleted = async (session: Stripe.Checkout.Session) 
       description: `Checkout Session ${session.id}`,
       method: 'credit_card',
       stripePaymentIntentId: session.payment_intent as string,
-      stripePaymentMethodId: session.payment_method_details?.card?.last4 || '',
+      stripePaymentMethodId: (session as any).payment_method || '',
     });
     
     console.log('💳 Checkout payment recorded:', {
@@ -139,6 +139,160 @@ const handleCheckoutSessionCompleted = async (session: Stripe.Checkout.Session) 
 const handleCheckoutSessionExpired = async (session: Stripe.Checkout.Session) => {
   console.log('⏰ Checkout session expired:', session.id);
   // Could track abandoned checkouts for analytics
+};
+
+// Handle subscription creation/updates
+const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
+  console.log('📋 Subscription updated:', subscription.id, 'Status:', subscription.status);
+  
+  try {
+    const customerId = subscription.customer as string;
+    if (!customerId) return;
+    
+    const user = await storage.getUserByCustomerId(customerId);
+    if (!user) {
+      console.warn('⚠️  User not found for subscription customer:', customerId);
+      return;
+    }
+    
+    const membership = await storage.getMembershipByUserId(user.id);
+    if (!membership) {
+      console.warn('⚠️  Membership not found for user:', user.id);
+      return;
+    }
+    
+    // Map Stripe subscription status to membership status
+    let membershipStatus: 'active' | 'inactive' | 'expired' | 'frozen' = 'inactive';
+    if (subscription.status === 'active' || subscription.status === 'trialing') {
+      membershipStatus = 'active';
+    } else if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
+      membershipStatus = 'expired';
+    } else if (subscription.status === 'past_due') {
+      membershipStatus = 'frozen';
+    }
+    
+    // Update membership with Stripe subscription data
+    const currentPeriodEnd = (subscription as any).current_period_end;
+    await storage.updateMembership(membership.membershipId, {
+      status: membershipStatus,
+      stripeSubscriptionId: subscription.id,
+      endDate: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : undefined,
+      autoRenew: !subscription.cancel_at_period_end,
+    });
+    
+    console.log('✅ Membership updated for user:', user.email, 'Status:', membershipStatus);
+  } catch (error) {
+    console.error('❌ Error handling subscription update:', error);
+  }
+};
+
+// Handle subscription deletion
+const handleSubscriptionDeleted = async (subscription: Stripe.Subscription) => {
+  console.log('🗑️ Subscription deleted:', subscription.id);
+  
+  try {
+    const customerId = subscription.customer as string;
+    if (!customerId) return;
+    
+    const user = await storage.getUserByCustomerId(customerId);
+    if (!user) return;
+    
+    const membership = await storage.getMembershipByUserId(user.id);
+    if (!membership) return;
+    
+    // Mark membership as expired
+    await storage.updateMembership(membership.id, {
+      status: 'expired',
+      autoRenew: false,
+    });
+    
+    console.log('✅ Membership expired for user:', user.email);
+  } catch (error) {
+    console.error('❌ Error handling subscription deletion:', error);
+  }
+};
+
+// Handle invoice payment for recurring subscriptions
+const handleInvoicePaymentSucceeded = async (invoice: Stripe.Invoice) => {
+  console.log('🧾 Invoice paid:', invoice.id, 'Amount:', invoice.amount_paid / 100);
+  
+  try {
+    const customerId = invoice.customer as string;
+    const subscriptionId = (invoice as any).subscription as string;
+    
+    if (!customerId) return;
+    
+    const user = await storage.getUserByCustomerId(customerId);
+    if (!user) return;
+    
+    // Record the payment
+    const paymentIntentId = (invoice as any).payment_intent as string;
+    await storage.createPayment({
+      userId: user.id,
+      amount: invoice.amount_paid,
+      status: 'successful',
+      description: subscriptionId 
+        ? `Subscription renewal - Invoice ${invoice.number || invoice.id}`
+        : `Payment - Invoice ${invoice.number || invoice.id}`,
+      method: 'credit_card',
+      membershipId: subscriptionId || 'invoice-payment',
+      stripePaymentIntentId: paymentIntentId,
+    });
+    
+    console.log('💳 Invoice payment recorded for user:', user.email);
+    
+    // If this is a subscription renewal, update the membership end date
+    if (subscriptionId) {
+      const membership = await storage.getMembershipByUserId(user.id);
+      if (membership && membership.stripeSubscriptionId === subscriptionId) {
+        const periodEnd = (invoice.lines.data[0] as any)?.period?.end;
+        if (periodEnd) {
+          await storage.updateMembership(membership.id, {
+            status: 'active',
+            endDate: new Date(periodEnd * 1000),
+          });
+          console.log('📅 Membership renewed until:', new Date(periodEnd * 1000));
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error handling invoice payment:', error);
+  }
+};
+
+// Handle failed invoice payment
+const handleInvoicePaymentFailed = async (invoice: Stripe.Invoice) => {
+  console.log('❌ Invoice payment failed:', invoice.id);
+  
+  try {
+    const customerId = invoice.customer as string;
+    if (!customerId) return;
+    
+    const user = await storage.getUserByCustomerId(customerId);
+    if (!user) return;
+    
+    // Record the failed payment
+    const paymentIntentId = (invoice as any).payment_intent as string;
+    await storage.createPayment({
+      userId: user.id,
+      amount: invoice.amount_due,
+      status: 'failed',
+      description: `Failed subscription payment - Invoice ${invoice.number || invoice.id}`,
+      method: 'credit_card',
+      stripePaymentIntentId: paymentIntentId,
+    });
+    
+    // Optionally freeze the membership after payment failure
+    const membership = await storage.getMembershipByUserId(user.id);
+    if (membership) {
+      await storage.updateMembership(membership.id, {
+        status: 'frozen',
+      });
+      console.log('⚠️ Membership frozen due to payment failure for user:', user.email);
+    }
+  } catch (error) {
+    console.error('❌ Error handling failed invoice:', error);
+  }
 };
 
 // Main webhook handler
@@ -203,13 +357,19 @@ export const setupStripeWebhooks = (app: Express) => {
           
         case 'customer.subscription.created':
         case 'customer.subscription.updated':
+          await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+          break;
+          
         case 'customer.subscription.deleted':
-          console.log('📋 Subscription event (future implementation):', event.type);
+          await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
           break;
           
         case 'invoice.payment_succeeded':
+          await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
+          break;
+          
         case 'invoice.payment_failed':
-          console.log('🧾 Invoice event (future implementation):', event.type);
+          await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
           break;
           
         default:

@@ -44,58 +44,58 @@
 @tailwind utilities;
 
 :root {
-  /* Wolf Mother Wellness - Brand Color Palette */
-  --background: 45 20% 94%;      /* Ivory Veil #EFEDE9 */
-  --foreground: 0 0% 12%;        /* Charred Ash #1F1F1F */
-  --muted: 30 15% 80%;           /* Earthen Linen #C9BBAA */
-  --muted-foreground: 90 8% 40%; /* Deep Moss #5C6656 */
-  --popover: 45 20% 94%;         /* Ivory Veil */
-  --popover-foreground: 0 0% 12%;
-  --card: 45 20% 96%;            /* Slightly lighter Ivory Veil */
-  --card-foreground: 0 0% 12%;
-  --border: 30 15% 75%;          /* Earthen Linen border */
-  --input: 45 15% 92%;           /* Light Ivory input backgrounds */
-  --primary: 90 8% 36%;          /* Deep Moss #5C6656 */
-  --primary-foreground: 45 20% 94%;
-  --secondary: 12 20% 67%;       /* Rosy Smoke #D6A8A1 */
-  --secondary-foreground: 0 0% 12%;
-  --accent: 30 15% 78%;          /* Earthen Linen #C9BBAA */
-  --accent-foreground: 0 0% 12%;
-  --destructive: 0 75% 50%;      /* Clear red for alerts */
+  /* Wolf Mother Wellness - Brand Color Palette (Enhanced Contrast) */
+  --background: 45 18% 95%;      /* Ivory Veil #F0EEE9 - slightly lighter */
+  --foreground: 0 0% 10%;        /* Charred Ash #1A1A1A - darker for better contrast */
+  --muted: 30 12% 82%;           /* Earthen Linen #CFC3B3 */
+  --muted-foreground: 90 10% 30%; /* Deep Moss #465240 - darker for better readability */
+  --popover: 45 18% 97%;         /* Lighter Ivory for popovers */
+  --popover-foreground: 0 0% 10%;
+  --card: 0 0% 100%;             /* Pure white cards for clear separation */
+  --card-foreground: 0 0% 10%;
+  --border: 30 12% 70%;          /* Earthen Linen border - darker for visibility */
+  --input: 0 0% 100%;            /* White input backgrounds for clarity */
+  --primary: 90 12% 28%;         /* Deep Moss #3D4A36 - darker for WCAG compliance */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 12 25% 60%;       /* Rosy Smoke #C8938A - slightly darker */
+  --secondary-foreground: 0 0% 10%;
+  --accent: 30 18% 75%;          /* Earthen Linen #C9BBAA */
+  --accent-foreground: 0 0% 10%;
+  --destructive: 0 72% 45%;      /* Darker red for better contrast */
   --destructive-foreground: 0 0% 100%;
-  --success: 90 8% 36%;          /* Deep Moss for success */
-  --success-foreground: 45 20% 94%;
-  --warning: 45 90% 50%;         /* Warm amber for warnings */
+  --success: 140 45% 35%;        /* Forest green for success */
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 45%;         /* Darker amber for warnings */
   --warning-foreground: 0 0% 100%;
-  --ring: 90 8% 36%;
+  --ring: 90 12% 28%;
   --radius: 0.75rem;
 }
 
 .dark {
-  /* Wolf Mother Wellness - Dark Brand Theme */
-  --background: 0 0% 8%;          /* Deep Charred Ash background */
-  --foreground: 45 20% 90%;       /* Light Ivory Veil text */
-  --muted: 0 0% 15%;              /* Dark muted background */
-  --muted-foreground: 30 15% 65%; /* Medium Earthen Linen for secondary text */
-  --popover: 0 0% 10%;            /* Dark popover background */
-  --popover-foreground: 45 20% 90%;
-  --card: 0 0% 12%;               /* Dark cards */
-  --card-foreground: 45 20% 90%;
-  --border: 0 0% 20%;             /* Subtle dark borders */
-  --input: 0 0% 18%;              /* Dark input backgrounds */
-  --primary: 12 20% 67%;          /* Rosy Smoke for dark mode primary */
-  --primary-foreground: 0 0% 12%;
-  --secondary: 90 8% 50%;         /* Lighter Deep Moss */
-  --secondary-foreground: 45 20% 94%;
-  --accent: 150 35% 65%;          /* Light forest green accent */
-  --accent-foreground: 150 20% 8%;
-  --destructive: 0 70% 55%;       /* Bright red for alerts */
+  /* Wolf Mother Wellness - Dark Brand Theme (Enhanced Contrast) */
+  --background: 0 0% 6%;          /* Deeper charcoal background */
+  --foreground: 0 0% 95%;         /* Near-white text for strong contrast */
+  --muted: 0 0% 14%;              /* Dark muted background */
+  --muted-foreground: 0 0% 70%;   /* Light gray for readable secondary text */
+  --popover: 0 0% 8%;             /* Dark popover background */
+  --popover-foreground: 0 0% 95%;
+  --card: 0 0% 10%;               /* Slightly elevated dark cards */
+  --card-foreground: 0 0% 95%;
+  --border: 0 0% 22%;             /* Visible dark borders */
+  --input: 0 0% 12%;              /* Dark input backgrounds */
+  --primary: 12 30% 70%;          /* Rosy Smoke for dark mode primary - brighter */
+  --primary-foreground: 0 0% 8%;
+  --secondary: 90 15% 55%;        /* Lighter Deep Moss - more visible */
+  --secondary-foreground: 0 0% 8%;
+  --accent: 140 30% 55%;          /* Forest green accent */
+  --accent-foreground: 0 0% 8%;
+  --destructive: 0 65% 55%;       /* Bright red for alerts */
   --destructive-foreground: 0 0% 100%;
-  --success: 150 60% 50%;         /* Bright success green */
+  --success: 140 50% 50%;         /* Bright success green */
   --success-foreground: 0 0% 100%;
-  --warning: 45 85% 60%;          /* Bright amber for warnings */
-  --warning-foreground: 150 20% 8%;
-  --ring: 150 40% 45%;
+  --warning: 38 90% 55%;          /* Bright amber for warnings */
+  --warning-foreground: 0 0% 8%;
+  --ring: 12 30% 70%;
   --radius: 0.75rem;
 }
 

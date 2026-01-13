@@ -24,7 +24,7 @@ export interface PromoCode {
 interface CartContextType {
   items: CartItem[];
   promoCode: PromoCode | null;
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem, options?: { skipAutoOpen?: boolean }) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -35,7 +35,9 @@ interface CartContextType {
   applyPromoCode: (promo: PromoCode) => void;
   removePromoCode: () => void;
   openCart: () => void;
+  closeCart: () => void;
   setCartOpenCallback: (callback: (() => void) | null) => void;
+  setCartCloseCallback: (callback: (() => void) | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -44,8 +46,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [promoCode, setPromoCode] = useState<PromoCode | null>(null);
   const [cartOpenCallback, setCartOpenCallback] = useState<(() => void) | null>(null);
+  const [cartCloseCallback, setCartCloseCallback] = useState<(() => void) | null>(null);
 
-  const addItem = (newItem: CartItem) => {
+  const addItem = (newItem: CartItem, options?: { skipAutoOpen?: boolean }) => {
     setItems(prevItems => {
       // For memberships, replace any existing membership
       if (newItem.type === 'membership') {
@@ -66,8 +69,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return [...prevItems, { ...newItem, quantity: newItem.quantity || 1 }];
     });
     
-    // Auto-open cart when item is added
-    if (cartOpenCallback) {
+    // Auto-open cart when item is added (unless skipAutoOpen is true)
+    if (cartOpenCallback && !options?.skipAutoOpen) {
       cartOpenCallback();
     }
   };
@@ -75,6 +78,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const openCart = () => {
     if (cartOpenCallback) {
       cartOpenCallback();
+    }
+  };
+
+  const closeCart = () => {
+    if (cartCloseCallback) {
+      cartCloseCallback();
     }
   };
 
@@ -154,7 +163,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       applyPromoCode,
       removePromoCode,
       openCart,
-      setCartOpenCallback
+      closeCart,
+      setCartOpenCallback,
+      setCartCloseCallback
     }}>
       {children}
     </CartContext.Provider>

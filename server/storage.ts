@@ -17,6 +17,7 @@ import {
   promotions, type Promotion, type InsertPromotion,
   inventoryItems, type InventoryItem, type InsertInventoryItem,
   itemCheckouts, type ItemCheckout, type InsertItemCheckout,
+  loginEvents, type LoginEvent, type InsertLoginEvent,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -36,8 +37,16 @@ export interface IStorage {
   updateUser(userId: number, data: Partial<User>): Promise<User>;
   updateUserPassword(userId: number, newPassword: string): Promise<User>;
   deleteUser(userId: number): Promise<void>;
-  createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string }): Promise<User>;
+  createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string; mustChangePassword?: boolean }): Promise<User>;
+  updateStaffAdmin(userId: number, data: Partial<{ email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber: string; mustChangePassword: boolean }>): Promise<User>;
+  deleteStaffAdmin(userId: number): Promise<void>;
   listStaffAdmins(): Promise<User[]>;
+
+  // Login event methods
+  createLoginEvent(event: InsertLoginEvent): Promise<LoginEvent>;
+  getLoginEventsByUserId(userId: number, limit?: number): Promise<LoginEvent[]>;
+  getAllStaffLoginEvents(limit?: number): Promise<(LoginEvent & { user?: User })[]>;
+  updateUserLastLogin(userId: number): Promise<void>;
 
   // Password reset methods
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -153,6 +162,8 @@ export interface IStorage {
   getActiveCheckouts(): Promise<(ItemCheckout & { item?: InventoryItem, user?: User })[]>;
   getUserCheckouts(userId: number): Promise<(ItemCheckout & { item?: InventoryItem })[]>;
   getItemCheckoutHistory(itemId: number): Promise<(ItemCheckout & { user?: User })[]>;
+  getCheckoutById(checkoutId: number): Promise<(ItemCheckout & { item?: InventoryItem, user?: User }) | undefined>;
+  updateCheckoutPayment(checkoutId: number, data: { paymentStatus: 'not_charged' | 'charged' | 'failed', stripePaymentIntentId?: string, chargedAmountCents?: number }): Promise<ItemCheckout>;
   
   // Session store
   sessionStore: any;
@@ -250,7 +261,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string }): Promise<User> {
+  async createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string; mustChangePassword?: boolean }): Promise<User> {
     let username = data.email.split('@')[0];
     let usernameExists = await this.getUserByUsername(username);
     let suffix = 1;
@@ -273,9 +284,35 @@ export class DatabaseStorage implements IStorage {
         phoneNumber: data.phoneNumber,
         membershipAgreementCompleted: true,
         membershipAgreementDate: new Date(),
+        mustChangePassword: data.mustChangePassword ?? true,
       })
       .returning();
     return user;
+  }
+
+  async updateStaffAdmin(userId: number, data: Partial<{ email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber: string; mustChangePassword: boolean }>): Promise<User> {
+    const updateData: any = {};
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.password !== undefined) {
+      updateData.password = data.password;
+      updateData.passwordSetAt = new Date();
+    }
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName;
+    if (data.role !== undefined) updateData.role = data.role;
+    if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
+    if (data.mustChangePassword !== undefined) updateData.mustChangePassword = data.mustChangePassword;
+
+    const [user] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async deleteStaffAdmin(userId: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   async listStaffAdmins(): Promise<User[]> {
@@ -919,6 +956,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(userId: number): Promise<void> {
     // Delete related data first due to foreign key constraints
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
     await db.delete(memberships).where(eq(memberships.userId, userId));
     await db.delete(checkIns).where(eq(checkIns.userId, userId));
     await db.delete(payments).where(eq(payments.userId, userId));
@@ -927,6 +965,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(therapySessions).where(eq(therapySessions.userId, userId));
     await db.delete(healthMetrics).where(eq(healthMetrics.userId, userId));
     await db.delete(stravaIntegrations).where(eq(stravaIntegrations.userId, userId));
+    
+    // Delete item checkouts where the user is the member OR the staff who processed them
+    await db.delete(itemCheckouts).where(or(
+      eq(itemCheckouts.userId, userId),
+      eq(itemCheckouts.checkedOutByStaffId, userId),
+      eq(itemCheckouts.checkedInByStaffId, userId)
+    ));
     
     // Finally delete the user
     await db.delete(users).where(eq(users.id, userId));
@@ -1203,6 +1248,88 @@ export class DatabaseStorage implements IStorage {
     );
 
     return enrichedCheckouts;
+  }
+
+  async getCheckoutById(checkoutId: number): Promise<(ItemCheckout & { item?: InventoryItem, user?: User }) | undefined> {
+    const [checkout] = await db
+      .select()
+      .from(itemCheckouts)
+      .where(eq(itemCheckouts.id, checkoutId));
+
+    if (!checkout) return undefined;
+
+    const item = await this.getInventoryItemById(checkout.itemId);
+    const user = await this.getUserById(checkout.userId);
+    return { ...checkout, item, user };
+  }
+
+  async updateCheckoutPayment(
+    checkoutId: number, 
+    data: { paymentStatus: 'not_charged' | 'charged' | 'failed', stripePaymentIntentId?: string, chargedAmountCents?: number }
+  ): Promise<ItemCheckout> {
+    const [updated] = await db
+      .update(itemCheckouts)
+      .set({
+        paymentStatus: data.paymentStatus,
+        stripePaymentIntentId: data.stripePaymentIntentId,
+        chargedAmountCents: data.chargedAmountCents,
+        chargedAt: data.paymentStatus === 'charged' ? new Date() : undefined,
+      })
+      .where(eq(itemCheckouts.id, checkoutId))
+      .returning();
+
+    if (!updated) {
+      throw new Error("Checkout not found");
+    }
+
+    return updated;
+  }
+
+  async createLoginEvent(event: InsertLoginEvent): Promise<LoginEvent> {
+    const [loginEvent] = await db
+      .insert(loginEvents)
+      .values(event)
+      .returning();
+    return loginEvent;
+  }
+
+  async getLoginEventsByUserId(userId: number, limit: number = 50): Promise<LoginEvent[]> {
+    return await db
+      .select()
+      .from(loginEvents)
+      .where(eq(loginEvents.userId, userId))
+      .orderBy(desc(loginEvents.occurredAt))
+      .limit(limit);
+  }
+
+  async getAllStaffLoginEvents(limit: number = 100): Promise<(LoginEvent & { user?: User })[]> {
+    const staffAdmins = await this.listStaffAdmins();
+    const staffAdminIds = staffAdmins.map(u => u.id);
+    
+    if (staffAdminIds.length === 0) return [];
+
+    const events = await db
+      .select()
+      .from(loginEvents)
+      .where(inArray(loginEvents.userId, staffAdminIds))
+      .orderBy(desc(loginEvents.occurredAt))
+      .limit(limit);
+
+    const enrichedEvents = await Promise.all(
+      events.map(async (event) => {
+        const user = await this.getUserById(event.userId);
+        return { ...event, user };
+      })
+    );
+
+    return enrichedEvents;
+  }
+
+  async updateUserLastLogin(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, userId));
   }
 }
 

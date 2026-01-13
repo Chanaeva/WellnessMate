@@ -11,8 +11,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ShoppingCart, CreditCard, Shield, ArrowLeft, Check } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  ShoppingCart,
+  CreditCard,
+  Shield,
+  ArrowLeft,
+  Check,
+} from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
@@ -26,7 +40,14 @@ const stripePromise = fetch("/api/stripe/config")
 
 export default function CheckoutPage() {
   const { user } = useAuth();
-  const { items, promoCode, getTotalPrice, getSubtotal, getDiscount, clearCart } = useCart();
+  const {
+    items,
+    promoCode,
+    getTotalPrice,
+    getSubtotal,
+    getDiscount,
+    clearCart,
+  } = useCart();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showPaymentMethodAlert, setShowPaymentMethodAlert] = useState(false);
@@ -42,174 +63,10 @@ export default function CheckoutPage() {
   const hasPaymentMethod = paymentMethods && paymentMethods.length > 0;
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
     }).format(price / 100);
-  };
-
-  // Process checkout with payment intent (embedded)
-  const checkoutWithTaxMutation = useMutation({
-    mutationFn: async () => {
-      if (!hasPaymentMethod) {
-        throw new Error("Please add a payment method first");
-      }
-
-      // Check if user is trying to purchase the same membership plan they already have
-      const membershipItems = items.filter(item => item.type === 'membership');
-      if (membershipItems.length > 0) {
-        try {
-          const membershipRes = await apiRequest("GET", "/api/membership");
-          if (membershipRes.ok) {
-            const currentMembership = await membershipRes.json();
-            if (currentMembership && currentMembership.status === 'active') {
-              const newPlan = membershipItems[0].data;
-              if (currentMembership.planType === newPlan.planType) {
-                throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
-              }
-            }
-          }
-        } catch (error: any) {
-          // If 404, user has no membership - allow purchase
-          // If other error, allow checkout to proceed
-          if (!error.message?.includes('404')) {
-            console.warn("Error checking existing membership:", error);
-          }
-        }
-      }
-
-      const cartData = {
-        items: items.map(item => ({
-          id: item.id,
-          type: item.type,
-          quantity: item.quantity || 1,
-          data: item.data
-        })),
-        totalAmount: getTotalPrice(),
-        paymentMethodId: paymentMethods?.[0]?.stripePaymentMethodId,
-        promoCode: promoCode || undefined
-      };
-
-      const res = await apiRequest("POST", "/api/checkout-with-payment", cartData);
-      return await res.json();
-    },
-    onSuccess: (data) => {
-      const hasMembers = items.some(item => item.type === 'membership');
-      const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
-      
-      toast({
-        title: isUpgrade ? "Membership Upgraded!" : "Order Successful!",
-        description: isUpgrade 
-          ? "Your membership plan has been upgraded successfully."
-          : "Your purchase has been processed successfully.",
-      });
-      clearCart();
-      
-      // Set flag for dashboard to listen for changes
-      localStorage.setItem('purchase_completed', 'true');
-      
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-      
-      // Navigate back to dashboard
-      setLocation("/");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Checkout Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Process checkout mutation (legacy method)
-  const checkoutMutation = useMutation({
-    mutationFn: async () => {
-      // Check if user is trying to purchase the same membership plan they already have
-      const membershipItems = items.filter(item => item.type === 'membership');
-      if (membershipItems.length > 0) {
-        try {
-          const membershipRes = await apiRequest("GET", "/api/membership");
-          if (membershipRes.ok) {
-            const currentMembership = await membershipRes.json();
-            if (currentMembership && currentMembership.status === 'active') {
-              const newPlan = membershipItems[0].data;
-              if (currentMembership.planType === newPlan.planType) {
-                throw new Error("You are already subscribed to this membership plan. Please select a different plan to upgrade or downgrade.");
-              }
-            }
-          }
-        } catch (error: any) {
-          // If 404, user has no membership - allow purchase
-          // If other error, allow checkout to proceed
-          if (!error.message?.includes('404')) {
-            console.warn("Error checking existing membership:", error);
-          }
-        }
-      }
-
-      const cartData = {
-        items: items.map(item => ({
-          id: item.id,
-          type: item.type,
-          quantity: item.quantity || 1,
-          data: item.data
-        })),
-        totalAmount: getTotalPrice()
-      };
-
-      const res = await apiRequest("POST", "/api/checkout", cartData);
-      return await res.json();
-    },
-    onSuccess: (data) => {
-      const hasMembers = items.some(item => item.type === 'membership');
-      const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
-      
-      toast({
-        title: isUpgrade ? "Membership Upgraded!" : "Order Successful!",
-        description: isUpgrade 
-          ? "Your membership plan has been upgraded successfully."
-          : "Your purchase has been processed successfully.",
-      });
-      clearCart();
-      
-      // Set flag for dashboard to listen for changes
-      localStorage.setItem('purchase_completed', 'true');
-      
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-      
-      // Navigate back to dashboard
-      setLocation("/");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Checkout Failed",
-        description: error.message || "There was an error processing your order.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCheckout = () => {
-    if (!hasPaymentMethod) {
-      setShowPaymentMethodAlert(true);
-      return;
-    }
-    checkoutMutation.mutate();
-  };
-
-  const handleCheckoutWithTax = () => {
-    if (!hasPaymentMethod) {
-      setShowPaymentMethodAlert(true);
-      return;
-    }
-    checkoutWithTaxMutation.mutate();
   };
 
   const handleAddPaymentMethod = () => {
@@ -241,7 +98,7 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      
+
       <main className="flex-grow wellness-container py-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
@@ -253,8 +110,12 @@ export default function CheckoutPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-heading text-foreground">Checkout</h1>
-              <p className="text-muted-foreground">Review and complete your order</p>
+              <h1 className="text-3xl font-heading text-foreground">
+                Checkout
+              </h1>
+              <p className="text-muted-foreground">
+                Review and complete your order
+              </p>
             </div>
           </div>
 
@@ -270,7 +131,10 @@ export default function CheckoutPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {items.map((item) => (
-                    <div key={item.id} className="flex items-start justify-between p-4 border rounded-lg">
+                    <div
+                      key={item.id}
+                      className="flex items-start justify-between p-4 border rounded-lg"
+                    >
                       <div className="flex-1">
                         <h3 className="font-semibold">{item.name}</h3>
                         {item.description && (
@@ -280,21 +144,27 @@ export default function CheckoutPage() {
                         )}
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="outline">
-                            {item.type === 'membership' ? 'Monthly Plan' : 'Day Passes'}
+                            {item.type === "membership"
+                              ? "Monthly Plan"
+                              : "Day Passes"}
                           </Badge>
-                          {item.type === 'punch_card' && item.quantity && item.quantity > 1 && (
-                            <Badge variant="outline">
-                              Qty: {item.quantity}
-                            </Badge>
-                          )}
+                          {item.type === "punch_card" &&
+                            item.quantity &&
+                            item.quantity > 1 && (
+                              <Badge variant="outline">
+                                Qty: {item.quantity}
+                              </Badge>
+                            )}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="font-semibold">
                           {formatPrice(item.price * (item.quantity || 1))}
                         </div>
-                        {item.type === 'membership' && (
-                          <div className="text-sm text-muted-foreground">/month</div>
+                        {item.type === "membership" && (
+                          <div className="text-sm text-muted-foreground">
+                            /month
+                          </div>
                         )}
                       </div>
                     </div>
@@ -314,92 +184,95 @@ export default function CheckoutPage() {
                   {showAddPaymentMethod ? (
                     <Elements stripe={stripePromise}>
                       <CheckoutPaymentForm
-                        items={items.map(item => ({
+                        items={items.map((item) => ({
                           id: item.id,
                           type: item.type,
                           quantity: item.quantity || 1,
-                          data: item.data
+                          data: item.data,
                         }))}
                         promoCode={promoCode}
                         onSuccess={(paymentIntentId) => {
                           setShowAddPaymentMethod(false);
-                          const hasMembers = items.some(item => item.type === 'membership');
-                          const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
-                          
+                          const hasMembers = items.some(
+                            (item) => item.type === "membership",
+                          );
+                          const isUpgrade =
+                            hasMembers &&
+                            items.some((item) => item.data?.isUpgrade);
+
                           toast({
-                            title: isUpgrade ? "Membership Upgraded!" : "Payment Successful!",
-                            description: isUpgrade 
+                            title: isUpgrade
+                              ? "Membership Upgraded!"
+                              : "Payment Successful!",
+                            description: isUpgrade
                               ? "Your membership plan has been upgraded successfully."
                               : "Your purchase has been processed successfully.",
                           });
                           clearCart();
-                          
-                          localStorage.setItem('purchase_completed', 'true');
-                          
-                          queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                          
+
+                          localStorage.setItem("purchase_completed", "true");
+
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/membership"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/punch-cards"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/payments"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/payment-methods"],
+                          });
+
                           setLocation("/dashboard");
                         }}
                         onCancel={() => setShowAddPaymentMethod(false)}
                       />
                     </Elements>
-                  ) : hasPaymentMethod ? (
-                    <div>
-                      <div className="flex items-center gap-3 p-4 border rounded-lg mb-3">
-                        <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <CreditCard className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {paymentMethods?.[0]?.cardBrand?.toUpperCase()} •••• {paymentMethods?.[0]?.cardLast4}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Expires {paymentMethods?.[0]?.cardExpMonth}/{paymentMethods?.[0]?.cardExpYear}
-                          </div>
-                        </div>
-                        <Check className="h-5 w-5 text-success" />
-                      </div>
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAddPaymentMethod(true)}
-                        className="w-full"
-                      >
-                        Use a Different Card
-                      </Button>
-                    </div>
                   ) : (
                     <Elements stripe={stripePromise}>
                       <CheckoutPaymentForm
-                        items={items.map(item => ({
+                        items={items.map((item) => ({
                           id: item.id,
                           type: item.type,
                           quantity: item.quantity || 1,
-                          data: item.data
+                          data: item.data,
                         }))}
                         promoCode={promoCode}
                         onSuccess={(paymentIntentId) => {
-                          const hasMembers = items.some(item => item.type === 'membership');
-                          const isUpgrade = hasMembers && items.some(item => item.data?.isUpgrade);
-                          
+                          const hasMembers = items.some(
+                            (item) => item.type === "membership",
+                          );
+                          const isUpgrade =
+                            hasMembers &&
+                            items.some((item) => item.data?.isUpgrade);
+
                           toast({
-                            title: isUpgrade ? "Membership Upgraded!" : "Payment Successful!",
-                            description: isUpgrade 
+                            title: isUpgrade
+                              ? "Membership Upgraded!"
+                              : "Payment Successful!",
+                            description: isUpgrade
                               ? "Your membership plan has been upgraded successfully."
                               : "Your purchase has been processed successfully.",
                           });
                           clearCart();
-                          
-                          localStorage.setItem('purchase_completed', 'true');
-                          
-                          queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
-                          
+
+                          localStorage.setItem("purchase_completed", "true");
+
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/membership"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/punch-cards"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/payments"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["/api/payment-methods"],
+                          });
+
                           setLocation("/dashboard");
                         }}
                       />
@@ -407,8 +280,6 @@ export default function CheckoutPage() {
                   )}
                 </CardContent>
               </Card>
-
-
             </div>
 
             {/* Order Total & Checkout */}
@@ -420,28 +291,39 @@ export default function CheckoutPage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     {items.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm">
+                      <div
+                        key={item.id}
+                        className="flex justify-between text-sm"
+                      >
                         <span>
                           {item.name}
-                          {item.type === 'punch_card' && item.quantity && item.quantity > 1 && ` (${item.quantity})`}
+                          {item.type === "punch_card" &&
+                            item.quantity &&
+                            item.quantity > 1 &&
+                            ` (${item.quantity})`}
                         </span>
-                        <span>{formatPrice(item.price * (item.quantity || 1))}</span>
+                        <span>
+                          {formatPrice(item.price * (item.quantity || 1))}
+                        </span>
                       </div>
                     ))}
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal:</span>
                       <span>{formatPrice(getSubtotal())}</span>
                     </div>
-                    
+
                     {promoCode && getDiscount() > 0 && (
                       <div className="flex justify-between text-sm text-green-600">
                         <span className="flex items-center gap-1">
-                          <Badge variant="outline" className="text-xs border-green-200 bg-green-50 text-green-700">
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-green-200 bg-green-50 text-green-700"
+                          >
                             {promoCode.code}
                           </Badge>
                           Discount:
@@ -450,38 +332,12 @@ export default function CheckoutPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <Separator />
-                  
+
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>
                     <span>{formatPrice(getTotalPrice())}</span>
-                  </div>
-
-                  <Button 
-                    className="w-full wellness-button-primary" 
-                    size="lg"
-                    onClick={handleCheckoutWithTax}
-                    disabled={checkoutWithTaxMutation.isPending}
-                    data-testid="button-checkout"
-                  >
-                    {checkoutWithTaxMutation.isPending ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Processing Payment...
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="h-4 w-4 mr-2" />
-                        Checkout
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">
-                      Secure checkout powered by Stripe
-                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -492,16 +348,17 @@ export default function CheckoutPage() {
                   <div className="flex items-start gap-3">
                     <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-primary">Secure Checkout</p>
+                      <p className="text-sm font-medium text-primary">
+                        Secure Checkout
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Your payment information is encrypted and secure. We never store your card details.
+                        Your payment information is encrypted and secure. We
+                        never store your card details.
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-
-
             </div>
           </div>
         </div>
@@ -510,28 +367,42 @@ export default function CheckoutPage() {
       <Footer />
 
       {/* Payment Method Required Alert */}
-      <AlertDialog open={showPaymentMethodAlert} onOpenChange={setShowPaymentMethodAlert}>
+      <AlertDialog
+        open={showPaymentMethodAlert}
+        onOpenChange={setShowPaymentMethodAlert}
+      >
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center text-destructive">
-              <svg className="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              <svg
+                className="h-6 w-6 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
               </svg>
               Payment Method Required
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base">
-              You need to add a payment method before completing your order. This helps us process your purchase securely.
+              You need to add a payment method before completing your order.
+              This helps us process your purchase securely.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowPaymentMethodAlert(false)}
               className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleAddPaymentMethod}
               className="w-full sm:w-auto wellness-button-primary"
             >

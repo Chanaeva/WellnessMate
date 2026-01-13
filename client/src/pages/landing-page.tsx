@@ -10,7 +10,7 @@ import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png"
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
 import { format } from "date-fns";
-import type { MembershipPlan } from "@shared/schema";
+import type { MembershipPlan, Notification } from "@shared/schema";
 import {
   Waves,
   Crown,
@@ -28,6 +28,12 @@ import {
   Copy,
   Instagram,
   Building2,
+  Bell,
+  Megaphone,
+  Settings,
+  Star,
+  AlertCircle,
+  X,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -79,14 +85,87 @@ export default function LandingPage() {
     },
   });
 
+  // Day order for sorting (Sunday first, Saturday last)
+  const dayOrder: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+
   // Fetch weekly hours of operation
   const { data: weeklyHours } = useQuery({
     queryKey: ["/api/hours-of-operation"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/hours-of-operation");
-      return await res.json();
+      const hours = await res.json();
+      // Sort by day of week
+      return hours.sort((a: any, b: any) => {
+        const dayA = dayOrder[a.dayOfWeek?.toLowerCase()] ?? 7;
+        const dayB = dayOrder[b.dayOfWeek?.toLowerCase()] ?? 7;
+        return dayA - dayB;
+      });
     },
   });
+
+  // Helper to group consecutive days with identical hours
+  const groupHours = (hours: any[]) => {
+    if (!hours || hours.length === 0) return [];
+    
+    const dayAbbrev: Record<string, string> = {
+      sunday: 'Sun', monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed',
+      thursday: 'Thu', friday: 'Fri', saturday: 'Sat'
+    };
+    
+    const result: Array<{ days: string; memberHours: string; dayPassHours: string; isClosed: boolean }> = [];
+    let startDay = '';
+    let endDay = '';
+    let lastMemberHours = '';
+    let lastDayPassHours = '';
+    let lastIsClosed = false;
+    
+    const pushGroup = () => {
+      if (startDay) {
+        result.push({
+          days: startDay === endDay ? startDay : `${startDay} - ${endDay}`,
+          memberHours: lastMemberHours,
+          dayPassHours: lastDayPassHours,
+          isClosed: lastIsClosed
+        });
+      }
+    };
+    
+    hours.forEach((day: any, index: number) => {
+      const abbrev = dayAbbrev[day.dayOfWeek?.toLowerCase()] || day.dayOfWeek;
+      const memberHours = day.isClosed ? 'Closed' : `${day.openTime} - ${day.closeTime}`;
+      const dayPassHours = day.isClosed ? 'Closed' : (day.dayPassStart && day.dayPassEnd ? `${day.dayPassStart} - ${day.dayPassEnd}` : 'Not available');
+      
+      if (index === 0) {
+        startDay = abbrev;
+        endDay = abbrev;
+        lastMemberHours = memberHours;
+        lastDayPassHours = dayPassHours;
+        lastIsClosed = day.isClosed;
+      } else if (memberHours === lastMemberHours && dayPassHours === lastDayPassHours) {
+        endDay = abbrev;
+      } else {
+        pushGroup();
+        startDay = abbrev;
+        endDay = abbrev;
+        lastMemberHours = memberHours;
+        lastDayPassHours = dayPassHours;
+        lastIsClosed = day.isClosed;
+      }
+    });
+    
+    pushGroup();
+    return result;
+  };
+
+  const groupedHours = weeklyHours ? groupHours(weeklyHours) : [];
 
   // Fetch hero content
   const { data: heroContent } = useQuery({
@@ -128,7 +207,11 @@ export default function LandingPage() {
           title: data.find((s: any) => s.key === 'feature4Title')?.value || '',
           description: data.find((s: any) => s.key === 'feature4Description')?.value || '',
         },
-      ];
+        {
+          title: data.find((s: any) => s.key === 'feature5Title')?.value || '',
+          description: data.find((s: any) => s.key === 'feature5Description')?.value || '',
+        },
+      ].filter(f => f.title);
     },
   });
 
@@ -176,6 +259,42 @@ export default function LandingPage() {
     },
   });
 
+  // Fetch active notifications
+  const { data: activeNotifications } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications/active"],
+  });
+
+  // Track dismissed notifications (stored in session)
+  const [dismissedNotifications, setDismissedNotifications] = useState<number[]>([]);
+
+  const dismissNotification = (id: number) => {
+    setDismissedNotifications(prev => [...prev, id]);
+  };
+
+  const visibleNotifications = activeNotifications?.filter(
+    n => !dismissedNotifications.includes(n.id)
+  ) || [];
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'announcement': return <Megaphone className="h-5 w-5" />;
+      case 'maintenance': return <Settings className="h-5 w-5" />;
+      case 'promotion': return <Star className="h-5 w-5" />;
+      case 'alert': return <AlertCircle className="h-5 w-5" />;
+      default: return <Bell className="h-5 w-5" />;
+    }
+  };
+
+  const getNotificationStyle = (type: string) => {
+    switch (type) {
+      case 'announcement': return 'bg-blue-50 border-blue-200 text-blue-800';
+      case 'maintenance': return 'bg-orange-50 border-orange-200 text-orange-800';
+      case 'promotion': return 'bg-green-50 border-green-200 text-green-800';
+      case 'alert': return 'bg-red-50 border-red-200 text-red-800';
+      default: return 'bg-gray-50 border-gray-200 text-gray-800';
+    }
+  };
+
   // Format price for display
   const formatPrice = (priceInCents: number) => {
     return `$${(priceInCents / 100).toFixed(0)}`;
@@ -203,6 +322,7 @@ export default function LandingPage() {
     <Crown className="h-8 w-8 text-primary" />,
     <Heart className="h-8 w-8 text-primary" />,
     <Users className="h-8 w-8 text-primary" />,
+    <Sparkles className="h-8 w-8 text-primary" />,
   ];
 
   // Benefit icons mapping
@@ -218,6 +338,37 @@ export default function LandingPage() {
       <div className="fixed top-4 right-4 z-50">
         <AudioControls />
       </div>
+
+      {/* Notification Banner */}
+      {visibleNotifications.length > 0 && (
+        <div className="w-full">
+          {visibleNotifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={`relative border-b px-4 py-3 ${getNotificationStyle(notification.type)}`}
+            >
+              <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="flex-shrink-0">
+                    {getNotificationIcon(notification.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm">{notification.title}</p>
+                    <p className="text-sm opacity-90 line-clamp-1">{notification.message}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => dismissNotification(notification.id)}
+                  className="flex-shrink-0 p-1 hover:bg-black/5 rounded-full transition-colors"
+                  aria-label="Dismiss notification"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative py-20 px-4 bg-white overflow-hidden">
@@ -314,11 +465,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-heading font-bold text-foreground mb-4">
-              Choose Your Wellness Path
+              Choose your path to wellness.
             </h2>
             <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
-              Select the perfect membership or day pass package to begin your
-              thermal wellness journey
+              Choose a membership or day pass to start your thermal wellness experience. Come relax with us.
             </p>
           </div>
 
@@ -331,7 +481,7 @@ export default function LandingPage() {
                   Monthly Memberships
                 </h3>
                 <p className="text-muted-foreground font-body">
-                  Unlimited access to our thermal wellness sanctuary
+                  Access to all amenities, including special events.
                 </p>
               </div>
 
@@ -473,7 +623,7 @@ export default function LandingPage() {
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-3xl p-8 lg:p-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-heading font-bold text-foreground mb-4">
-                Why Choose Wolf Mother Wellness?
+                Why Choose Wolf Mother Wellness
               </h3>
             </div>
 
@@ -577,7 +727,7 @@ export default function LandingPage() {
       <section className="py-16 px-4 bg-muted/30">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
-            Sacred Wellness Experience
+            Core Experience
           </h2>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -605,11 +755,10 @@ export default function LandingPage() {
       <section className="py-20 px-4 bg-primary text-white">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-heading font-bold mb-6">
-            Ready to Begin Your Wellness Journey?
+            Ready to get started?
           </h2>
           <p className="text-xl mb-8 text-white/90 font-body">
-            Join the Wolf Mother pack today and discover the ancient path to
-            vitality
+            Choose a plan and begin your wellness experience.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
@@ -629,7 +778,7 @@ export default function LandingPage() {
                 size="lg"
                 className="border-4 border-white text-white bg-transparent hover:bg-white hover:text-neutral-900 px-10 py-6 text-xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
               >
-                Login to View Plans
+                Log In to View Plans
               </Button>
             </Link>
           </div>
@@ -668,25 +817,36 @@ export default function LandingPage() {
               <h3 className="font-heading font-semibold text-foreground mb-2">
                 Hours of Operation
               </h3>
-              <div className="text-muted-foreground font-body text-sm space-y-1">
-                {weeklyHours && weeklyHours.length > 0 ? (
-                  weeklyHours.map((dayHours: any) => (
-                    <div key={dayHours.id} className="flex justify-between gap-4">
-                      <span className="capitalize font-semibold">{dayHours.dayOfWeek}:</span>
-                      <span>
-                        {dayHours.isClosed 
-                          ? 'Closed' 
-                          : `${dayHours.openTime} - ${dayHours.closeTime}`}
-                      </span>
-                    </div>
-                  ))
+              <div className="text-muted-foreground font-body text-sm w-full max-w-sm">
+                {groupedHours.length > 0 ? (
+                  <div className="space-y-4">
+                    {groupedHours.map((group, idx) => (
+                      <div key={idx} className="border-b border-muted-foreground/20 pb-3 last:border-0">
+                        <div className="font-semibold text-foreground text-center mb-2">{group.days}</div>
+                        {group.isClosed ? (
+                          <div className="text-center italic text-muted-foreground">Closed</div>
+                        ) : (
+                          <div className="flex flex-col sm:flex-row sm:justify-center gap-2 text-xs">
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="inline-block px-2 py-0.5 rounded bg-primary/10 text-primary font-medium">Members</span>
+                              <span>{group.memberHours}</span>
+                            </div>
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="inline-block px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium">Day Pass</span>
+                              <span className={group.dayPassHours === 'Not available' ? 'italic text-muted-foreground' : ''}>
+                                {group.dayPassHours}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <p>
-                    Hours of Operation: {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
+                  <p className="text-center">
+                    Members: {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
                     <br />
-                    Members Only Access: {footerSettings?.hoursMembers || '6:00 AM - 9:00 AM'}
-                    <br />
-                    Day Pass Access: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
+                    Day Pass: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
                   </p>
                 )}
               </div>

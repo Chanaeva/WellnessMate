@@ -462,7 +462,22 @@ function AuthPage() {
                                   placeholder="MM/DD/YYYY"
                                   className="pl-10"
                                   data-testid="input-register-dob"
-                                  {...field}
+                                  maxLength={10}
+                                  value={field.value}
+                                  onChange={(e) => {
+                                    const numbersOnly = e.target.value.replace(/\D/g, '');
+                                    let formatted = '';
+                                    if (numbersOnly.length > 0) {
+                                      formatted = numbersOnly.substring(0, 2);
+                                    }
+                                    if (numbersOnly.length > 2) {
+                                      formatted += '/' + numbersOnly.substring(2, 4);
+                                    }
+                                    if (numbersOnly.length > 4) {
+                                      formatted += '/' + numbersOnly.substring(4, 8);
+                                    }
+                                    field.onChange(formatted);
+                                  }}
                                 />
                               </div>
                             </FormControl>

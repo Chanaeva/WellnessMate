@@ -10,6 +10,33 @@
 - Scannable data hierarchies
 - Consistent interaction patterns
 - Minimal cognitive load for repetitive tasks
+- **WCAG AA compliant contrast ratios** (minimum 4.5:1 for normal text, 3:1 for large text)
+
+---
+
+## Color System (Enhanced Contrast)
+
+**Light Mode**:
+- Background: `hsl(45, 18%, 95%)` - Ivory Veil (#F0EEE9)
+- Foreground: `hsl(0, 0%, 10%)` - Charred Ash (#1A1A1A)
+- Muted Foreground: `hsl(90, 10%, 30%)` - Deep Moss (#465240) - enhanced for readability
+- Primary: `hsl(90, 12%, 28%)` - Deep Moss (#3D4A36) - WCAG compliant
+- Secondary: `hsl(12, 25%, 60%)` - Rosy Smoke (#C8938A)
+- Cards: Pure white (#FFFFFF) for clear visual separation
+- Borders: `hsl(30, 12%, 70%)` - darkened for visibility
+
+**Dark Mode**:
+- Background: `hsl(0, 0%, 6%)` - Deep charcoal
+- Foreground: `hsl(0, 0%, 95%)` - Near-white for strong contrast
+- Muted Foreground: `hsl(0, 0%, 70%)` - Light gray for readable secondary text
+- Primary: `hsl(12, 30%, 70%)` - Rosy Smoke (brighter for dark mode)
+- Cards: `hsl(0, 0%, 10%)` - Slightly elevated for depth
+
+**Contrast Guidelines**:
+- All body text must have minimum 4.5:1 contrast ratio
+- Interactive elements must have 3:1 contrast with surrounding area
+- Focus states use visible ring with proper contrast
+- Error/success/warning colors meet accessibility standards
 
 ---
 

@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Trash2, DollarSign, Crown, Star, Zap, CreditCard, Calendar } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, Crown, Star, Zap, CreditCard, Calendar, RefreshCw, AlertCircle } from "lucide-react";
 
 export default function PackagesManagement() {
   const { toast } = useToast();
@@ -170,6 +170,34 @@ export default function PackagesManagement() {
       });
     },
   });
+
+  // Sync plans with Stripe
+  const syncStripeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/membership-plans/sync-stripe");
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/membership-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/membership-plans"] });
+      const synced = data.results?.filter((r: any) => r.status === 'synced').length || 0;
+      const errors = data.results?.filter((r: any) => r.status === 'error').length || 0;
+      toast({
+        title: "Stripe Sync Complete",
+        description: `${synced} plans synced successfully${errors > 0 ? `, ${errors} errors` : ''}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Check if any plans are missing Stripe configuration
+  const plansNeedingSync = plans?.filter(p => !p.stripePriceId) || [];
 
   const handleDeleteTemplate = (id: number) => {
     setTemplateToDelete(id);
@@ -333,11 +361,62 @@ export default function PackagesManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Stripe Sync Warning Banner */}
+      {plansNeedingSync.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              {plansNeedingSync.length} membership plan{plansNeedingSync.length > 1 ? 's' : ''} not configured for payments
+            </p>
+            <p className="text-sm text-amber-600 dark:text-amber-500">
+              Members cannot checkout with these plans. Click "Sync with Stripe" to enable payments.
+            </p>
+          </div>
+          <Button 
+            onClick={() => syncStripeMutation.mutate()}
+            disabled={syncStripeMutation.isPending}
+            className="bg-amber-500 hover:bg-amber-600 text-white"
+            data-testid="button-sync-stripe-warning"
+          >
+            {syncStripeMutation.isPending ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Sync with Stripe
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Package Management</h1>
           <p className="text-muted-foreground">Manage membership plans and day pass packages</p>
         </div>
+        <Button 
+          variant="outline" 
+          onClick={() => syncStripeMutation.mutate()}
+          disabled={syncStripeMutation.isPending}
+          data-testid="button-sync-stripe"
+        >
+          {syncStripeMutation.isPending ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Syncing...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Sync with Stripe
+            </>
+          )}
+        </Button>
       </div>
 
       <Tabs defaultValue="memberships" className="space-y-6">

@@ -26,6 +26,7 @@ type InventoryItem = {
   size: string;
   quantityTotal: number;
   quantityAvailable: number;
+  priceInCents: number;
   isActive: boolean;
   notes: string | null;
   createdAt: string;
@@ -61,6 +62,7 @@ export default function AdminInventory() {
       size: "One Size",
       quantityTotal: 0,
       quantityAvailable: 0,
+      priceInCents: 0,
       isActive: true,
       notes: "",
     },
@@ -74,6 +76,7 @@ export default function AdminInventory() {
       size: "One Size",
       quantityTotal: 0,
       quantityAvailable: 0,
+      priceInCents: 0,
       isActive: true,
       notes: "",
     },
@@ -171,6 +174,7 @@ export default function AdminInventory() {
       size: item.size,
       quantityTotal: item.quantityTotal,
       quantityAvailable: item.quantityAvailable,
+      priceInCents: item.priceInCents || 0,
       isActive: item.isActive,
       notes: item.notes || "",
     });
@@ -324,6 +328,31 @@ export default function AdminInventory() {
 
                       <FormField
                         control={createForm.control}
+                        name="priceInCents"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price ($)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={field.value ? (field.value / 100).toFixed(2) : ""}
+                                onChange={e => {
+                                  const dollars = parseFloat(e.target.value) || 0;
+                                  field.onChange(Math.round(dollars * 100));
+                                }}
+                                data-testid="input-create-price"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={createForm.control}
                         name="notes"
                         render={({ field }) => (
                           <FormItem>
@@ -388,6 +417,7 @@ export default function AdminInventory() {
                         <TableHead>Type</TableHead>
                         <TableHead>Size</TableHead>
                         <TableHead>Available / Total</TableHead>
+                        <TableHead>Price</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -403,6 +433,9 @@ export default function AdminInventory() {
                               {item.quantityAvailable}
                             </span>
                             {" / "}{item.quantityTotal}
+                          </TableCell>
+                          <TableCell>
+                            {item.priceInCents > 0 ? `$${(item.priceInCents / 100).toFixed(2)}` : "Free"}
                           </TableCell>
                           <TableCell>
                             <Badge variant={item.isActive ? "default" : "secondary"}>
@@ -556,6 +589,31 @@ export default function AdminInventory() {
                   )}
                 />
               </div>
+
+              <FormField
+                control={editForm.control}
+                name="priceInCents"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price ($)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={field.value ? (field.value / 100).toFixed(2) : ""}
+                        onChange={e => {
+                          const dollars = parseFloat(e.target.value) || 0;
+                          field.onChange(Math.round(dollars * 100));
+                        }}
+                        data-testid="input-edit-price"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={editForm.control}

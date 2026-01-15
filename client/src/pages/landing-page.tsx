@@ -264,11 +264,18 @@ export default function LandingPage() {
     queryKey: ["/api/notifications/active"],
   });
 
-  // Track dismissed notifications (stored in session)
+  // Track dismissed and expanded notifications
   const [dismissedNotifications, setDismissedNotifications] = useState<number[]>([]);
+  const [expandedNotifications, setExpandedNotifications] = useState<number[]>([]);
 
   const dismissNotification = (id: number) => {
     setDismissedNotifications(prev => [...prev, id]);
+  };
+
+  const toggleExpanded = (id: number) => {
+    setExpandedNotifications(prev => 
+      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
+    );
   };
 
   const visibleNotifications = activeNotifications?.filter(

@@ -120,6 +120,7 @@
   .font-heading {
     font-family: 'LeCharisme', serif;
     font-feature-settings: 'liga' 1, 'kern' 1;
+    letter-spacing: 0.025em;
   }
 
   .font-body {

@@ -424,7 +424,7 @@ export default function LandingPage() {
             />
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading text-foreground mb-4">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-heading-display text-foreground mb-4">
             {heroContent?.title}
           </h1>
 

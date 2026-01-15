@@ -119,8 +119,13 @@
 
   .font-heading {
     font-family: 'LeCharisme', serif;
-    font-feature-settings: 'liga' 1, 'kern' 1;
+    font-feature-settings: 'liga' 0, 'kern' 1;
     letter-spacing: 0.025em;
+  }
+
+  .font-heading-display {
+    font-family: 'LeCharisme', serif;
+    font-feature-settings: 'liga' 1, 'kern' 1;
   }
 
   .font-body {

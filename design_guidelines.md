@@ -47,7 +47,8 @@
 - Monospace: JetBrains Mono (for data/IDs)
 
 **Hierarchy**:
-- Page Headers: text-2xl font-semibold (32px)
+- Page Headers: text-2xl font-bold leading-snug tracking-wide (32px)
+- Card Headers: text-2xl font-bold leading-snug tracking-wide (32px)
 - Section Headers: text-lg font-semibold (20px)
 - Table Headers: text-sm font-medium uppercase tracking-wide (14px)
 - Body Text: text-sm font-normal (14px)

@@ -243,16 +243,16 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 lg:grid-cols-9">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="members">Members</TabsTrigger>
-            <TabsTrigger value="staff">Staff</TabsTrigger>
-            <TabsTrigger value="item-checkout">Item Checkout</TabsTrigger>
-            <TabsTrigger value="packages">Packages</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="landing-page">Landing Page</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto gap-1 px-1 whitespace-nowrap">
+            <TabsTrigger value="overview" className="flex-shrink-0">Overview</TabsTrigger>
+            <TabsTrigger value="members" className="flex-shrink-0">Members</TabsTrigger>
+            <TabsTrigger value="staff" className="flex-shrink-0">Staff</TabsTrigger>
+            <TabsTrigger value="item-checkout" className="flex-shrink-0">Item Checkout</TabsTrigger>
+            <TabsTrigger value="packages" className="flex-shrink-0">Packages</TabsTrigger>
+            <TabsTrigger value="inventory" className="flex-shrink-0">Inventory</TabsTrigger>
+            <TabsTrigger value="landing-page" className="flex-shrink-0">Landing Page</TabsTrigger>
+            <TabsTrigger value="notifications" className="flex-shrink-0">Notifications</TabsTrigger>
+            <TabsTrigger value="analytics" className="flex-shrink-0">Analytics</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}

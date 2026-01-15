@@ -354,7 +354,7 @@ export default function LandingPage() {
               key={notification.id}
               className={`relative border-b px-4 py-3 ${getNotificationStyle(notification.type)}`}
             >
-              <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 pr-14 sm:pr-0">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="flex-shrink-0">
                     {getNotificationIcon(notification.type)}

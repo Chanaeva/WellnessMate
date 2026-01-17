@@ -436,6 +436,8 @@ export class DatabaseStorage implements IStorage {
       location: checkIns.location,
       method: sql<string>`CASE WHEN ${checkIns.location} LIKE '%Manual%' OR ${checkIns.location} LIKE '%Front Desk%' THEN 'manual' ELSE 'qr' END`,
       user: {
+        firstName: users.firstName,
+        lastName: users.lastName,
         username: users.username,
         email: users.email
       }

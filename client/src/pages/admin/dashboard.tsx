@@ -393,12 +393,17 @@ export default function AdminDashboard() {
                 <CardContent>
                   {checkIns.length > 0 ? (
                     <div className="space-y-3">
-                      {checkIns.slice(0, 5).map((checkIn) => (
+                      {checkIns.slice(0, 5).map((checkIn: any) => (
                         <div key={checkIn.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                           <div>
-                            <p className="font-medium">Member #{checkIn.userId}</p>
+                            <p className="font-medium">
+                              {checkIn.user?.firstName && checkIn.user?.lastName 
+                                ? `${checkIn.user.firstName} ${checkIn.user.lastName}`
+                                : checkIn.user?.email || `Member #${checkIn.userId}`}
+                            </p>
                             <p className="text-sm text-muted-foreground">
                               {checkIn.timestamp ? format(new Date(checkIn.timestamp), "h:mm a") : "N/A"}
+                              {checkIn.location && ` • ${checkIn.location}`}
                             </p>
                           </div>
                           <Badge variant="default">

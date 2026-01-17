@@ -406,14 +406,14 @@ export default function KioskCheckIn() {
               <div className="space-y-6">
                 <div className="text-center mb-6">
                   <p className="text-lg text-muted-foreground">
-                    Enter your email address or membership ID
+                    Search by name, email, or membership ID
                   </p>
                 </div>
                 
                 <div className="space-y-4">
                   <Input
                     type="text"
-                    placeholder="email@example.com or membership ID"
+                    placeholder="Start typing to search..."
                     value={manualSearchTerm}
                     onChange={(e) => setManualSearchTerm(e.target.value)}
                     className="text-lg py-6"
@@ -427,37 +427,79 @@ export default function KioskCheckIn() {
                     </div>
                   )}
                   
-                  {manualSearchResults && (
-                    <Card className="bg-green-50 border-green-200">
-                      <CardContent className="p-4">
-                        <div className="text-center mb-4">
-                          <h3 className="text-lg font-bold text-green-800">
-                            {manualSearchResults.firstName} {manualSearchResults.lastName}
-                          </h3>
-                          <p className="text-sm text-green-600">{manualSearchResults.email}</p>
-                          {manualSearchResults.membershipId && (
-                            <p className="text-xs text-green-500 mt-1">ID: {manualSearchResults.membershipId}</p>
-                          )}
-                        </div>
-                        <Button
+                  {/* Search Results Dropdown */}
+                  {manualSearchResults?.members && manualSearchResults.members.length > 0 && (
+                    <div className="border rounded-xl overflow-hidden bg-white shadow-lg max-h-80 overflow-y-auto">
+                      {manualSearchResults.members.map((member: {
+                        id: number;
+                        firstName: string;
+                        lastName: string;
+                        email: string;
+                        membershipId: string | null;
+                        membershipStatus: string;
+                        dayPassesRemaining: number;
+                      }) => (
+                        <button
+                          key={member.id}
                           onClick={() => {
-                            if (manualSearchResults.membershipId) {
-                              setPendingMembershipId(manualSearchResults.membershipId);
-                              checkInMutation.mutate({ membershipId: manualSearchResults.membershipId });
+                            if (member.membershipId) {
+                              setPendingMembershipId(member.membershipId);
+                              checkInMutation.mutate({ membershipId: member.membershipId });
                             } else {
                               toast({
-                                title: "Error",
-                                description: "Member has no membership ID. Please contact staff.",
+                                title: "Cannot Check In",
+                                description: "This member doesn't have an active membership or day passes.",
                                 variant: "destructive"
                               });
                             }
                           }}
-                          className="w-full bg-primary hover:bg-primary/90"
-                          disabled={checkInMutation.isPending || !manualSearchResults.membershipId}
-                          data-testid="button-confirm-manual-checkin"
+                          disabled={checkInMutation.isPending || (!member.membershipId && member.membershipStatus === 'none')}
+                          className="w-full text-left p-4 hover:bg-primary/5 border-b last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          data-testid={`member-result-${member.id}`}
                         >
-                          {checkInMutation.isPending ? 'Checking In...' : 'Check In'}
-                        </Button>
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-semibold text-foreground">
+                                {member.firstName} {member.lastName}
+                              </div>
+                              <div className="text-sm text-muted-foreground">{member.email}</div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              {member.membershipStatus === 'active' && (
+                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                  Member
+                                </Badge>
+                              )}
+                              {member.membershipStatus === 'day-pass' && (
+                                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                                  Day Pass ({member.dayPassesRemaining} left)
+                                </Badge>
+                              )}
+                              {member.membershipStatus === 'expired' && (
+                                <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                                  Expired
+                                </Badge>
+                              )}
+                              {member.membershipStatus === 'none' && member.dayPassesRemaining === 0 && (
+                                <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-100">
+                                  No Membership
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No results message */}
+                  {manualSearchResults?.members && manualSearchResults.members.length === 0 && manualSearchTerm.length >= 3 && (
+                    <Card className="bg-yellow-50 border-yellow-200">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-yellow-700 font-medium">No members found</p>
+                        <p className="text-sm text-yellow-600 mt-1">
+                          Try a different search term or check the spelling.
+                        </p>
                       </CardContent>
                     </Card>
                   )}
@@ -465,9 +507,9 @@ export default function KioskCheckIn() {
                   {manualSearchError && manualSearchTerm.length >= 3 && (
                     <Card className="bg-red-50 border-red-200">
                       <CardContent className="p-4 text-center">
-                        <p className="text-red-700 font-medium">Member not found</p>
+                        <p className="text-red-700 font-medium">Search failed</p>
                         <p className="text-sm text-red-600 mt-1">
-                          Please check your email or membership ID and try again.
+                          Please try again.
                         </p>
                       </CardContent>
                     </Card>

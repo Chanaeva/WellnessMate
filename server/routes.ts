@@ -23,6 +23,7 @@ import {
   insertPromotionSchema,
   createStaffAdminSchema,
   users as usersTable,
+  memberships as membershipsTable,
   hoursOfOperation,
   insertHoursOfOperationSchema
 } from "@shared/schema";
@@ -664,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Kiosk member search by email or membership ID
+  // Kiosk member search by email, name, or membership ID - returns multiple results for dropdown
   app.get("/api/kiosk/search-member", async (req, res) => {
     try {
       const { query } = req.query;
@@ -673,42 +674,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const searchTerm = query.toLowerCase().trim();
-      let user = null;
-      let membershipId = null;
+      const results: Array<{
+        id: number;
+        firstName: string;
+        lastName: string;
+        email: string;
+        membershipId: string | null;
+        membershipStatus: string;
+        dayPassesRemaining: number;
+      }> = [];
       
-      // Try to find by membership ID first
-      const userByMembershipId = await storage.getUserByMembershipId(query.trim());
-      if (userByMembershipId) {
-        user = userByMembershipId;
-        const membership = await storage.getMembershipByUserId(user.id);
-        membershipId = membership?.membershipId;
-      } else {
-        // If not found, try by email
-        const users = await db
-          .select()
-          .from(usersTable)
-          .where(sql`LOWER(${usersTable.email}) = ${searchTerm}`)
-          .limit(1);
-        
-        if (users.length > 0) {
-          user = users[0];
-          const membership = await storage.getMembershipByUserId(user.id);
-          membershipId = membership?.membershipId;
+      // Search by email or name (partial match)
+      const users = await db
+        .select()
+        .from(usersTable)
+        .where(
+          or(
+            sql`LOWER(${usersTable.email}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(${usersTable.firstName}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(${usersTable.lastName}) LIKE ${`%${searchTerm}%`}`,
+            sql`LOWER(CONCAT(${usersTable.firstName}, ' ', ${usersTable.lastName})) LIKE ${`%${searchTerm}%`}`
+          )
+        )
+        .limit(10);
+      
+      // Also search by partial membership ID match
+      const membershipMatches = await db
+        .select({ userId: membershipsTable.userId })
+        .from(membershipsTable)
+        .where(sql`LOWER(${membershipsTable.membershipId}) LIKE ${`%${searchTerm}%`}`)
+        .limit(10);
+      
+      // Add users found by membership ID if not already in results
+      for (const match of membershipMatches) {
+        if (!users.find(u => u.id === match.userId)) {
+          const user = await db.select().from(usersTable).where(eq(usersTable.id, match.userId)).limit(1);
+          if (user[0]) {
+            users.push(user[0]);
+          }
         }
       }
-
-      if (!user) {
-        return res.status(404).json({ message: "Member not found" });
-      }
       
-      // Return minimal info needed for check-in
-      res.json({
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        membershipId: membershipId
-      });
+      // Get membership and day pass info for each user
+      for (const user of users) {
+        const membership = await storage.getMembershipByUserId(user.id);
+        const punchCards = await storage.getPunchCardsByUserId(user.id);
+        const activeDayPasses = punchCards.filter(card => 
+          card.status === 'active' && card.remainingPunches > 0
+        );
+        const dayPassesRemaining = activeDayPasses.reduce((sum, card) => sum + card.remainingPunches, 0);
+        
+        let membershipStatus = 'none';
+        if (membership?.status === 'active') {
+          membershipStatus = 'active';
+        } else if (dayPassesRemaining > 0) {
+          membershipStatus = 'day-pass';
+        } else if (membership?.status) {
+          membershipStatus = membership.status;
+        }
+        
+        results.push({
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          membershipId: membership?.membershipId || null,
+          membershipStatus,
+          dayPassesRemaining
+        });
+      }
+
+      res.json({ members: results });
     } catch (error: any) {
       console.error("Kiosk member search error:", error);
       res.status(500).json({ message: error.message });

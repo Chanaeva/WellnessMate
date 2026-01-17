@@ -106,8 +106,8 @@ export default function KioskCheckIn() {
   });
 
   const checkInMutation = useMutation({
-    mutationFn: async ({ membershipId, useDayPass }: { membershipId: string; useDayPass?: boolean }) => {
-      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId, useDayPass });
+    mutationFn: async ({ membershipId, userId, useDayPass }: { membershipId?: string; userId?: number; useDayPass?: boolean }) => {
+      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId, userId, useDayPass });
       return await res.json() as CheckInResponse;
     },
     onSuccess: (data) => {
@@ -445,6 +445,10 @@ export default function KioskCheckIn() {
                             if (member.membershipId) {
                               setPendingMembershipId(member.membershipId);
                               checkInMutation.mutate({ membershipId: member.membershipId });
+                            } else if (member.dayPassesRemaining > 0) {
+                              // Day pass user without membership - check in by userId
+                              setPendingMembershipId(`user-${member.id}`);
+                              checkInMutation.mutate({ userId: member.id });
                             } else {
                               toast({
                                 title: "Cannot Check In",
@@ -453,7 +457,7 @@ export default function KioskCheckIn() {
                               });
                             }
                           }}
-                          disabled={checkInMutation.isPending || (!member.membershipId && member.membershipStatus === 'none')}
+                          disabled={checkInMutation.isPending || (member.membershipStatus === 'none' && member.dayPassesRemaining === 0)}
                           className="w-full text-left p-4 hover:bg-primary/5 border-b last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           data-testid={`member-result-${member.id}`}
                         >

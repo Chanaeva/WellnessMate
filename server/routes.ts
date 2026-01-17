@@ -751,20 +751,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Kiosk check-in using membership ID from QR code
+  // Kiosk check-in using membership ID from QR code or user ID for day pass users
   app.post("/api/kiosk-check-in", async (req, res) => {
     try {
-      const { membershipId, useDayPass } = req.body;
+      const { membershipId, userId, useDayPass } = req.body;
       
-      if (!membershipId) {
+      if (!membershipId && !userId) {
         return res.status(400).json({ 
           success: false,
-          message: "Membership ID is required" 
+          message: "Membership ID or User ID is required" 
         });
       }
 
-      // Find user by membership ID
-      const user = await storage.getUserByMembershipId(membershipId);
+      // Find user by membership ID or user ID
+      let user;
+      if (membershipId) {
+        user = await storage.getUserByMembershipId(membershipId);
+      } else if (userId) {
+        user = await storage.getUser(userId);
+      }
+      
       if (!user) {
         return res.status(404).json({ 
           success: false,

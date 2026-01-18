@@ -854,10 +854,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if session booking is required
-      const sessionConfigs = await storage.getAllSessionConfigs();
-      const enabledSessions = sessionConfigs.filter(s => s.isEnabled);
-      
       // Helper function to parse time string to minutes since midnight
       const parseTimeToMinutes = (timeStr: string): number => {
         // Handle various formats: "7:00 AM", "7 AM", "7:00AM", "14:00", etc.
@@ -885,47 +881,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return hours * 60 + minutes;
       };
+
+      const now = new Date();
+      const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
       
-      if (enabledSessions.length > 0) {
-        // Sessions are configured - check if user has a booking for today
-        const today = new Date().toISOString().split('T')[0];
+      // Determine if user is using a day pass (explicitly or implicitly)
+      const willUseDayPass = useDayPass === true || 
+        ((!membership || membership.status !== 'active') && activeDayPasses.length > 0);
+      
+      if (willUseDayPass && useDayPass !== undefined) {
+        // Day pass user - check day pass hours instead of session booking
+        const dayPassHoursConfig = await storage.getDayPassHours();
         
-        // Determine current session based on time
-        const now = new Date();
-        const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-        
-        // Find which session is currently active
-        let currentSession: 'morning' | 'evening' | null = null;
-        for (const session of enabledSessions) {
-          const sessionStartMinutes = parseTimeToMinutes(session.startTime);
-          const sessionEndMinutes = parseTimeToMinutes(session.endTime);
+        if (dayPassHoursConfig && dayPassHoursConfig.isEnabled) {
+          const dayPassStart = parseTimeToMinutes(dayPassHoursConfig.startTime);
+          const dayPassEnd = parseTimeToMinutes(dayPassHoursConfig.endTime);
           
-          if (currentTimeMinutes >= sessionStartMinutes && currentTimeMinutes < sessionEndMinutes) {
-            currentSession = session.sessionType as 'morning' | 'evening';
-            break;
-          }
-        }
-        
-        if (currentSession) {
-          // Check if user has a booking for the current session
-          const hasBooking = await storage.hasUserBookedSession(user.id, today, currentSession);
-          
-          if (!hasBooking) {
-            const sessionConfig = sessionConfigs.find(s => s.sessionType === currentSession);
+          if (currentTimeMinutes < dayPassStart || currentTimeMinutes >= dayPassEnd) {
             return res.status(400).json({
               success: false,
-              requiresBooking: true,
-              sessionType: currentSession,
-              message: `Session booking required. The ${currentSession} session (${sessionConfig?.startTime} - ${sessionConfig?.endTime}) is currently active. Please book this session from your member dashboard before checking in.`
+              message: `Day pass check-in is only available during open hours: ${dayPassHoursConfig.startTime} - ${dayPassHoursConfig.endTime}. Please come back during these hours.`
             });
           }
-        } else {
-          // No session is currently active
-          const sessionTimes = enabledSessions.map(s => `${s.sessionType}: ${s.startTime} - ${s.endTime}`).join(', ');
-          return res.status(400).json({
-            success: false,
-            message: `No session is currently active. Available sessions are: ${sessionTimes}. Please check back during session hours.`
-          });
+        }
+        // Day pass hours check passed or not configured - allow check-in
+      } else if (!willUseDayPass || useDayPass === undefined) {
+        // Monthly member - check session booking requirement
+        const sessionConfigs = await storage.getAllSessionConfigs();
+        const enabledSessions = sessionConfigs.filter(s => s.isEnabled);
+        
+        if (enabledSessions.length > 0 && membership && membership.status === 'active') {
+          // Sessions are configured - check if user has a booking for today
+          const today = new Date().toISOString().split('T')[0];
+          
+          // Find which session is currently active
+          let currentSession: 'morning' | 'evening' | null = null;
+          for (const session of enabledSessions) {
+            const sessionStartMinutes = parseTimeToMinutes(session.startTime);
+            const sessionEndMinutes = parseTimeToMinutes(session.endTime);
+            
+            if (currentTimeMinutes >= sessionStartMinutes && currentTimeMinutes < sessionEndMinutes) {
+              currentSession = session.sessionType as 'morning' | 'evening';
+              break;
+            }
+          }
+          
+          if (currentSession) {
+            // Check if user has a booking for the current session
+            const hasBooking = await storage.hasUserBookedSession(user.id, today, currentSession);
+            
+            if (!hasBooking) {
+              const sessionConfig = sessionConfigs.find(s => s.sessionType === currentSession);
+              return res.status(400).json({
+                success: false,
+                requiresBooking: true,
+                sessionType: currentSession,
+                message: `Session booking required. The ${currentSession} session (${sessionConfig?.startTime} - ${sessionConfig?.endTime}) is currently active. Please book this session from your member dashboard before checking in.`
+              });
+            }
+          } else {
+            // No session is currently active - check if day pass hours apply
+            const dayPassHoursConfig = await storage.getDayPassHours();
+            if (dayPassHoursConfig && dayPassHoursConfig.isEnabled) {
+              const dayPassStart = parseTimeToMinutes(dayPassHoursConfig.startTime);
+              const dayPassEnd = parseTimeToMinutes(dayPassHoursConfig.endTime);
+              
+              // If within day pass hours, that's fine for members too
+              if (currentTimeMinutes < dayPassStart || currentTimeMinutes >= dayPassEnd) {
+                const sessionTimes = enabledSessions.map(s => `${s.sessionType}: ${s.startTime} - ${s.endTime}`).join(', ');
+                return res.status(400).json({
+                  success: false,
+                  message: `No session is currently active. Member sessions: ${sessionTimes}. Please check back during session hours.`
+                });
+              }
+            } else {
+              const sessionTimes = enabledSessions.map(s => `${s.sessionType}: ${s.startTime} - ${s.endTime}`).join(', ');
+              return res.status(400).json({
+                success: false,
+                message: `No session is currently active. Available sessions are: ${sessionTimes}. Please check back during session hours.`
+              });
+            }
+          }
         }
       }
       
@@ -1001,20 +1037,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         location: "Kiosk Check-in"
       });
 
-      // Mark session booking as checked in if sessions are enabled
-      if (enabledSessions.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
-        const now = new Date();
-        const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+      // Mark session booking as checked in if sessions are enabled and user is a member
+      if (!usedDayPass && membership && membership.status === 'active') {
+        const allSessionConfigs = await storage.getAllSessionConfigs();
+        const enabledSessionsForCheckin = allSessionConfigs.filter(s => s.isEnabled);
         
-        for (const session of enabledSessions) {
-          const sessionStartMinutes = parseTimeToMinutes(session.startTime);
-          const sessionEndMinutes = parseTimeToMinutes(session.endTime);
+        if (enabledSessionsForCheckin.length > 0) {
+          const today = new Date().toISOString().split('T')[0];
+          const nowTime = new Date();
+          const currentTimeMin = nowTime.getHours() * 60 + nowTime.getMinutes();
           
-          if (currentTimeMinutes >= sessionStartMinutes && currentTimeMinutes < sessionEndMinutes) {
-            // Mark this session booking as checked in
-            await storage.markSessionBookingCheckedIn(user.id, today, session.sessionType as 'morning' | 'evening');
-            break;
+          for (const session of enabledSessionsForCheckin) {
+            const sessionStartMinutes = parseTimeToMinutes(session.startTime);
+            const sessionEndMinutes = parseTimeToMinutes(session.endTime);
+            
+            if (currentTimeMin >= sessionStartMinutes && currentTimeMin < sessionEndMinutes) {
+              // Mark this session booking as checked in
+              await storage.markSessionBookingCheckedIn(user.id, today, session.sessionType as 'morning' | 'evening');
+              break;
+            }
           }
         }
       }
@@ -3637,6 +3678,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessions = await storage.getAllSessionConfigs();
       res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Get day pass hours (for landing page)
+  app.get("/api/day-pass-hours", async (req, res) => {
+    try {
+      const hours = await storage.getDayPassHours();
+      res.json(hours || { startTime: '10:00 AM', endTime: '5:00 PM', isEnabled: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Update day pass hours
+  app.put("/api/admin/day-pass-hours", isAdmin, async (req, res) => {
+    try {
+      const { startTime, endTime, isEnabled } = req.body;
+      const updated = await storage.updateDayPassHours({ startTime, endTime, isEnabled });
+      res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

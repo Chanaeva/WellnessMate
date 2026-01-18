@@ -10,7 +10,7 @@ import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png"
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
 import { format } from "date-fns";
-import type { MembershipPlan, Notification, SessionConfig } from "@shared/schema";
+import type { MembershipPlan, Notification, SessionConfig, DayPassHours } from "@shared/schema";
 import {
   Waves,
   Crown,
@@ -174,6 +174,15 @@ export default function LandingPage() {
     queryKey: ["/api/sessions"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/sessions");
+      return res.json();
+    },
+  });
+
+  // Fetch day pass hours
+  const { data: dayPassHoursConfig } = useQuery<DayPassHours>({
+    queryKey: ["/api/day-pass-hours"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/day-pass-hours");
       return res.json();
     },
   });
@@ -837,22 +846,39 @@ export default function LandingPage() {
               </h3>
               <div className="text-muted-foreground font-body text-sm w-full max-w-sm">
                 {sessionConfigs && sessionConfigs.length > 0 ? (
-                  <div className="space-y-3">
-                    <p className="text-xs text-center mb-2">Book a session to visit</p>
-                    {sessionConfigs.filter(s => s.isEnabled).map((session) => (
-                      <div key={session.id} className="flex items-center justify-center gap-2">
-                        {session.sessionType === 'morning' ? (
-                          <Sun className="h-4 w-4 text-amber-500" />
-                        ) : (
-                          <Moon className="h-4 w-4 text-indigo-500" />
-                        )}
-                        <span className="capitalize font-medium">{session.sessionType}:</span>
-                        <span>{session.startTime} - {session.endTime}</span>
+                  <div className="space-y-4">
+                    {/* Member Sessions */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-center font-medium text-primary">Member Sessions</p>
+                      {sessionConfigs.filter(s => s.isEnabled).map((session) => (
+                        <div key={session.id} className="flex items-center justify-center gap-2">
+                          {session.sessionType === 'morning' ? (
+                            <Sun className="h-4 w-4 text-amber-500" />
+                          ) : (
+                            <Moon className="h-4 w-4 text-indigo-500" />
+                          )}
+                          <span className="capitalize font-medium">{session.sessionType}:</span>
+                          <span>{session.startTime} - {session.endTime}</span>
+                        </div>
+                      ))}
+                      <p className="text-xs text-center text-muted-foreground">
+                        (Booking required)
+                      </p>
+                    </div>
+                    
+                    {/* Day Pass Hours */}
+                    {dayPassHoursConfig && dayPassHoursConfig.isEnabled && (
+                      <div className="space-y-2 pt-2 border-t border-muted-foreground/20">
+                        <p className="text-xs text-center font-medium text-green-600">Day Pass Hours</p>
+                        <div className="flex items-center justify-center gap-2">
+                          <Clock className="h-4 w-4 text-green-500" />
+                          <span>{dayPassHoursConfig.startTime} - {dayPassHoursConfig.endTime}</span>
+                        </div>
+                        <p className="text-xs text-center text-muted-foreground">
+                          (No booking required)
+                        </p>
                       </div>
-                    ))}
-                    <p className="text-xs text-center text-muted-foreground mt-2">
-                      Members can book via their dashboard
-                    </p>
+                    )}
                   </div>
                 ) : groupedHours.length > 0 ? (
                   <div className="space-y-4">

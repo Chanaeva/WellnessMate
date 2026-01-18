@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { SessionConfig } from "@shared/schema";
+import { SessionConfig, DayPassHours } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,22 +9,36 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sun, Moon, Users, Clock, Save, Loader2 } from "lucide-react";
+import { Sun, Moon, Users, Clock, Save, Loader2, Ticket } from "lucide-react";
 
 export default function AdminSessions() {
   const { toast } = useToast();
   const [editingSession, setEditingSession] = useState<'morning' | 'evening' | null>(null);
+  const [editingDayPass, setEditingDayPass] = useState(false);
   const [formData, setFormData] = useState<{
     startTime: string;
     endTime: string;
     capacity: number;
     isEnabled: boolean;
   }>({ startTime: '', endTime: '', capacity: 20, isEnabled: true });
+  const [dayPassFormData, setDayPassFormData] = useState<{
+    startTime: string;
+    endTime: string;
+    isEnabled: boolean;
+  }>({ startTime: '10:00 AM', endTime: '5:00 PM', isEnabled: true });
 
   const { data: sessions, isLoading } = useQuery<SessionConfig[]>({
     queryKey: ["/api/admin/sessions"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/sessions");
+      return res.json();
+    },
+  });
+
+  const { data: dayPassHours, isLoading: isDayPassLoading } = useQuery<DayPassHours>({
+    queryKey: ["/api/day-pass-hours"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/day-pass-hours");
       return res.json();
     },
   });
@@ -52,6 +66,28 @@ export default function AdminSessions() {
     },
   });
 
+  const updateDayPassMutation = useMutation({
+    mutationFn: async (data: { startTime: string; endTime: string; isEnabled: boolean }) => {
+      const res = await apiRequest("PUT", "/api/admin/day-pass-hours", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/day-pass-hours"] });
+      toast({
+        title: "Day Pass Hours Updated",
+        description: "Day pass hours have been saved successfully.",
+      });
+      setEditingDayPass(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update day pass hours",
+        variant: "destructive",
+      });
+    },
+  });
+
   const morningSession = sessions?.find(s => s.sessionType === 'morning');
   const eveningSession = sessions?.find(s => s.sessionType === 'evening');
 
@@ -65,6 +101,17 @@ export default function AdminSessions() {
     });
   };
 
+  const startEditingDayPass = () => {
+    if (dayPassHours) {
+      setDayPassFormData({
+        startTime: dayPassHours.startTime,
+        endTime: dayPassHours.endTime,
+        isEnabled: dayPassHours.isEnabled,
+      });
+    }
+    setEditingDayPass(true);
+  };
+
   const handleSave = () => {
     if (!editingSession) return;
     updateSessionMutation.mutate({
@@ -73,8 +120,16 @@ export default function AdminSessions() {
     });
   };
 
+  const handleSaveDayPass = () => {
+    updateDayPassMutation.mutate(dayPassFormData);
+  };
+
   const handleCancel = () => {
     setEditingSession(null);
+  };
+
+  const handleCancelDayPass = () => {
+    setEditingDayPass(false);
   };
 
   if (isLoading) {
@@ -290,6 +345,92 @@ export default function AdminSessions() {
         </Card>
       </div>
 
+      {/* Day Pass Hours Card */}
+      <Card className={!dayPassHours?.isEnabled ? "opacity-60" : ""}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                <Ticket className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <CardTitle>Day Pass Hours</CardTitle>
+                <CardDescription>Open hours for day pass visitors (no booking required)</CardDescription>
+              </div>
+            </div>
+            <Badge variant={dayPassHours?.isEnabled ? "default" : "secondary"}>
+              {dayPassHours?.isEnabled ? "Active" : "Disabled"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {editingDayPass ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="daypass-start">Start Time</Label>
+                  <Input
+                    id="daypass-start"
+                    value={dayPassFormData.startTime}
+                    onChange={(e) => setDayPassFormData({ ...dayPassFormData, startTime: e.target.value })}
+                    placeholder="10:00 AM"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="daypass-end">End Time</Label>
+                  <Input
+                    id="daypass-end"
+                    value={dayPassFormData.endTime}
+                    onChange={(e) => setDayPassFormData({ ...dayPassFormData, endTime: e.target.value })}
+                    placeholder="5:00 PM"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="daypass-enabled">Day Pass Hours Enabled</Label>
+                <Switch
+                  id="daypass-enabled"
+                  checked={dayPassFormData.isEnabled}
+                  onCheckedChange={(checked) => setDayPassFormData({ ...dayPassFormData, isEnabled: checked })}
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleSaveDayPass} disabled={updateDayPassMutation.isPending}>
+                  {updateDayPassMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save
+                </Button>
+                <Button variant="outline" onClick={handleCancelDayPass}>
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-lg">
+                <Clock className="h-5 w-5 text-muted-foreground" />
+                <span className="font-semibold">{dayPassHours?.startTime || '10:00 AM'}</span>
+                <span className="text-muted-foreground">to</span>
+                <span className="font-semibold">{dayPassHours?.endTime || '5:00 PM'}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Day pass holders can check in during these hours without needing to book a session.
+              </p>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={startEditingDayPass}
+              >
+                Edit Day Pass Hours
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>How Session Booking Works</CardTitle>
@@ -299,6 +440,7 @@ export default function AdminSessions() {
           <p>Each session has a maximum capacity to ensure a quality experience.</p>
           <p>Disabled sessions will not be available for booking.</p>
           <p>Members must have a booking to check in during session hours.</p>
+          <p className="font-medium text-foreground">Day pass users can check in during day pass hours without booking.</p>
         </CardContent>
       </Card>
     </div>

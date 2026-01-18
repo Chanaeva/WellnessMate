@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+import { loadStripeTerminal, Terminal } from "@stripe/terminal-js";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import {
   UserPlus,
@@ -46,6 +47,9 @@ import {
   Star,
   Zap,
   FileText,
+  Wifi,
+  WifiOff,
+  Loader2,
 } from "lucide-react";
 
 // Stripe setup - fetch the public key from the server to support test/live key switching
@@ -560,7 +564,7 @@ function DiscountForm({
   );
 }
 
-// Payment form component
+// Payment form component with Stripe Terminal card reader support
 function PaymentForm({
   memberData,
   packageData,
@@ -580,6 +584,11 @@ function PaymentForm({
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('reader');
+  const [readerStatus, setReaderStatus] = useState<'connecting' | 'connected' | 'waiting' | 'processing' | 'error' | 'idle'>('idle');
+  const [readerMessage, setReaderMessage] = useState<string>('');
+  const [terminal, setTerminal] = useState<Terminal | null>(null);
+  const [connectedReader, setConnectedReader] = useState<any>(null);
   
   // Calculate final price with discount
   const originalPrice = packageData.price; // in cents
@@ -595,7 +604,258 @@ function PaymentForm({
   
   const finalPrice = Math.max(0, originalPrice - discountAmountCents);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Track terminal instance in ref for cleanup
+  const terminalRef = useRef<Terminal | null>(null);
+  
+  // Initialize Stripe Terminal when reader mode is selected
+  useEffect(() => {
+    let mounted = true;
+    
+    const initTerminal = async () => {
+      // Clean up existing terminal connection before reinitializing
+      if (terminalRef.current) {
+        try {
+          await terminalRef.current.disconnectReader();
+        } catch (e) {
+          console.log('Disconnect error (ok if no reader connected):', e);
+        }
+      }
+      
+      try {
+        setReaderStatus('connecting');
+        setReaderMessage('Initializing card reader...');
+        
+        const stripeTerminal = await loadStripeTerminal();
+        if (!stripeTerminal || !mounted) return;
+        
+        const term = stripeTerminal.create({
+          onFetchConnectionToken: async () => {
+            const response = await fetch('/api/stripe/terminal/connection-token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await response.json();
+            return data.secret;
+          },
+          onUnexpectedReaderDisconnect: () => {
+            console.log('Reader disconnected unexpectedly');
+            setReaderStatus('error');
+            setReaderMessage('Card reader disconnected. Please reconnect or use manual entry.');
+            setConnectedReader(null);
+          },
+        });
+        
+        if (!mounted) return;
+        setTerminal(term);
+        terminalRef.current = term;
+        
+        // Try to discover and connect to a reader
+        const discoverResult = await term.discoverReaders({
+          simulated: false, // Set to true for testing without a real reader
+        });
+        
+        if (!mounted) return;
+        
+        if ('error' in discoverResult) {
+          console.log('No physical readers found, trying simulated:', discoverResult.error);
+          // Try simulated reader for testing
+          const simulatedResult = await term.discoverReaders({ simulated: true });
+          if ('error' in simulatedResult || simulatedResult.discoveredReaders.length === 0) {
+            setReaderStatus('error');
+            setReaderMessage('No card reader found. Using manual card entry.');
+            setPaymentMethod('manual');
+            return;
+          }
+          
+          const reader = simulatedResult.discoveredReaders[0];
+          const connectResult = await term.connectReader(reader);
+          if ('error' in connectResult) {
+            setReaderStatus('error');
+            setReaderMessage('Could not connect to reader. Using manual entry.');
+            setPaymentMethod('manual');
+          } else {
+            setConnectedReader(connectResult.reader);
+            setReaderStatus('connected');
+            setReaderMessage('Card reader connected (simulated)');
+          }
+        } else if (discoverResult.discoveredReaders.length > 0) {
+          const reader = discoverResult.discoveredReaders[0];
+          const connectResult = await term.connectReader(reader);
+          if ('error' in connectResult) {
+            setReaderStatus('error');
+            setReaderMessage('Could not connect to reader. Using manual entry.');
+            setPaymentMethod('manual');
+          } else {
+            setConnectedReader(connectResult.reader);
+            setReaderStatus('connected');
+            setReaderMessage(`Connected to ${reader.label || 'card reader'}`);
+          }
+        } else {
+          setReaderStatus('error');
+          setReaderMessage('No card reader found. Using manual card entry.');
+          setPaymentMethod('manual');
+        }
+      } catch (error: any) {
+        console.error('Terminal initialization error:', error);
+        if (mounted) {
+          setReaderStatus('error');
+          setReaderMessage('Card reader unavailable. Using manual entry.');
+          setPaymentMethod('manual');
+        }
+      }
+    };
+    
+    if (paymentMethod === 'reader' && !connectedReader) {
+      initTerminal();
+    } else if (paymentMethod === 'manual') {
+      // Reset reader state when switching to manual
+      setReaderStatus('idle');
+      setReaderMessage('');
+    }
+    
+    return () => {
+      mounted = false;
+    };
+  }, [paymentMethod]);
+  
+  // Cleanup terminal on unmount
+  useEffect(() => {
+    return () => {
+      if (terminalRef.current) {
+        terminalRef.current.disconnectReader().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Handle card reader payment
+  const handleReaderPayment = async () => {
+    if (!terminal || !connectedReader) {
+      toast({
+        title: "Reader Not Connected",
+        description: "Please wait for the reader to connect or use manual entry.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setReaderStatus('processing');
+    setReaderMessage('Please tap, insert, or swipe your card...');
+
+    try {
+      // Create payment intent using existing kiosk endpoint with Terminal mode
+      const piResponse = await apiRequest(
+        "POST",
+        "/api/kiosk/create-member-payment",
+        {
+          memberData,
+          packageData: {
+            ...packageData,
+            finalPrice,
+            originalPrice,
+          },
+          agreementData,
+          discountData: discountData ? {
+            type: discountData.type,
+            value: discountData.value,
+            reason: discountData.reason,
+            amountCents: discountAmountCents,
+          } : null,
+          useTerminal: true, // Use Terminal (card_present) payment method
+        },
+      );
+      
+      const { clientSecret, paymentIntentId } = await piResponse.json();
+      
+      if (!clientSecret) {
+        throw new Error('Failed to create payment intent');
+      }
+
+      // Collect payment method from the reader
+      const collectResult = await terminal.collectPaymentMethod(clientSecret);
+      
+      if ('error' in collectResult) {
+        throw new Error(collectResult.error.message || 'Failed to collect payment');
+      }
+
+      setReaderMessage('Processing payment...');
+
+      // Process the payment
+      const processResult = await terminal.processPayment(collectResult.paymentIntent);
+      
+      if ('error' in processResult) {
+        throw new Error(processResult.error.message || 'Payment processing failed');
+      }
+
+      if (processResult.paymentIntent.status === 'succeeded') {
+        // Payment succeeded, create member account
+        const confirmResponse = await apiRequest(
+          "POST",
+          "/api/kiosk/confirm-member-creation",
+          {
+            paymentIntentId: processResult.paymentIntent.id,
+            memberData,
+            packageData: {
+              ...packageData,
+              finalPrice,
+              originalPrice,
+            },
+            agreementData,
+            discountData: discountData ? {
+              type: discountData.type,
+              value: discountData.value,
+              reason: discountData.reason,
+              amountCents: discountAmountCents,
+            } : null,
+          },
+        );
+
+        if (confirmResponse.ok) {
+          toast({
+            title: "Payment Successful",
+            description: `Welcome, ${memberData.firstName}! Your account has been created.`,
+          });
+          onSuccess();
+        } else {
+          const errorData = await confirmResponse.json();
+          throw new Error(errorData.message || 'Failed to create member account');
+        }
+      } else {
+        throw new Error('Payment was not successful');
+      }
+    } catch (error: any) {
+      console.error('Reader payment error:', error);
+      
+      // Cancel any pending reader action to prevent lockup
+      if (terminal) {
+        try {
+          await terminal.cancelCollectPaymentMethod();
+        } catch (cancelError) {
+          console.log('Cancel action (ok if nothing to cancel):', cancelError);
+        }
+      }
+      
+      setReaderStatus('error');
+      setReaderMessage(error.message || 'Payment failed. Please try again.');
+      toast({
+        title: "Payment Failed",
+        description: error.message || 'Failed to process payment',
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      // Reset to connected status after a short delay for error recovery
+      setTimeout(() => {
+        if (connectedReader) {
+          setReaderStatus('connected');
+          setReaderMessage('Ready for payment');
+        }
+      }, 2000);
+    }
+  };
+
+  // Handle manual card payment (fallback)
+  const handleManualPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stripe || !elements) return;
 
@@ -604,7 +864,6 @@ function PaymentForm({
     if (!cardElement) return;
 
     try {
-      // Create payment intent with discount if applicable
       const response = await apiRequest(
         "POST",
         "/api/kiosk/create-member-payment",
@@ -612,8 +871,8 @@ function PaymentForm({
           memberData,
           packageData: {
             ...packageData,
-            finalPrice, // The discounted price in cents
-            originalPrice, // Original price in cents
+            finalPrice,
+            originalPrice,
           },
           agreementData,
           discountData: discountData ? {
@@ -624,9 +883,8 @@ function PaymentForm({
           } : null,
         },
       );
-      const { clientSecret, paymentIntentId } = await response.json();
+      const { clientSecret } = await response.json();
 
-      // Confirm payment
       const { error, paymentIntent } = await stripe.confirmCardPayment(
         clientSecret,
         {
@@ -642,80 +900,49 @@ function PaymentForm({
       );
 
       if (error) {
-        console.error("❌ Payment error:", error);
         toast({
           title: "Payment Failed",
           description: error.message,
           variant: "destructive",
         });
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
-        console.log(
-          "✅ Payment succeeded, confirming member creation...",
-          paymentIntent.id,
-        );
-        // Payment succeeded, now create the member account
-        try {
-          const confirmResponse = await apiRequest(
-            "POST",
-            "/api/kiosk/confirm-member-creation",
-            {
-              paymentIntentId: paymentIntent.id,
-              memberData,
-              packageData: {
-                ...packageData,
-                finalPrice,
-                originalPrice,
-              },
-              agreementData,
-              discountData: discountData ? {
-                type: discountData.type,
-                value: discountData.value,
-                reason: discountData.reason,
-                amountCents: discountAmountCents,
-              } : null,
+        const confirmResponse = await apiRequest(
+          "POST",
+          "/api/kiosk/confirm-member-creation",
+          {
+            paymentIntentId: paymentIntent.id,
+            memberData,
+            packageData: {
+              ...packageData,
+              finalPrice,
+              originalPrice,
             },
-          );
+            agreementData,
+            discountData: discountData ? {
+              type: discountData.type,
+              value: discountData.value,
+              reason: discountData.reason,
+              amountCents: discountAmountCents,
+            } : null,
+          },
+        );
 
-          console.log("📝 Confirm response status:", confirmResponse.status);
-
-          if (confirmResponse.ok) {
-            const responseData = await confirmResponse.json();
-            console.log("🎉 Member created successfully:", responseData);
-            toast({
-              title: "Member Created Successfully",
-              description: `${memberData.firstName} ${memberData.lastName} has been registered and payment processed.`,
-            });
-            onSuccess();
-          } else {
-            const errorData = await confirmResponse.json();
-            console.error("❌ Confirm member creation failed:", errorData);
-            toast({
-              title: "Member Creation Failed",
-              description:
-                errorData.message || "Failed to create member account",
-              variant: "destructive",
-            });
-          }
-        } catch (confirmError: any) {
-          console.error(
-            "❌ Error during confirm member creation:",
-            confirmError,
-          );
+        if (confirmResponse.ok) {
+          toast({
+            title: "Payment Successful",
+            description: `Welcome, ${memberData.firstName}! Your account has been created.`,
+          });
+          onSuccess();
+        } else {
+          const errorData = await confirmResponse.json();
           toast({
             title: "Member Creation Failed",
-            description:
-              confirmError.message || "Failed to create member account",
+            description: errorData.message || "Failed to create member account",
             variant: "destructive",
           });
         }
-      } else {
-        console.warn(
-          "⚠️ Payment intent status not succeeded:",
-          paymentIntent?.status,
-        );
       }
     } catch (error: any) {
-      console.error("❌ Payment processing error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to process payment",
@@ -730,7 +957,7 @@ function PaymentForm({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Payment Information</h2>
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="outline" onClick={onBack} disabled={isProcessing}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -778,35 +1005,125 @@ function PaymentForm({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="p-6 border rounded-lg">
-          <Label className="text-sm font-medium mb-4 block">
-            Card Information
-          </Label>
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: "18px",
-                  color: "#424770",
-                  "::placeholder": {
-                    color: "#aab7c4",
+      {/* Payment Method Selection */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={paymentMethod === 'reader' ? 'default' : 'outline'}
+          onClick={() => setPaymentMethod('reader')}
+          disabled={isProcessing}
+          className="flex-1"
+        >
+          <Wifi className="h-4 w-4 mr-2" />
+          Card Reader
+        </Button>
+        <Button
+          type="button"
+          variant={paymentMethod === 'manual' ? 'default' : 'outline'}
+          onClick={() => setPaymentMethod('manual')}
+          disabled={isProcessing}
+          className="flex-1"
+        >
+          <CreditCard className="h-4 w-4 mr-2" />
+          Manual Entry
+        </Button>
+      </div>
+
+      {paymentMethod === 'reader' ? (
+        <div className="space-y-6">
+          {/* Card Reader Status */}
+          <div className={`p-6 border-2 rounded-lg text-center ${
+            readerStatus === 'connected' ? 'border-green-500 bg-green-50' :
+            readerStatus === 'processing' ? 'border-blue-500 bg-blue-50' :
+            readerStatus === 'error' ? 'border-red-500 bg-red-50' :
+            'border-gray-300 bg-gray-50'
+          }`}>
+            <div className="flex justify-center mb-4">
+              {readerStatus === 'connecting' && (
+                <Loader2 className="h-12 w-12 text-gray-500 animate-spin" />
+              )}
+              {readerStatus === 'connected' && (
+                <Wifi className="h-12 w-12 text-green-600" />
+              )}
+              {readerStatus === 'processing' && (
+                <CreditCard className="h-12 w-12 text-blue-600 animate-pulse" />
+              )}
+              {readerStatus === 'error' && (
+                <WifiOff className="h-12 w-12 text-red-600" />
+              )}
+              {readerStatus === 'idle' && (
+                <CreditCard className="h-12 w-12 text-gray-400" />
+              )}
+            </div>
+            <p className={`text-lg font-medium ${
+              readerStatus === 'connected' ? 'text-green-700' :
+              readerStatus === 'processing' ? 'text-blue-700' :
+              readerStatus === 'error' ? 'text-red-700' :
+              'text-gray-600'
+            }`}>
+              {readerMessage || 'Initializing...'}
+            </p>
+            {readerStatus === 'processing' && (
+              <p className="text-sm text-blue-600 mt-2">
+                Please do not remove your card until prompted
+              </p>
+            )}
+          </div>
+
+          <Button
+            onClick={handleReaderPayment}
+            disabled={isProcessing || readerStatus !== 'connected'}
+            className="w-full text-lg py-6"
+            data-testid="button-pay-reader"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Pay $${(finalPrice / 100).toFixed(2)} with Card Reader`
+            )}
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleManualPayment} className="space-y-6">
+          <div className="p-6 border rounded-lg">
+            <Label className="text-sm font-medium mb-4 block">
+              Card Information
+            </Label>
+            <CardElement
+              options={{
+                style: {
+                  base: {
+                    fontSize: "18px",
+                    color: "#424770",
+                    "::placeholder": {
+                      color: "#aab7c4",
+                    },
                   },
                 },
-              },
-            }}
-          />
-        </div>
+              }}
+            />
+          </div>
 
-        <Button
-          type="submit"
-          disabled={!stripe || isProcessing}
-          className="w-full text-lg py-6"
-          data-testid="button-pay"
-        >
-          {isProcessing ? "Processing Payment..." : `Pay $${(finalPrice / 100).toFixed(2)}`}
-        </Button>
-      </form>
+          <Button
+            type="submit"
+            disabled={!stripe || isProcessing}
+            className="w-full text-lg py-6"
+            data-testid="button-pay"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Pay $${(finalPrice / 100).toFixed(2)}`
+            )}
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

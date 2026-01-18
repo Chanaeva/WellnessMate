@@ -42,6 +42,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // STRIPE TERMINAL ROUTES (for card reader)
+  // ============================================
+  
+  // Create connection token for Stripe Terminal JS SDK
+  // This endpoint needs to be public for the kiosk to initialize the Terminal SDK
+  app.post("/api/stripe/terminal/connection-token", async (req, res) => {
+    try {
+      const connectionToken = await stripe.terminal.connectionTokens.create();
+      res.json({ secret: connectionToken.secret });
+    } catch (error: any) {
+      console.error("Failed to create Terminal connection token:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin-only: List registered card readers
+  app.get("/api/stripe/terminal/readers", async (req, res) => {
+    if (!req.isAuthenticated() || !['admin', 'staff'].includes(req.user?.role || '')) {
+      return res.sendStatus(403);
+    }
+    try {
+      const readers = await stripe.terminal.readers.list({ limit: 10 });
+      res.json({ readers: readers.data });
+    } catch (error: any) {
+      console.error("Failed to list Terminal readers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin-only: Get or create Terminal location
+  app.get("/api/stripe/terminal/location", async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    try {
+      const locations = await stripe.terminal.locations.list({ limit: 1 });
+      
+      if (locations.data.length > 0) {
+        res.json({ location: locations.data[0] });
+      } else {
+        const location = await stripe.terminal.locations.create({
+          display_name: 'Wolf Mother Wellness - Front Desk',
+          address: {
+            line1: '123 Wellness Way',
+            city: 'Austin',
+            state: 'TX',
+            postal_code: '78701',
+            country: 'US',
+          },
+        });
+        res.json({ location });
+      }
+    } catch (error: any) {
+      console.error("Failed to get/create Terminal location:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================
   // ONE-TIME ADMIN SETUP ROUTES (for production)
   // ============================================
   
@@ -4129,11 +4188,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Kiosk member creation endpoint
+  // Kiosk member creation endpoint - supports both online card entry and Terminal card reader
   app.post("/api/kiosk/create-member-payment", async (req, res) => {
     try {
-      const { memberData, packageData, discountData } = req.body;
-      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData, discountData });
+      const { memberData, packageData, discountData, useTerminal } = req.body;
+      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData, discountData, useTerminal });
       
       // Validate the request data
       const memberFormSchema = z.object({
@@ -4167,14 +4226,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountDescription = ` (${discountLabel}${discountData.reason ? ` - ${discountData.reason}` : ''})`;
       }
       
-      // Create payment intent with discounted amount
-      const paymentIntent = await stripe.paymentIntents.create({
+      // Create payment intent - use card_present for Terminal, automatic_payment_methods for online
+      const paymentIntentConfig: any = {
         amount: Math.round(finalAmount), // Final price after discount in cents
         currency: 'usd',
         description: `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
-        automatic_payment_methods: {
-          enabled: true,
-        },
         metadata: {
           memberFirstName: validatedMemberData.firstName,
           memberLastName: validatedMemberData.lastName,
@@ -4188,8 +4244,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           discountValue: discountData?.value?.toString() || '',
           discountAmount: discountData?.amountCents?.toString() || '',
           discountReason: discountData?.reason || '',
+          useTerminal: useTerminal ? 'true' : 'false',
         },
-      });
+      };
+      
+      if (useTerminal) {
+        // Terminal (card reader) payment
+        paymentIntentConfig.payment_method_types = ['card_present'];
+        paymentIntentConfig.capture_method = 'automatic';
+      } else {
+        // Online card entry payment
+        paymentIntentConfig.automatic_payment_methods = { enabled: true };
+      }
+      
+      const paymentIntent = await stripe.paymentIntents.create(paymentIntentConfig);
       
       res.json({ 
         clientSecret: paymentIntent.client_secret,

@@ -81,25 +81,25 @@ export default function AdminDashboard() {
   });
 
   const { data: analytics = {} } = useQuery({
-    queryKey: ["/api/analytics", selectedPeriod],
+    queryKey: ["/api/admin/visit-analytics", selectedPeriod],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/analytics?period=${selectedPeriod}`);
+      const res = await apiRequest("GET", `/api/admin/visit-analytics?period=${selectedPeriod}`);
       return res.json();
     },
   });
 
   const { data: peakHours = {} } = useQuery({
-    queryKey: ["/api/analytics/peak-hours"],
+    queryKey: ["/api/admin/peak-hours"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/analytics/peak-hours");
+      const res = await apiRequest("GET", "/api/admin/peak-hours");
       return res.json();
     },
   });
 
   const { data: dashboardSummary = {} } = useQuery({
-    queryKey: ["/api/dashboard-summary"],
+    queryKey: ["/api/admin/dashboard-summary"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/dashboard-summary");
+      const res = await apiRequest("GET", "/api/admin/dashboard-summary");
       return res.json();
     },
   });
@@ -293,7 +293,7 @@ export default function AdminDashboard() {
                 <CardContent>
                   <div className="text-2xl font-bold">{dashboardSummary.monthlyVisits || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    {dashboardSummary.growth >= 0 ? '+' : ''}{dashboardSummary.growth || 0}% from last month
+                    {(dashboardSummary.growth?.visits || 0) >= 0 ? '+' : ''}{dashboardSummary.growth?.visits || 0}% from last month
                   </p>
                 </CardContent>
               </Card>

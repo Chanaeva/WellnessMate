@@ -3504,6 +3504,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // SESSION MANAGEMENT ROUTES
+  // ============================================
+
+  // Admin: Get all session configurations
+  app.get("/api/admin/sessions", isAdmin, async (req, res) => {
+    try {
+      const sessions = await storage.getAllSessionConfigs();
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Update session configuration
+  app.put("/api/admin/sessions/:type", isAdmin, async (req, res) => {
+    try {
+      const sessionType = req.params.type as 'morning' | 'evening';
+      if (!['morning', 'evening'].includes(sessionType)) {
+        return res.status(400).json({ message: "Invalid session type" });
+      }
+      
+      const { startTime, endTime, capacity, isEnabled } = req.body;
+      const updated = await storage.updateSessionConfig(sessionType, {
+        startTime,
+        endTime,
+        capacity,
+        isEnabled
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Get session configurations (for landing page and member dashboard)
+  app.get("/api/sessions", async (req, res) => {
+    try {
+      const sessions = await storage.getAllSessionConfigs();
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: Get my session bookings
+  app.get("/api/session-bookings", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+    try {
+      const bookings = await storage.getSessionBookingsByUserId(req.user!.id);
+      res.json(bookings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: Book a session
+  app.post("/api/session-bookings", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+    try {
+      const { sessionType, bookingDate } = req.body;
+      
+      if (!['morning', 'evening'].includes(sessionType)) {
+        return res.status(400).json({ message: "Invalid session type" });
+      }
+      
+      // Check if user already has a booking for this session
+      const hasBooking = await storage.hasUserBookedSession(req.user!.id, bookingDate, sessionType);
+      if (hasBooking) {
+        return res.status(400).json({ message: "You already have a booking for this session" });
+      }
+      
+      // Check capacity
+      const availability = await storage.getSessionAvailability(bookingDate, sessionType);
+      if (availability.booked >= availability.capacity) {
+        return res.status(400).json({ message: "This session is fully booked" });
+      }
+      
+      // Check if session is enabled
+      const config = await storage.getSessionConfigByType(sessionType);
+      if (!config || !config.isEnabled) {
+        return res.status(400).json({ message: "This session is not available" });
+      }
+      
+      const booking = await storage.createSessionBooking({
+        userId: req.user!.id,
+        sessionType,
+        bookingDate,
+        status: 'confirmed'
+      });
+      
+      res.status(201).json(booking);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: Cancel a session booking
+  app.delete("/api/session-bookings/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+    try {
+      const bookingId = parseInt(req.params.id);
+      
+      // Verify the booking belongs to this user
+      const booking = await storage.getSessionBookingById(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      if (booking.userId !== req.user!.id) {
+        return res.status(403).json({ message: "You can only cancel your own bookings" });
+      }
+      
+      const cancelled = await storage.cancelSessionBooking(bookingId);
+      res.json(cancelled);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get session availability for a specific date
+  app.get("/api/sessions/availability", async (req, res) => {
+    try {
+      const { date } = req.query;
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+      
+      const [morningAvail, eveningAvail] = await Promise.all([
+        storage.getSessionAvailability(date as string, 'morning'),
+        storage.getSessionAvailability(date as string, 'evening')
+      ]);
+      
+      const [morningConfig, eveningConfig] = await Promise.all([
+        storage.getSessionConfigByType('morning'),
+        storage.getSessionConfigByType('evening')
+      ]);
+      
+      res.json({
+        morning: {
+          ...morningAvail,
+          startTime: morningConfig?.startTime,
+          endTime: morningConfig?.endTime,
+          isEnabled: morningConfig?.isEnabled ?? false
+        },
+        evening: {
+          ...eveningAvail,
+          startTime: eveningConfig?.startTime,
+          endTime: eveningConfig?.endTime,
+          isEnabled: eveningConfig?.isEnabled ?? false
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Promotion routes (Admin only)
   app.get("/api/admin/promotions", isAdmin, async (req, res) => {
     try {

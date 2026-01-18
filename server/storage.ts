@@ -18,6 +18,8 @@ import {
   inventoryItems, type InventoryItem, type InsertInventoryItem,
   itemCheckouts, type ItemCheckout, type InsertItemCheckout,
   loginEvents, type LoginEvent, type InsertLoginEvent,
+  sessionConfigs, type SessionConfig, type InsertSessionConfig,
+  sessionBookings, type SessionBooking, type InsertSessionBooking,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -164,6 +166,20 @@ export interface IStorage {
   getItemCheckoutHistory(itemId: number): Promise<(ItemCheckout & { user?: User })[]>;
   getCheckoutById(checkoutId: number): Promise<(ItemCheckout & { item?: InventoryItem, user?: User }) | undefined>;
   updateCheckoutPayment(checkoutId: number, data: { paymentStatus: 'not_charged' | 'charged' | 'failed', stripePaymentIntentId?: string, chargedAmountCents?: number }): Promise<ItemCheckout>;
+  
+  // Session configuration methods
+  getAllSessionConfigs(): Promise<SessionConfig[]>;
+  getSessionConfigByType(sessionType: 'morning' | 'evening'): Promise<SessionConfig | undefined>;
+  updateSessionConfig(sessionType: 'morning' | 'evening', data: Partial<SessionConfig>): Promise<SessionConfig>;
+  
+  // Session booking methods
+  createSessionBooking(booking: InsertSessionBooking): Promise<SessionBooking>;
+  getSessionBookingsByUserId(userId: number): Promise<SessionBooking[]>;
+  getSessionBookingsForDate(date: string, sessionType?: 'morning' | 'evening'): Promise<SessionBooking[]>;
+  cancelSessionBooking(bookingId: number): Promise<SessionBooking>;
+  getSessionBookingById(bookingId: number): Promise<SessionBooking | undefined>;
+  getSessionAvailability(date: string, sessionType: 'morning' | 'evening'): Promise<{ booked: number, capacity: number }>;
+  hasUserBookedSession(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<boolean>;
   
   // Session store
   sessionStore: any;
@@ -1332,6 +1348,127 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ lastLoginAt: new Date() })
       .where(eq(users.id, userId));
+  }
+
+  // Session configuration methods
+  async getAllSessionConfigs(): Promise<SessionConfig[]> {
+    return await db.select().from(sessionConfigs);
+  }
+
+  async getSessionConfigByType(sessionType: 'morning' | 'evening'): Promise<SessionConfig | undefined> {
+    const [config] = await db
+      .select()
+      .from(sessionConfigs)
+      .where(eq(sessionConfigs.sessionType, sessionType));
+    return config;
+  }
+
+  async updateSessionConfig(sessionType: 'morning' | 'evening', data: Partial<SessionConfig>): Promise<SessionConfig> {
+    const [updated] = await db
+      .update(sessionConfigs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(sessionConfigs.sessionType, sessionType))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Session config not found");
+    }
+    return updated;
+  }
+
+  // Session booking methods
+  async createSessionBooking(booking: InsertSessionBooking): Promise<SessionBooking> {
+    const [created] = await db
+      .insert(sessionBookings)
+      .values(booking)
+      .returning();
+    return created;
+  }
+
+  async getSessionBookingsByUserId(userId: number): Promise<SessionBooking[]> {
+    return await db
+      .select()
+      .from(sessionBookings)
+      .where(and(
+        eq(sessionBookings.userId, userId),
+        eq(sessionBookings.status, 'confirmed')
+      ))
+      .orderBy(desc(sessionBookings.bookingDate));
+  }
+
+  async getSessionBookingsForDate(date: string, sessionType?: 'morning' | 'evening'): Promise<SessionBooking[]> {
+    const conditions = [
+      eq(sessionBookings.bookingDate, date),
+      eq(sessionBookings.status, 'confirmed')
+    ];
+    
+    if (sessionType) {
+      conditions.push(eq(sessionBookings.sessionType, sessionType));
+    }
+    
+    return await db
+      .select()
+      .from(sessionBookings)
+      .where(and(...conditions));
+  }
+
+  async cancelSessionBooking(bookingId: number): Promise<SessionBooking> {
+    const [updated] = await db
+      .update(sessionBookings)
+      .set({ 
+        status: 'cancelled',
+        cancelledAt: new Date()
+      })
+      .where(eq(sessionBookings.id, bookingId))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Booking not found");
+    }
+    return updated;
+  }
+
+  async getSessionBookingById(bookingId: number): Promise<SessionBooking | undefined> {
+    const [booking] = await db
+      .select()
+      .from(sessionBookings)
+      .where(eq(sessionBookings.id, bookingId));
+    return booking;
+  }
+
+  async getSessionAvailability(date: string, sessionType: 'morning' | 'evening'): Promise<{ booked: number, capacity: number }> {
+    const config = await this.getSessionConfigByType(sessionType);
+    if (!config) {
+      return { booked: 0, capacity: 0 };
+    }
+    
+    const bookings = await db
+      .select()
+      .from(sessionBookings)
+      .where(and(
+        eq(sessionBookings.bookingDate, date),
+        eq(sessionBookings.sessionType, sessionType),
+        eq(sessionBookings.status, 'confirmed')
+      ));
+    
+    return {
+      booked: bookings.length,
+      capacity: config.capacity
+    };
+  }
+
+  async hasUserBookedSession(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<boolean> {
+    const [booking] = await db
+      .select()
+      .from(sessionBookings)
+      .where(and(
+        eq(sessionBookings.userId, userId),
+        eq(sessionBookings.bookingDate, date),
+        eq(sessionBookings.sessionType, sessionType),
+        eq(sessionBookings.status, 'confirmed')
+      ));
+    
+    return !!booking;
   }
 }
 

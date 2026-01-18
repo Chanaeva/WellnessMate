@@ -634,3 +634,46 @@ export const updateStaffAdminSchema = z.object({
   password: z.string().min(6).optional(),
   mustChangePassword: z.boolean().optional(),
 });
+
+// Session type enum
+export const sessionTypeEnum = pgEnum('session_type', ['morning', 'evening']);
+
+// Session configurations table - configurable morning/evening session times
+export const sessionConfigs = pgTable("session_configs", {
+  id: serial("id").primaryKey(),
+  sessionType: sessionTypeEnum("session_type").notNull().unique(),
+  startTime: text("start_time").notNull(), // e.g., "7:00 AM"
+  endTime: text("end_time").notNull(), // e.g., "12:00 PM"
+  capacity: integer("capacity").notNull().default(20), // Max members per session
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+// Session bookings table - member reservations for specific dates/sessions
+export const sessionBookings = pgTable("session_bookings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  sessionType: sessionTypeEnum("session_type").notNull(),
+  bookingDate: date("booking_date").notNull(), // The date of the booking
+  status: text("status").notNull().default('confirmed'), // confirmed, cancelled, checked_in
+  createdAt: timestamp("created_at").defaultNow(),
+  cancelledAt: timestamp("cancelled_at"),
+});
+
+// Insert schemas for sessions
+export const insertSessionConfigSchema = createInsertSchema(sessionConfigs).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertSessionBookingSchema = createInsertSchema(sessionBookings).omit({
+  id: true,
+  createdAt: true,
+  cancelledAt: true,
+});
+
+// Types for sessions
+export type SessionConfig = typeof sessionConfigs.$inferSelect;
+export type InsertSessionConfig = z.infer<typeof insertSessionConfigSchema>;
+export type SessionBooking = typeof sessionBookings.$inferSelect;
+export type InsertSessionBooking = z.infer<typeof insertSessionBookingSchema>;

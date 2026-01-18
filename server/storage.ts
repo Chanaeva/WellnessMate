@@ -20,6 +20,7 @@ import {
   loginEvents, type LoginEvent, type InsertLoginEvent,
   sessionConfigs, type SessionConfig, type InsertSessionConfig,
   sessionBookings, type SessionBooking, type InsertSessionBooking,
+  dayPassHours, type DayPassHours,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -181,6 +182,10 @@ export interface IStorage {
   getSessionAvailability(date: string, sessionType: 'morning' | 'evening'): Promise<{ booked: number, capacity: number }>;
   hasUserBookedSession(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<boolean>;
   markSessionBookingCheckedIn(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<void>;
+  
+  // Day pass hours methods
+  getDayPassHours(): Promise<DayPassHours | undefined>;
+  updateDayPassHours(data: Partial<DayPassHours>): Promise<DayPassHours>;
   
   // Session store
   sessionStore: any;
@@ -1482,6 +1487,37 @@ export class DatabaseStorage implements IStorage {
         eq(sessionBookings.sessionType, sessionType),
         eq(sessionBookings.status, 'confirmed')
       ));
+  }
+
+  // Day pass hours methods
+  async getDayPassHours(): Promise<DayPassHours | undefined> {
+    const [hours] = await db.select().from(dayPassHours).limit(1);
+    return hours;
+  }
+
+  async updateDayPassHours(data: Partial<DayPassHours>): Promise<DayPassHours> {
+    // Get the first (and should be only) row
+    const existing = await this.getDayPassHours();
+    
+    if (existing) {
+      const [updated] = await db
+        .update(dayPassHours)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(dayPassHours.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      // Create if doesn't exist
+      const [created] = await db
+        .insert(dayPassHours)
+        .values({
+          startTime: data.startTime || '10:00 AM',
+          endTime: data.endTime || '5:00 PM',
+          isEnabled: data.isEnabled ?? true,
+        })
+        .returning();
+      return created;
+    }
   }
 }
 

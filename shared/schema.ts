@@ -677,3 +677,20 @@ export type SessionConfig = typeof sessionConfigs.$inferSelect;
 export type InsertSessionConfig = z.infer<typeof insertSessionConfigSchema>;
 export type SessionBooking = typeof sessionBookings.$inferSelect;
 export type InsertSessionBooking = z.infer<typeof insertSessionBookingSchema>;
+
+// Day pass hours configuration - separate from member sessions
+export const dayPassHours = pgTable("day_pass_hours", {
+  id: serial("id").primaryKey(),
+  startTime: text("start_time").notNull().default("10:00 AM"), // Default 10 AM
+  endTime: text("end_time").notNull().default("5:00 PM"), // Default 5 PM
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertDayPassHoursSchema = createInsertSchema(dayPassHours).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type DayPassHours = typeof dayPassHours.$inferSelect;
+export type InsertDayPassHours = z.infer<typeof insertDayPassHoursSchema>;

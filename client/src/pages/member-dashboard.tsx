@@ -9,6 +9,8 @@ import {
   Notification,
   PaymentMethod,
   Payment,
+  SessionConfig,
+  SessionBooking,
 } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +69,10 @@ import {
   AlertTriangle,
   FileText,
   Download,
+  Sun,
+  Moon,
+  Clock,
+  CalendarCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";
@@ -89,6 +95,9 @@ export default function MemberDashboard() {
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
   const [showCancelMembershipDialog, setShowCancelMembershipDialog] = useState(false);
+  const [selectedBookingDate, setSelectedBookingDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
 
   // Check if we should auto-open add payment form from URL params
   useEffect(() => {
@@ -164,6 +173,18 @@ export default function MemberDashboard() {
   // Fetch checked-out items
   const { data: checkedOutItems = [] } = useQuery<any[]>({
     queryKey: ["/api/checkouts/my-items"],
+    enabled: !!user,
+  });
+
+  // Fetch available sessions
+  const { data: availableSessions = [] } = useQuery<SessionConfig[]>({
+    queryKey: ["/api/sessions"],
+    enabled: !!user,
+  });
+
+  // Fetch user's session bookings
+  const { data: mySessionBookings = [] } = useQuery<SessionBooking[]>({
+    queryKey: ["/api/session-bookings"],
     enabled: !!user,
   });
   
@@ -381,6 +402,61 @@ export default function MemberDashboard() {
     },
   });
 
+  // Book session mutation
+  const bookSessionMutation = useMutation({
+    mutationFn: async ({ date, sessionType }: { date: string; sessionType: 'morning' | 'evening' }) => {
+      const response = await apiRequest("POST", "/api/session-bookings", {
+        date,
+        sessionType,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to book session");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/session-bookings"] });
+      toast({
+        title: "Session Booked!",
+        description: "Your session has been reserved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Booking Failed",
+        description: error.message || "Failed to book session",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cancel session booking mutation
+  const cancelBookingMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      const response = await apiRequest("DELETE", `/api/session-bookings/${bookingId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to cancel booking");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/session-bookings"] });
+      toast({
+        title: "Booking Cancelled",
+        description: "Your session booking has been cancelled.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cancellation Failed",
+        description: error.message || "Failed to cancel booking",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Helper functions for notification styling
   const getNotificationColor = (type: string) => {
     switch (type) {
@@ -481,6 +557,152 @@ export default function MemberDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Session Booking Section */}
+            {membership?.status === "active" && availableSessions.length > 0 && (
+              <Card className="wellness-card">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading text-foreground flex items-center">
+                    <CalendarCheck className="h-5 w-5 mr-2" />
+                    Book Your Session
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Reserve your spot for a morning or evening session. A booking is required for facility access.
+                  </p>
+                  
+                  {/* Date Selector */}
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium">Select Date:</label>
+                    <input
+                      type="date"
+                      value={selectedBookingDate}
+                      onChange={(e) => setSelectedBookingDate(e.target.value)}
+                      min={format(new Date(), "yyyy-MM-dd")}
+                      className="border rounded-md px-3 py-2 text-sm bg-background"
+                    />
+                  </div>
+
+                  {/* Session Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {availableSessions.map((session) => {
+                      const existingBooking = mySessionBookings.find(
+                        (b) => b.bookingDate === selectedBookingDate && b.sessionType === session.sessionType && b.status !== 'cancelled'
+                      );
+                      const isBooked = !!existingBooking;
+                      const Icon = session.sessionType === 'morning' ? Sun : Moon;
+                      const bgColor = session.sessionType === 'morning' 
+                        ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800' 
+                        : 'bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-800';
+                      const iconColor = session.sessionType === 'morning'
+                        ? 'text-amber-500'
+                        : 'text-indigo-500';
+
+                      return (
+                        <div 
+                          key={session.id} 
+                          className={`p-4 rounded-lg border ${bgColor} space-y-3`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className={`h-5 w-5 ${iconColor}`} />
+                            <span className="font-semibold capitalize">
+                              {session.sessionType} Session
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>{session.startTime} - {session.endTime}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Users className="h-4 w-4" />
+                            <span>Capacity: {session.capacity}</span>
+                          </div>
+                          
+                          {isBooked ? (
+                            <div className="space-y-2">
+                              <Badge variant="default" className="bg-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Booked
+                              </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => existingBooking && cancelBookingMutation.mutate(existingBooking.id)}
+                                disabled={cancelBookingMutation.isPending}
+                              >
+                                {cancelBookingMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                )}
+                                Cancel Booking
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              className="w-full wellness-button-primary"
+                              onClick={() => bookSessionMutation.mutate({
+                                date: selectedBookingDate,
+                                sessionType: session.sessionType as 'morning' | 'evening'
+                              })}
+                              disabled={bookSessionMutation.isPending}
+                            >
+                              {bookSessionMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : (
+                                <CalendarCheck className="h-4 w-4 mr-2" />
+                              )}
+                              Book Session
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Upcoming Bookings */}
+                  {mySessionBookings.filter(b => b.status !== 'cancelled' && new Date(b.bookingDate) >= new Date(format(new Date(), 'yyyy-MM-dd'))).length > 0 && (
+                    <div className="pt-4 border-t">
+                      <h4 className="font-medium mb-2">Your Upcoming Bookings</h4>
+                      <div className="space-y-2">
+                        {mySessionBookings
+                          .filter(b => b.status !== 'cancelled' && new Date(b.bookingDate) >= new Date(format(new Date(), 'yyyy-MM-dd')))
+                          .sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime())
+                          .slice(0, 5)
+                          .map((booking) => {
+                            const session = availableSessions.find(s => s.sessionType === booking.sessionType);
+                            const Icon = booking.sessionType === 'morning' ? Sun : Moon;
+                            return (
+                              <div 
+                                key={booking.id}
+                                className="flex items-center justify-between p-2 rounded bg-muted/50"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-4 w-4" />
+                                  <span className="font-medium">
+                                    {format(new Date(booking.bookingDate), "EEE, MMM d")}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground capitalize">
+                                    {booking.sessionType} ({session?.startTime} - {session?.endTime})
+                                  </span>
+                                </div>
+                                <Badge 
+                                  variant={booking.status === 'checked_in' ? 'default' : 'secondary'}
+                                  className={booking.status === 'checked_in' ? 'bg-green-600' : ''}
+                                >
+                                  {booking.status === 'checked_in' ? 'Checked In' : 'Confirmed'}
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Checked Out Items */}
             {checkedOutItems && checkedOutItems.length > 0 && (

@@ -10,7 +10,7 @@ import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png"
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
 import { format } from "date-fns";
-import type { MembershipPlan, Notification } from "@shared/schema";
+import type { MembershipPlan, Notification, SessionConfig } from "@shared/schema";
 import {
   Waves,
   Crown,
@@ -34,6 +34,8 @@ import {
   Star,
   AlertCircle,
   X,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -166,6 +168,15 @@ export default function LandingPage() {
   };
 
   const groupedHours = weeklyHours ? groupHours(weeklyHours) : [];
+
+  // Fetch session configurations
+  const { data: sessionConfigs } = useQuery<SessionConfig[]>({
+    queryKey: ["/api/sessions"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/sessions");
+      return res.json();
+    },
+  });
 
   // Fetch hero content
   const { data: heroContent } = useQuery({
@@ -822,10 +833,28 @@ export default function LandingPage() {
             <div className="flex flex-col items-center">
               <Clock className="h-8 w-8 text-primary mb-3" />
               <h3 className="font-heading font-semibold text-foreground mb-2">
-                Hours of Operation
+                Session Times
               </h3>
               <div className="text-muted-foreground font-body text-sm w-full max-w-sm">
-                {groupedHours.length > 0 ? (
+                {sessionConfigs && sessionConfigs.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-center mb-2">Book a session to visit</p>
+                    {sessionConfigs.filter(s => s.isEnabled).map((session) => (
+                      <div key={session.id} className="flex items-center justify-center gap-2">
+                        {session.sessionType === 'morning' ? (
+                          <Sun className="h-4 w-4 text-amber-500" />
+                        ) : (
+                          <Moon className="h-4 w-4 text-indigo-500" />
+                        )}
+                        <span className="capitalize font-medium">{session.sessionType}:</span>
+                        <span>{session.startTime} - {session.endTime}</span>
+                      </div>
+                    ))}
+                    <p className="text-xs text-center text-muted-foreground mt-2">
+                      Members can book via their dashboard
+                    </p>
+                  </div>
+                ) : groupedHours.length > 0 ? (
                   <div className="space-y-4">
                     {groupedHours.map((group, idx) => (
                       <div key={idx} className="border-b border-muted-foreground/20 pb-3 last:border-0">

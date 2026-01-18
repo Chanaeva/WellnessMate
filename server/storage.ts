@@ -180,6 +180,7 @@ export interface IStorage {
   getSessionBookingById(bookingId: number): Promise<SessionBooking | undefined>;
   getSessionAvailability(date: string, sessionType: 'morning' | 'evening'): Promise<{ booked: number, capacity: number }>;
   hasUserBookedSession(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<boolean>;
+  markSessionBookingCheckedIn(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<void>;
   
   // Session store
   sessionStore: any;
@@ -1469,6 +1470,18 @@ export class DatabaseStorage implements IStorage {
       ));
     
     return !!booking;
+  }
+
+  async markSessionBookingCheckedIn(userId: number, date: string, sessionType: 'morning' | 'evening'): Promise<void> {
+    await db
+      .update(sessionBookings)
+      .set({ status: 'checked_in' })
+      .where(and(
+        eq(sessionBookings.userId, userId),
+        eq(sessionBookings.bookingDate, date),
+        eq(sessionBookings.sessionType, sessionType),
+        eq(sessionBookings.status, 'confirmed')
+      ));
   }
 }
 

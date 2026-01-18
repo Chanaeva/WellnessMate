@@ -853,6 +853,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "No active membership or day passes found. Please purchase a membership or day pass package." 
         });
       }
+
+      // Check if session booking is required
+      const sessionConfigs = await storage.getAllSessionConfigs();
+      const enabledSessions = sessionConfigs.filter(s => s.isEnabled);
+      
+      // Helper function to parse time string to minutes since midnight
+      const parseTimeToMinutes = (timeStr: string): number => {
+        // Handle various formats: "7:00 AM", "7 AM", "7:00AM", "14:00", etc.
+        const normalized = timeStr.trim().toUpperCase();
+        const isPM = normalized.includes('PM');
+        const isAM = normalized.includes('AM');
+        const cleaned = normalized.replace(/\s?(AM|PM)/gi, '').trim();
+        
+        let hours: number, minutes: number = 0;
+        
+        if (cleaned.includes(':')) {
+          const parts = cleaned.split(':');
+          hours = parseInt(parts[0], 10) || 0;
+          minutes = parseInt(parts[1], 10) || 0;
+        } else {
+          hours = parseInt(cleaned, 10) || 0;
+        }
+        
+        // Convert 12-hour to 24-hour format
+        if (isPM && hours !== 12) {
+          hours += 12;
+        } else if (isAM && hours === 12) {
+          hours = 0;
+        }
+        
+        return hours * 60 + minutes;
+      };
+      
+      if (enabledSessions.length > 0) {
+        // Sessions are configured - check if user has a booking for today
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Determine current session based on time
+        const now = new Date();
+        const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+        
+        // Find which session is currently active
+        let currentSession: 'morning' | 'evening' | null = null;
+        for (const session of enabledSessions) {
+          const sessionStartMinutes = parseTimeToMinutes(session.startTime);
+          const sessionEndMinutes = parseTimeToMinutes(session.endTime);
+          
+          if (currentTimeMinutes >= sessionStartMinutes && currentTimeMinutes < sessionEndMinutes) {
+            currentSession = session.sessionType as 'morning' | 'evening';
+            break;
+          }
+        }
+        
+        if (currentSession) {
+          // Check if user has a booking for the current session
+          const hasBooking = await storage.hasUserBookedSession(user.id, today, currentSession);
+          
+          if (!hasBooking) {
+            const sessionConfig = sessionConfigs.find(s => s.sessionType === currentSession);
+            return res.status(400).json({
+              success: false,
+              requiresBooking: true,
+              sessionType: currentSession,
+              message: `Session booking required. The ${currentSession} session (${sessionConfig?.startTime} - ${sessionConfig?.endTime}) is currently active. Please book this session from your member dashboard before checking in.`
+            });
+          }
+        } else {
+          // No session is currently active
+          const sessionTimes = enabledSessions.map(s => `${s.sessionType}: ${s.startTime} - ${s.endTime}`).join(', ');
+          return res.status(400).json({
+            success: false,
+            message: `No session is currently active. Available sessions are: ${sessionTimes}. Please check back during session hours.`
+          });
+        }
+      }
       
       // If user has both membership and day passes, ask which to use
       if ((membership && membership.status === 'active') && activeDayPasses.length > 0 && useDayPass === undefined) {
@@ -925,6 +1000,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         membershipId: membership?.membershipId || 'day-pass-checkin',
         location: "Kiosk Check-in"
       });
+
+      // Mark session booking as checked in if sessions are enabled
+      if (enabledSessions.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+        
+        for (const session of enabledSessions) {
+          const sessionStartMinutes = parseTimeToMinutes(session.startTime);
+          const sessionEndMinutes = parseTimeToMinutes(session.endTime);
+          
+          if (currentTimeMinutes >= sessionStartMinutes && currentTimeMinutes < sessionEndMinutes) {
+            // Mark this session booking as checked in
+            await storage.markSessionBookingCheckedIn(user.id, today, session.sessionType as 'morning' | 'evening');
+            break;
+          }
+        }
+      }
 
       // Get updated day pass info if used
       let dayPassInfo = null;

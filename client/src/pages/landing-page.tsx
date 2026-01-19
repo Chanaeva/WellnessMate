@@ -91,18 +91,6 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
                         className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
                       />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent">
-                      <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <h3 className="text-white font-heading font-semibold text-lg mb-1">
-                          {image.title}
-                        </h3>
-                        {image.description && (
-                          <p className="text-white/80 text-sm font-body line-clamp-2">
-                            {image.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               ))}

@@ -10,7 +10,7 @@ import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png"
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
 import { format } from "date-fns";
-import type { MembershipPlan, Notification, SessionConfig, DayPassHours } from "@shared/schema";
+import type { MembershipPlan, Notification, SessionConfig, DayPassHours, GalleryImage } from "@shared/schema";
 import {
   Waves,
   Crown,
@@ -64,6 +64,15 @@ export default function LandingPage() {
     queryKey: ["/api/punch-cards/options"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/punch-cards/options");
+      return await res.json();
+    },
+  });
+
+  // Fetch gallery images
+  const { data: galleryImages } = useQuery<GalleryImage[]>({
+    queryKey: ["/api/gallery-images"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/gallery-images");
       return await res.json();
     },
   });
@@ -672,6 +681,51 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Gallery Section */}
+      {galleryImages && galleryImages.length > 0 && (
+        <section className="py-16 px-4 bg-gradient-to-br from-muted/30 to-background">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
+                Our Wellness Space
+              </h2>
+              <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
+                Step inside Wolf Mother Wellness and discover a sanctuary designed for relaxation and rejuvenation.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {galleryImages.map((image) => (
+                <div
+                  key={image.id}
+                  className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="aspect-[4/3] overflow-hidden">
+                    <img
+                      src={image.imageUrl}
+                      alt={image.altText || image.title}
+                      className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute bottom-0 left-0 right-0 p-4">
+                      <h3 className="text-white font-heading font-semibold text-lg mb-1">
+                        {image.title}
+                      </h3>
+                      {image.description && (
+                        <p className="text-white/80 text-sm font-body line-clamp-2">
+                          {image.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Promotions Carousel */}
       {promotions?.length > 0 && (

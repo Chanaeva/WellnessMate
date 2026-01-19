@@ -15,6 +15,7 @@ import {
   notifications, type Notification, type InsertNotification,
   landingPageContent, type LandingPageContent, type InsertLandingPageContent,
   promotions, type Promotion, type InsertPromotion,
+  galleryImages, type GalleryImage, type InsertGalleryImage,
   inventoryItems, type InventoryItem, type InsertInventoryItem,
   itemCheckouts, type ItemCheckout, type InsertItemCheckout,
   loginEvents, type LoginEvent, type InsertLoginEvent,
@@ -151,6 +152,14 @@ export interface IStorage {
   createPromotion(promotion: InsertPromotion): Promise<Promotion>;
   updatePromotion(id: number, data: Partial<Promotion>): Promise<Promotion>;
   deletePromotion(id: number): Promise<void>;
+
+  // Gallery image methods
+  getAllGalleryImages(): Promise<GalleryImage[]>;
+  getActiveGalleryImages(): Promise<GalleryImage[]>;
+  getGalleryImageById(id: number): Promise<GalleryImage | undefined>;
+  createGalleryImage(image: InsertGalleryImage): Promise<GalleryImage>;
+  updateGalleryImage(id: number, data: Partial<GalleryImage>): Promise<GalleryImage>;
+  deleteGalleryImage(id: number): Promise<void>;
 
   // Inventory item methods
   getAllInventoryItems(): Promise<InventoryItem[]>;
@@ -1071,6 +1080,43 @@ export class DatabaseStorage implements IStorage {
 
   async deletePromotion(id: number): Promise<void> {
     await db.delete(promotions).where(eq(promotions.id, id));
+  }
+
+  // Gallery image methods
+  async getAllGalleryImages(): Promise<GalleryImage[]> {
+    return await db.select().from(galleryImages).orderBy(galleryImages.sortOrder, galleryImages.createdAt);
+  }
+
+  async getActiveGalleryImages(): Promise<GalleryImage[]> {
+    return await db.select().from(galleryImages)
+      .where(eq(galleryImages.isActive, true))
+      .orderBy(galleryImages.sortOrder, galleryImages.createdAt);
+  }
+
+  async getGalleryImageById(id: number): Promise<GalleryImage | undefined> {
+    const [image] = await db.select().from(galleryImages).where(eq(galleryImages.id, id));
+    return image || undefined;
+  }
+
+  async createGalleryImage(image: InsertGalleryImage): Promise<GalleryImage> {
+    const [created] = await db
+      .insert(galleryImages)
+      .values(image)
+      .returning();
+    return created;
+  }
+
+  async updateGalleryImage(id: number, data: Partial<GalleryImage>): Promise<GalleryImage> {
+    const [updated] = await db
+      .update(galleryImages)
+      .set(data)
+      .where(eq(galleryImages.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGalleryImage(id: number): Promise<void> {
+    await db.delete(galleryImages).where(eq(galleryImages.id, id));
   }
 
   // Inventory item methods

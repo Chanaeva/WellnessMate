@@ -208,6 +208,19 @@ export const promotions = pgTable("promotions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Gallery images table for landing page image carousel/gallery
+export const galleryImages = pgTable("gallery_images", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url").notNull(),
+  altText: text("alt_text"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -515,6 +528,15 @@ export type InsertLandingPageContent = z.infer<typeof insertLandingPageContentSc
 
 export type Promotion = typeof promotions.$inferSelect;
 export type InsertPromotion = z.infer<typeof insertPromotionSchema>;
+
+export const insertGalleryImageSchema = createInsertSchema(galleryImages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type GalleryImage = typeof galleryImages.$inferSelect;
+export type InsertGalleryImage = z.infer<typeof insertGalleryImageSchema>;
 
 // Inventory item type enum
 export const itemTypeEnum = pgEnum('item_type', ['robe', 'shoes', 'other']);

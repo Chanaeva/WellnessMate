@@ -21,6 +21,7 @@ import {
   insertNotificationSchema,
   insertUserSchema,
   insertPromotionSchema,
+  insertGalleryImageSchema,
   createStaffAdminSchema,
   users as usersTable,
   memberships as membershipsTable,
@@ -3806,6 +3807,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Gallery image routes (Admin)
+  app.get("/api/admin/gallery-images", isAdmin, async (req, res) => {
+    try {
+      const images = await storage.getAllGalleryImages();
+      res.json(images);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/gallery-images", isAdmin, async (req, res) => {
+    try {
+      const validatedData = insertGalleryImageSchema.parse(req.body);
+      const image = await storage.createGalleryImage(validatedData);
+      res.status(201).json(image);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/admin/gallery-images/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const image = await storage.updateGalleryImage(id, req.body);
+      res.json(image);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/gallery-images/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteGalleryImage(id);
+      res.json({ message: "Gallery image deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Site settings route (Admin only)
   app.post("/api/admin/site-settings", isAdmin, async (req, res) => {
     try {
@@ -4388,6 +4429,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const promotions = await storage.getActivePromotions();
       res.json(promotions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public gallery images route for landing page
+  app.get("/api/gallery-images", async (req, res) => {
+    try {
+      const images = await storage.getActiveGalleryImages();
+      res.json(images);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

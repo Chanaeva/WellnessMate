@@ -1416,16 +1416,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSessionConfig(sessionType: 'morning' | 'evening', data: Partial<SessionConfig>): Promise<SessionConfig> {
-    const [updated] = await db
-      .update(sessionConfigs)
-      .set({ ...data, updatedAt: new Date() })
+    const existing = await db
+      .select()
+      .from(sessionConfigs)
       .where(eq(sessionConfigs.sessionType, sessionType))
-      .returning();
+      .limit(1);
     
-    if (!updated) {
-      throw new Error("Session config not found");
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(sessionConfigs)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(sessionConfigs.sessionType, sessionType))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(sessionConfigs)
+        .values({
+          sessionType,
+          startTime: data.startTime || (sessionType === 'morning' ? '7:00 AM' : '4:00 PM'),
+          endTime: data.endTime || (sessionType === 'morning' ? '12:00 PM' : '9:00 PM'),
+          capacity: data.capacity || 20,
+          isEnabled: data.isEnabled !== undefined ? data.isEnabled : true,
+        })
+        .returning();
+      return created;
     }
-    return updated;
   }
 
   // Session booking methods

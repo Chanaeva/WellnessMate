@@ -8,7 +8,11 @@ import {
   CreditCard, 
   FileText, 
   Settings,
-  LogOut
+  LogOut,
+  Image,
+  Clock,
+  Package,
+  UserCog
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,14 +45,29 @@ const Sidebar = ({ className }: SidebarProps) => {
       icon: <Users className="h-5 w-5" />
     },
     {
+      title: "Staff",
+      href: "/admin/staff",
+      icon: <UserCog className="h-5 w-5" />
+    },
+    {
       title: "Check-ins",
       href: "/admin/check-ins",
       icon: <QrCode className="h-5 w-5" />
     },
     {
-      title: "Classes",
-      href: "/admin/classes",
-      icon: <Calendar className="h-5 w-5" />
+      title: "Sessions",
+      href: "/admin/sessions",
+      icon: <Clock className="h-5 w-5" />
+    },
+    {
+      title: "Inventory",
+      href: "/admin/inventory",
+      icon: <Package className="h-5 w-5" />
+    },
+    {
+      title: "Gallery",
+      href: "/admin/gallery",
+      icon: <Image className="h-5 w-5" />
     },
     {
       title: "Billing",

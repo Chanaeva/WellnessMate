@@ -4,7 +4,8 @@
 Wolf Mother Wellness is a full-stack web application designed for managing a thermal wellness center's membership system. It provides comprehensive membership management, efficient check-in functionalities, streamlined payment processing, and robust administrative tools. The project aims to enhance operational efficiency and member satisfaction through a seamless experience for both members and staff, leveraging modern web technologies. The business vision is to create a leading platform for wellness center management, with potential for market expansion and increased member engagement.
 
 ## User Preferences
-Preferred communication style: Simple, everyday language.
+- Preferred communication style: Simple, everyday language.
+- API Development: Always create full CRUD operations (Create, Read, Update, Delete) for new endpoints.
 
 ## System Architecture
 

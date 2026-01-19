@@ -462,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If there's a Stripe subscription, cancel it first
       if (membership.stripeSubscriptionId) {
         try {
-          await stripe.subscriptions.cancel(membership.stripeSubscriptionId);
+          await stripe.subscriptions.del(membership.stripeSubscriptionId);
           console.log(`Cancelled Stripe subscription: ${membership.stripeSubscriptionId}`);
         } catch (stripeError: any) {
           // Log but don't fail if Stripe cancellation fails (subscription might already be cancelled)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,7 @@ import logoTransparent from "@assets/WM Logo Moss Transparent_1751905199912.png"
 import coldPlungeImg from "@assets/LIT_1759176133152.png";
 import saunaImg from "@assets/nomadsaunainside_1759176129008.png";
 import { format } from "date-fns";
+import useEmblaCarousel from "embla-carousel-react";
 import type { MembershipPlan, Notification, SessionConfig, DayPassHours, GalleryImage } from "@shared/schema";
 import {
   Waves,
@@ -37,6 +38,113 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+
+// Gallery Carousel Component
+function GalleryCarousel({ images }: { images: GalleryImage[] }) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: "center" });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const scrollPrev = () => emblaApi?.scrollPrev();
+  const scrollNext = () => emblaApi?.scrollNext();
+
+  // Update selected index on scroll
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onSelect]);
+
+  return (
+    <section className="py-16 px-4 bg-gradient-to-br from-muted/30 to-background">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
+            Our Wellness Space
+          </h2>
+          <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
+            Step inside Wolf Mother Wellness and discover a sanctuary designed for relaxation and rejuvenation.
+          </p>
+        </div>
+
+        <div className="relative">
+          {/* Carousel Container */}
+          <div className="overflow-hidden rounded-2xl" ref={emblaRef}>
+            <div className="flex">
+              {images.map((image) => (
+                <div
+                  key={image.id}
+                  className="flex-[0_0_100%] min-w-0 md:flex-[0_0_50%] lg:flex-[0_0_33.333%] px-2"
+                >
+                  <div className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
+                    <div className="aspect-[4/3] overflow-hidden">
+                      <img
+                        src={image.imageUrl}
+                        alt={image.altText || image.title}
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent">
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="text-white font-heading font-semibold text-lg mb-1">
+                          {image.title}
+                        </h3>
+                        {image.description && (
+                          <p className="text-white/80 text-sm font-body line-clamp-2">
+                            {image.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation Arrows */}
+          <button
+            onClick={scrollPrev}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-foreground rounded-full p-3 shadow-lg transition-all duration-200 z-10"
+            aria-label="Previous image"
+          >
+            <ArrowRight className="h-5 w-5 rotate-180" />
+          </button>
+          <button
+            onClick={scrollNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white text-foreground rounded-full p-3 shadow-lg transition-all duration-200 z-10"
+            aria-label="Next image"
+          >
+            <ArrowRight className="h-5 w-5" />
+          </button>
+
+          {/* Dot Indicators */}
+          <div className="flex justify-center gap-2 mt-6">
+            {images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => emblaApi?.scrollTo(index)}
+                className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                  index === selectedIndex
+                    ? "bg-primary w-6"
+                    : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function LandingPage() {
   const [currentPromo, setCurrentPromo] = useState(0);
@@ -682,49 +790,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Gallery Section */}
+      {/* Gallery Carousel Section */}
       {galleryImages && galleryImages.length > 0 && (
-        <section className="py-16 px-4 bg-gradient-to-br from-muted/30 to-background">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
-                Our Wellness Space
-              </h2>
-              <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
-                Step inside Wolf Mother Wellness and discover a sanctuary designed for relaxation and rejuvenation.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {galleryImages.map((image) => (
-                <div
-                  key={image.id}
-                  className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                >
-                  <div className="aspect-[4/3] overflow-hidden">
-                    <img
-                      src={image.imageUrl}
-                      alt={image.altText || image.title}
-                      className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-heading font-semibold text-lg mb-1">
-                        {image.title}
-                      </h3>
-                      {image.description && (
-                        <p className="text-white/80 text-sm font-body line-clamp-2">
-                          {image.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <GalleryCarousel images={galleryImages} />
       )}
 
       {/* Promotions Carousel */}

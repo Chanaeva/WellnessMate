@@ -41,9 +41,13 @@ interface CheckoutPaymentFormProps {
   promoCode?: { code: string } | null;
   onSuccess: (paymentIntentId: string) => void;
   onCancel?: () => void;
+  billingDetails?: {
+    name?: string;
+    email?: string;
+  };
 }
 
-export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel }: CheckoutPaymentFormProps) {
+export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel, billingDetails }: CheckoutPaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -146,6 +150,10 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel }: C
         const { error: setupError, setupIntent } = await stripe.confirmCardSetup(clientSecret, {
           payment_method: {
             card: cardNumberElement,
+            billing_details: billingDetails ? {
+              name: billingDetails.name,
+              email: billingDetails.email,
+            } : undefined,
           }
         });
 
@@ -178,6 +186,10 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel }: C
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardNumberElement,
+          billing_details: billingDetails ? {
+            name: billingDetails.name,
+            email: billingDetails.email,
+          } : undefined,
         }
       });
 

@@ -64,6 +64,7 @@ type ItemCheckout = {
   user?: {
     id: number;
     username: string;
+    email: string;
     firstName: string;
     lastName: string;
   };
@@ -82,6 +83,7 @@ type PaymentDialogData = {
   itemName: string;
   priceInCents: number;
   memberName: string;
+  memberEmail?: string;
   userId: number;
 };
 
@@ -113,6 +115,7 @@ interface InlinePaymentFormProps {
   quantity: number;
   totalPriceCents: number;
   memberName: string;
+  memberEmail?: string;
   itemName: string;
   onSuccess: (paymentIntentId: string) => void;
   onCancel: () => void;
@@ -129,6 +132,7 @@ function InlinePaymentFormContent({
   quantity,
   totalPriceCents,
   memberName,
+  memberEmail,
   itemName,
   onSuccess,
   onCancel,
@@ -202,6 +206,10 @@ function InlinePaymentFormContent({
         const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
           payment_method: {
             card: cardNumberElement,
+            billing_details: {
+              name: memberName,
+              email: memberEmail,
+            },
           }
         });
 
@@ -519,6 +527,7 @@ export default function StaffItems({ embedded = false }: StaffItemsProps) {
         itemName: `${checkout.item.name}${checkout.item.size ? ` (${checkout.item.size})` : ''}`,
         priceInCents: checkout.item.priceInCents,
         memberName: `${checkout.user.firstName} ${checkout.user.lastName}`,
+        memberEmail: checkout.user.email,
         userId: checkout.userId,
       });
     }
@@ -787,6 +796,7 @@ export default function StaffItems({ embedded = false }: StaffItemsProps) {
                     quantity={quantity}
                     totalPriceCents={totalPrice}
                     memberName={`${selectedMember.firstName} ${selectedMember.lastName}`}
+                    memberEmail={selectedMember.email}
                     itemName={`${selectedItem.name}${selectedItem.size ? ` (${selectedItem.size})` : ''}`}
                     onSuccess={handleCheckoutWithPayment}
                     onCancel={() => setShowInlinePayment(false)}
@@ -956,6 +966,7 @@ export default function StaffItems({ embedded = false }: StaffItemsProps) {
           itemName={paymentDialog.itemName}
           priceInCents={paymentDialog.priceInCents}
           memberName={paymentDialog.memberName}
+          memberEmail={paymentDialog.memberEmail}
           onSuccess={() => {
             setMemberPaymentStatus(prev => {
               const updated = { ...prev };

@@ -191,6 +191,10 @@ export default function CheckoutPage() {
                           data: item.data,
                         }))}
                         promoCode={promoCode}
+                        billingDetails={user ? {
+                          name: `${user.firstName} ${user.lastName}`,
+                          email: user.email,
+                        } : undefined}
                         onSuccess={(paymentIntentId) => {
                           setShowAddPaymentMethod(false);
                           const hasMembers = items.some(
@@ -240,6 +244,10 @@ export default function CheckoutPage() {
                           data: item.data,
                         }))}
                         promoCode={promoCode}
+                        billingDetails={user ? {
+                          name: `${user.firstName} ${user.lastName}`,
+                          email: user.email,
+                        } : undefined}
                         onSuccess={(paymentIntentId) => {
                           const hasMembers = items.some(
                             (item) => item.type === "membership",

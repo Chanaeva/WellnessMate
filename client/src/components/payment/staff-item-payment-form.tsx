@@ -38,11 +38,12 @@ interface StaffItemPaymentFormProps {
   itemName: string;
   priceInCents: number;
   memberName: string;
+  memberEmail?: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-function PaymentFormContent({ checkoutId, itemName, priceInCents, memberName, onSuccess, onCancel }: StaffItemPaymentFormProps) {
+function PaymentFormContent({ checkoutId, itemName, priceInCents, memberName, memberEmail, onSuccess, onCancel }: StaffItemPaymentFormProps) {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -94,6 +95,10 @@ function PaymentFormContent({ checkoutId, itemName, priceInCents, memberName, on
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: cardNumberElement,
+          billing_details: {
+            name: memberName,
+            email: memberEmail,
+          },
         }
       });
 
@@ -213,6 +218,7 @@ interface StaffItemPaymentDialogProps {
   itemName: string;
   priceInCents: number;
   memberName: string;
+  memberEmail?: string;
   onSuccess: () => void;
   onClose: () => void;
 }
@@ -223,6 +229,7 @@ export function StaffItemPaymentDialog({
   itemName, 
   priceInCents, 
   memberName, 
+  memberEmail,
   onSuccess, 
   onClose 
 }: StaffItemPaymentDialogProps) {
@@ -244,6 +251,7 @@ export function StaffItemPaymentDialog({
             itemName={itemName}
             priceInCents={priceInCents}
             memberName={memberName}
+            memberEmail={memberEmail}
             onSuccess={onSuccess}
             onCancel={onClose}
           />

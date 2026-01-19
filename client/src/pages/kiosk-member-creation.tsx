@@ -72,7 +72,6 @@ type MemberFormData = z.infer<typeof memberFormSchema>;
 // Agreement form schema
 const agreementFormSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of birth is required"),
-  address: z.string().min(1, "Address is required"),
   emergencyContact: z.string().min(1, "Emergency contact name is required"),
   emergencyPhone: z.string().min(1, "Emergency contact phone is required"),
   healthConfirmation: z.boolean().refine(val => val === true, "You must confirm your health status"),
@@ -98,7 +97,6 @@ function AgreementForm({
     resolver: zodResolver(agreementFormSchema),
     defaultValues: {
       dateOfBirth: "",
-      address: "",
       emergencyContact: "",
       emergencyPhone: "",
       healthConfirmation: false,
@@ -154,20 +152,6 @@ function AgreementForm({
                     <FormLabel>Date of Birth *</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} data-testid="input-dob" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Address *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter your full address" {...field} data-testid="input-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

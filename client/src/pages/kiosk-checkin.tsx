@@ -232,13 +232,21 @@ export default function KioskCheckIn() {
     setScanResult(null);
     setPendingMembershipId(null);
     setManualSearchTerm("");
-    setScannerMode('waiting');
     
-    // Re-initialize scanner after a delay to ensure cleanup is complete
-    setTimeout(() => {
-      initializeScanner();
-    }, 500);
+    // Set mode to scanning - the useEffect will handle initialization
+    setScannerMode('scanning');
   };
+
+  // Initialize scanner when mode changes to 'scanning'
+  useEffect(() => {
+    if (scannerMode === 'scanning' && scannerRef.current && !scanner) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        initializeScanner();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [scannerMode]);
 
   // Cleanup scanner and timers on component unmount
   useEffect(() => {
@@ -314,7 +322,7 @@ export default function KioskCheckIn() {
                 </p>
                 <Button 
                   size="lg" 
-                  onClick={initializeScanner}
+                  onClick={() => setScannerMode('scanning')}
                   className="bg-primary hover:bg-primary/90 text-white px-12 py-6 text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                   data-testid="button-scan-qr"
                 >

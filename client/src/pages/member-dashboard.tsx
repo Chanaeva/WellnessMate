@@ -11,6 +11,7 @@ import {
   Payment,
   SessionConfig,
   SessionBooking,
+  HoursOfOperation,
 } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -187,6 +188,21 @@ export default function MemberDashboard() {
     queryKey: ["/api/session-bookings"],
     enabled: !!user,
   });
+
+  // Fetch hours of operation to check for closed days
+  const { data: hoursOfOperation = [] } = useQuery<HoursOfOperation[]>({
+    queryKey: ["/api/hours-of-operation"],
+    enabled: !!user,
+  });
+
+  // Helper function to check if a date is closed
+  const isDateClosed = (dateString: string): boolean => {
+    const date = new Date(dateString + 'T12:00:00');
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = dayNames[date.getDay()];
+    const dayHours = hoursOfOperation.find(h => h.dayOfWeek === dayOfWeek);
+    return dayHours?.isClosed ?? false;
+  };
   
   // Fetch billing info from Stripe (for correct next billing date)
   const { data: billingInfo } = useQuery<{
@@ -585,6 +601,15 @@ export default function MemberDashboard() {
                   </div>
 
                   {/* Session Cards */}
+                  {isDateClosed(selectedBookingDate) ? (
+                    <div className="text-center py-8 bg-muted/50 rounded-lg border border-dashed">
+                      <XCircle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-lg font-medium text-muted-foreground">Closed</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        We are closed on this day. Please select a different date.
+                      </p>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {availableSessions.map((session) => {
                       const existingBooking = mySessionBookings.find(
@@ -661,6 +686,7 @@ export default function MemberDashboard() {
                       );
                     })}
                   </div>
+                  )}
 
                   {/* Upcoming Bookings */}
                   {mySessionBookings.filter(b => b.status !== 'cancelled' && new Date(b.bookingDate) >= new Date(format(new Date(), 'yyyy-MM-dd'))).length > 0 && (

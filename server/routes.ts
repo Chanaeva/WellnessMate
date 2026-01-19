@@ -886,11 +886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
       
       // Determine if user is using a day pass (explicitly or implicitly)
-      const willUseDayPass = useDayPass === true || 
-        ((!membership || membership.status !== 'active') && activeDayPasses.length > 0);
+      const hasActiveMembership = membership && membership.status === 'active';
+      const hasDayPasses = activeDayPasses.length > 0;
+      const willUseDayPass = useDayPass === true || (!hasActiveMembership && hasDayPasses);
       
-      if (willUseDayPass && useDayPass !== undefined) {
-        // Day pass user - check day pass hours instead of session booking
+      // Day pass users (explicit choice or day-pass-only users) must check in during day pass hours
+      if (willUseDayPass) {
         const dayPassHoursConfig = await storage.getDayPassHours();
         
         if (dayPassHoursConfig && dayPassHoursConfig.isEnabled) {
@@ -905,65 +906,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         // Day pass hours check passed or not configured - allow check-in
-      } else if (!willUseDayPass || useDayPass === undefined) {
-        // Monthly member - check session booking requirement
-        const sessionConfigs = await storage.getAllSessionConfigs();
-        const enabledSessions = sessionConfigs.filter(s => s.isEnabled);
-        
-        if (enabledSessions.length > 0 && membership && membership.status === 'active') {
-          // Sessions are configured - check if user has a booking for today
-          const today = new Date().toISOString().split('T')[0];
-          
-          // Find which session is currently active
-          let currentSession: 'morning' | 'evening' | null = null;
-          for (const session of enabledSessions) {
-            const sessionStartMinutes = parseTimeToMinutes(session.startTime);
-            const sessionEndMinutes = parseTimeToMinutes(session.endTime);
-            
-            if (currentTimeMinutes >= sessionStartMinutes && currentTimeMinutes < sessionEndMinutes) {
-              currentSession = session.sessionType as 'morning' | 'evening';
-              break;
-            }
-          }
-          
-          if (currentSession) {
-            // Check if user has a booking for the current session
-            const hasBooking = await storage.hasUserBookedSession(user.id, today, currentSession);
-            
-            if (!hasBooking) {
-              const sessionConfig = sessionConfigs.find(s => s.sessionType === currentSession);
-              return res.status(400).json({
-                success: false,
-                requiresBooking: true,
-                sessionType: currentSession,
-                message: `Session booking required. The ${currentSession} session (${sessionConfig?.startTime} - ${sessionConfig?.endTime}) is currently active. Please book this session from your member dashboard before checking in.`
-              });
-            }
-          } else {
-            // No session is currently active - check if day pass hours apply
-            const dayPassHoursConfig = await storage.getDayPassHours();
-            if (dayPassHoursConfig && dayPassHoursConfig.isEnabled) {
-              const dayPassStart = parseTimeToMinutes(dayPassHoursConfig.startTime);
-              const dayPassEnd = parseTimeToMinutes(dayPassHoursConfig.endTime);
-              
-              // If within day pass hours, that's fine for members too
-              if (currentTimeMinutes < dayPassStart || currentTimeMinutes >= dayPassEnd) {
-                const sessionTimes = enabledSessions.map(s => `${s.sessionType}: ${s.startTime} - ${s.endTime}`).join(', ');
-                return res.status(400).json({
-                  success: false,
-                  message: `No session is currently active. Member sessions: ${sessionTimes}. Please check back during session hours.`
-                });
-              }
-            } else {
-              const sessionTimes = enabledSessions.map(s => `${s.sessionType}: ${s.startTime} - ${s.endTime}`).join(', ');
-              return res.status(400).json({
-                success: false,
-                message: `No session is currently active. Available sessions are: ${sessionTimes}. Please check back during session hours.`
-              });
-            }
-          }
-        }
       }
+      // Members with active membership can check in anytime - no booking requirement
       
       // If user has both membership and day passes, ask which to use
       if ((membership && membership.status === 'active') && activeDayPasses.length > 0 && useDayPass === undefined) {

@@ -569,7 +569,7 @@ export default function MemberDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Reserve your spot for a morning or evening session. A booking is required for facility access.
+                    Reserve your spot for a morning or evening session to secure your preferred time.
                   </p>
                   
                   {/* Date Selector */}

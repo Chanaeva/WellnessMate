@@ -237,7 +237,7 @@ export default function AdminSessions() {
                 </div>
                 <Button 
                   variant="outline" 
-                  className="w-full"
+                  className="w-full min-h-[44px] touch-manipulation"
                   onClick={() => morningSession && startEditing(morningSession)}
                 >
                   Edit Session
@@ -334,7 +334,7 @@ export default function AdminSessions() {
                 </div>
                 <Button 
                   variant="outline" 
-                  className="w-full"
+                  className="w-full min-h-[44px] touch-manipulation"
                   onClick={() => eveningSession && startEditing(eveningSession)}
                 >
                   Edit Session
@@ -421,7 +421,7 @@ export default function AdminSessions() {
               </p>
               <Button 
                 variant="outline" 
-                className="w-full"
+                className="w-full min-h-[44px] touch-manipulation"
                 onClick={startEditingDayPass}
               >
                 Edit Day Pass Hours
@@ -433,13 +433,13 @@ export default function AdminSessions() {
 
       <Card>
         <CardHeader>
-          <CardTitle>How Session Booking Works</CardTitle>
+          <CardTitle>How Sessions Work</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-muted-foreground">
-          <p>Members can book one session per day from their dashboard.</p>
-          <p>Each session has a maximum capacity to ensure a quality experience.</p>
-          <p>Disabled sessions will not be available for booking.</p>
-          <p>Members must have a booking to check in during session hours.</p>
+          <p>Sessions help organize facility capacity throughout the day.</p>
+          <p>Members can optionally book sessions to reserve their spot.</p>
+          <p>Disabled sessions will not be shown to members.</p>
+          <p className="font-medium text-foreground">Members can check in anytime during operating hours.</p>
           <p className="font-medium text-foreground">Day pass users can check in during day pass hours without booking.</p>
         </CardContent>
       </Card>

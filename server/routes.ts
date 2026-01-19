@@ -1,5 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
+import path from "path";
 import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -31,6 +33,9 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve attached_assets as static files
+  app.use("/attached_assets", express.static(path.join(process.cwd(), "attached_assets")));
+  
   // Setup Stripe webhooks
   setupStripeWebhooks(app);
   

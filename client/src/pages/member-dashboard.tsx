@@ -406,7 +406,7 @@ export default function MemberDashboard() {
   const bookSessionMutation = useMutation({
     mutationFn: async ({ date, sessionType }: { date: string; sessionType: 'morning' | 'evening' }) => {
       const response = await apiRequest("POST", "/api/session-bookings", {
-        date,
+        bookingDate: date,
         sessionType,
       });
       if (!response.ok) {

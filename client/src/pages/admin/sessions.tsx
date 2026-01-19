@@ -91,14 +91,24 @@ export default function AdminSessions() {
   const morningSession = sessions?.find(s => s.sessionType === 'morning');
   const eveningSession = sessions?.find(s => s.sessionType === 'evening');
 
-  const startEditing = (session: SessionConfig) => {
-    setEditingSession(session.sessionType as 'morning' | 'evening');
-    setFormData({
-      startTime: session.startTime,
-      endTime: session.endTime,
-      capacity: session.capacity,
-      isEnabled: session.isEnabled,
-    });
+  const startEditing = (session: SessionConfig | null, sessionType: 'morning' | 'evening') => {
+    setEditingSession(sessionType);
+    if (session) {
+      setFormData({
+        startTime: session.startTime,
+        endTime: session.endTime,
+        capacity: session.capacity,
+        isEnabled: session.isEnabled,
+      });
+    } else {
+      // Default values for creating new session
+      setFormData({
+        startTime: sessionType === 'morning' ? '7:00 AM' : '4:00 PM',
+        endTime: sessionType === 'morning' ? '12:00 PM' : '9:00 PM',
+        capacity: 20,
+        isEnabled: true,
+      });
+    }
   };
 
   const startEditingDayPass = () => {
@@ -225,22 +235,30 @@ export default function AdminSessions() {
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2 text-lg">
-                  <Clock className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-semibold">{morningSession?.startTime}</span>
-                  <span className="text-muted-foreground">to</span>
-                  <span className="font-semibold">{morningSession?.endTime}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-muted-foreground" />
-                  <span>Capacity: <strong>{morningSession?.capacity}</strong> members</span>
-                </div>
+                {morningSession ? (
+                  <>
+                    <div className="flex items-center gap-2 text-lg">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-semibold">{morningSession.startTime}</span>
+                      <span className="text-muted-foreground">to</span>
+                      <span className="font-semibold">{morningSession.endTime}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                      <span>Capacity: <strong>{morningSession.capacity}</strong> members</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">
+                    Session not configured yet. Click below to set up.
+                  </p>
+                )}
                 <Button 
                   variant="outline" 
                   className="w-full min-h-[44px] touch-manipulation"
-                  onClick={() => morningSession && startEditing(morningSession)}
+                  onClick={() => startEditing(morningSession || null, 'morning')}
                 >
-                  Edit Session
+                  {morningSession ? 'Edit Session' : 'Configure Session'}
                 </Button>
               </>
             )}
@@ -322,22 +340,30 @@ export default function AdminSessions() {
               </>
             ) : (
               <>
-                <div className="flex items-center gap-2 text-lg">
-                  <Clock className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-semibold">{eveningSession?.startTime}</span>
-                  <span className="text-muted-foreground">to</span>
-                  <span className="font-semibold">{eveningSession?.endTime}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-muted-foreground" />
-                  <span>Capacity: <strong>{eveningSession?.capacity}</strong> members</span>
-                </div>
+                {eveningSession ? (
+                  <>
+                    <div className="flex items-center gap-2 text-lg">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-semibold">{eveningSession.startTime}</span>
+                      <span className="text-muted-foreground">to</span>
+                      <span className="font-semibold">{eveningSession.endTime}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                      <span>Capacity: <strong>{eveningSession.capacity}</strong> members</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-center py-4">
+                    Session not configured yet. Click below to set up.
+                  </p>
+                )}
                 <Button 
                   variant="outline" 
                   className="w-full min-h-[44px] touch-manipulation"
-                  onClick={() => eveningSession && startEditing(eveningSession)}
+                  onClick={() => startEditing(eveningSession || null, 'evening')}
                 >
-                  Edit Session
+                  {eveningSession ? 'Edit Session' : 'Configure Session'}
                 </Button>
               </>
             )}

@@ -184,7 +184,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="members" className="flex-shrink-0">Members</TabsTrigger>
             <TabsTrigger value="staff" className="flex-shrink-0">Staff</TabsTrigger>
             <TabsTrigger value="sessions" className="flex-shrink-0">Sessions</TabsTrigger>
-            <TabsTrigger value="session-bookings" className="flex-shrink-0">Session Bookings</TabsTrigger>
             <TabsTrigger value="item-checkout" className="flex-shrink-0">Item Checkout</TabsTrigger>
             <TabsTrigger value="packages" className="flex-shrink-0">Packages</TabsTrigger>
             <TabsTrigger value="inventory" className="flex-shrink-0">Inventory</TabsTrigger>
@@ -383,13 +382,9 @@ export default function AdminDashboard() {
             <AdminStaffManagement />
           </TabsContent>
 
-          {/* Sessions Tab */}
-          <TabsContent value="sessions" className="space-y-6">
+          {/* Sessions Tab - Combined Sessions & Bookings */}
+          <TabsContent value="sessions" className="space-y-8">
             <AdminSessions />
-          </TabsContent>
-
-          {/* Session Bookings Tab */}
-          <TabsContent value="session-bookings" className="space-y-6">
             <AdminSessionBookings />
           </TabsContent>
 

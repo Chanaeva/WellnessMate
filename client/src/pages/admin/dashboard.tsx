@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { User, Membership, CheckIn, PunchCard, insertUserSchema } from "@shared/schema";
+import { User, Membership, CheckIn, insertUserSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +25,7 @@ import {
   CheckCircle,
   DollarSign,
   Monitor,
-  ExternalLink,
-  Ticket
+  ExternalLink
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -105,13 +104,6 @@ export default function AdminDashboard() {
     },
   });
 
-  const { data: dayPassHolders = [] } = useQuery<(PunchCard & { user?: User })[]>({
-    queryKey: ["/api/admin/day-pass-holders"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/admin/day-pass-holders");
-      return res.json();
-    },
-  });
 
   // Form for adding new member
   const newMemberForm = useForm<NewMemberFormData>({
@@ -251,63 +243,6 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Active Day Pass Holders Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Ticket className="h-5 w-5 mr-2" />
-                  Active Day Pass Holders
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Members with remaining day passes
-                </p>
-              </CardHeader>
-              <CardContent>
-                {dayPassHolders.length === 0 ? (
-                  <div className="text-center py-6">
-                    <Ticket className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No active day pass holders</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Pass Type</TableHead>
-                          <TableHead className="text-right">Remaining</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dayPassHolders.slice(0, 10).map((holder) => (
-                          <TableRow key={holder.id}>
-                            <TableCell className="font-medium">
-                              {holder.user?.firstName} {holder.user?.lastName}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {holder.user?.email}
-                            </TableCell>
-                            <TableCell>{holder.name}</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">
-                                {holder.remainingPunches} / {holder.totalPunches}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {dayPassHolders.length > 10 && (
-                      <p className="text-center text-sm text-muted-foreground pt-3">
-                        +{dayPassHolders.length - 10} more holders
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* Kiosk Section */}
             <div className="grid gap-6 md:grid-cols-2">

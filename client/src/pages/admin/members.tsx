@@ -8,6 +8,7 @@ import {
   insertMembershipSchema,
   CheckIn,
   Payment,
+  PunchCard,
 } from "@shared/schema";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
@@ -66,6 +67,7 @@ import {
   CreditCard,
   Activity,
   AlertCircle,
+  Ticket,
 } from "lucide-react";
 import {
   Select,

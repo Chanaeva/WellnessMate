@@ -313,6 +313,30 @@ export default function AdminCardReaders() {
                   </p>
                 </div>
               )}
+
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="pt-4">
+                  <div className="flex gap-3">
+                    <CreditCard className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-amber-900">Using a Stripe Reader M2 (Bluetooth)?</p>
+                      <p className="text-sm text-amber-800 mt-1">
+                        The M2 reader connects via Bluetooth and must be paired through the Stripe Dashboard or a mobile app. 
+                        Browser-based discovery only works with WiFi readers (WisePOS E, S700).
+                      </p>
+                      <p className="text-sm text-amber-800 mt-2">
+                        <strong>To pair your M2:</strong>
+                      </p>
+                      <ol className="text-sm text-amber-800 mt-1 list-decimal list-inside space-y-1">
+                        <li>Go to <a href="https://dashboard.stripe.com/terminal/readers" target="_blank" rel="noopener noreferrer" className="underline font-medium">Stripe Dashboard → Readers</a></li>
+                        <li>Click "Register a reader"</li>
+                        <li>Enter the registration code shown on your M2 screen</li>
+                        <li>Once registered, use the M2 with the Stripe mobile app or iPad POS</li>
+                      </ol>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           )}
         </CardContent>

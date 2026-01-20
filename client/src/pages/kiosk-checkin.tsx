@@ -81,6 +81,7 @@ export default function KioskCheckIn() {
   const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-drop-in'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
+  const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [manualSearchTerm, setManualSearchTerm] = useState("");
   const { toast } = useToast();
   const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -144,7 +145,11 @@ export default function KioskCheckIn() {
   });
 
   const confirmCheckIn = (useDayPass: boolean) => {
-    if (pendingMembershipId) {
+    if (pendingUserId) {
+      // Day pass user - use userId
+      checkInMutation.mutate({ userId: pendingUserId, useDayPass });
+    } else if (pendingMembershipId) {
+      // Membership user - use membershipId
       checkInMutation.mutate({ membershipId: pendingMembershipId, useDayPass });
     }
   };
@@ -159,6 +164,7 @@ export default function KioskCheckIn() {
     setScannerMode('waiting');
     setScanResult(null);
     setPendingMembershipId(null);
+    setPendingUserId(null);
     setManualSearchTerm("");
   };
 
@@ -172,6 +178,7 @@ export default function KioskCheckIn() {
     // Reset all state and go back to waiting
     setScanResult(null);
     setPendingMembershipId(null);
+    setPendingUserId(null);
     setManualSearchTerm("");
     setScannerMode('waiting');
   };
@@ -328,10 +335,12 @@ export default function KioskCheckIn() {
                           onClick={() => {
                             if (member.membershipId) {
                               setPendingMembershipId(member.membershipId);
+                              setPendingUserId(null);
                               checkInMutation.mutate({ membershipId: member.membershipId });
                             } else if (member.dayPassesRemaining > 0) {
                               // Day pass user without membership - check in by userId
-                              setPendingMembershipId(`user-${member.id}`);
+                              setPendingMembershipId(null);
+                              setPendingUserId(member.id);
                               checkInMutation.mutate({ userId: member.id });
                             } else {
                               toast({

@@ -38,13 +38,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/attached_assets", express.static(path.join(process.cwd(), "attached_assets")));
   
   // File upload endpoint for gallery images (admin only)
-  app.post("/api/admin/upload-image", express.raw({ type: 'image/*', limit: '10mb' }), async (req, res) => {
+  app.post("/api/admin/upload-image", express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/*'], limit: '10mb' }), async (req, res) => {
     if (!req.isAuthenticated() || req.user?.role !== 'admin') {
       return res.sendStatus(403);
     }
     
     try {
       const contentType = req.headers['content-type'] || 'image/jpeg';
+      console.log('Upload request - Content-Type:', contentType, 'Body type:', typeof req.body, 'Body length:', req.body?.length || 0);
+      
+      // Check if body is valid
+      if (!req.body || (Buffer.isBuffer(req.body) && req.body.length === 0)) {
+        console.error('Upload error: Empty body received');
+        return res.status(400).json({ message: 'No image data received. Please try again.' });
+      }
+      
       const extension = contentType.includes('png') ? 'png' : 
                        contentType.includes('gif') ? 'gif' : 
                        contentType.includes('webp') ? 'webp' : 'jpg';
@@ -60,11 +68,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = path.join(uploadDir, filename);
       fs.writeFileSync(filePath, req.body);
       
+      console.log('Image uploaded successfully:', filePath);
       const imageUrl = `/attached_assets/gallery/${filename}`;
       res.json({ success: true, imageUrl });
     } catch (error: any) {
       console.error('Image upload error:', error);
-      res.status(500).json({ message: 'Failed to upload image' });
+      res.status(500).json({ message: 'Failed to upload image: ' + error.message });
     }
   });
   

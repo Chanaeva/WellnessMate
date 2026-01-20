@@ -63,12 +63,12 @@ export default function AdminGallery() {
 
     setIsUploading(true);
     try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('image', file);
+      
       const response = await fetch('/api/admin/upload-image', {
         method: 'POST',
-        headers: {
-          'Content-Type': file.type,
-        },
-        body: file,
+        body: uploadFormData,
         credentials: 'include',
       });
 

@@ -12,8 +12,22 @@ import { stripe, createStripeClient, STRIPE_CONFIG, formatAmountForStripe, forma
 import { setupStripeWebhooks } from "./stripe-webhooks";
 import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
+import multer from "multer";
 
 const scryptAsync = promisify(scrypt);
+
+// Configure multer for file uploads
+const galleryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 import { 
   insertMembershipSchema, 
   insertCheckInSchema, 
@@ -44,7 +58,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
   // File upload endpoint for gallery images (admin only) - MUST be after setupAuth
-  app.post("/api/admin/upload-image", express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/*'], limit: '10mb' }), async (req, res) => {
+  // Uses multer middleware which properly preserves session/auth unlike express.raw()
+  app.post("/api/admin/upload-image", galleryUpload.single('image'), async (req, res) => {
     console.log('Upload request - isAuthenticated:', req.isAuthenticated?.(), 'user:', req.user?.email, 'role:', req.user?.role);
     if (!req.isAuthenticated || !req.isAuthenticated() || req.user?.role !== 'admin') {
       console.log('Upload denied - auth check failed');
@@ -52,18 +67,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const contentType = req.headers['content-type'] || 'image/jpeg';
-      console.log('Upload request - Content-Type:', contentType, 'Body type:', typeof req.body, 'Body length:', req.body?.length || 0);
+      const file = req.file;
+      console.log('Upload request - file:', file?.originalname, 'mimetype:', file?.mimetype, 'size:', file?.size);
       
-      // Check if body is valid
-      if (!req.body || (Buffer.isBuffer(req.body) && req.body.length === 0)) {
-        console.error('Upload error: Empty body received');
+      // Check if file is valid
+      if (!file || !file.buffer || file.buffer.length === 0) {
+        console.error('Upload error: No file received');
         return res.status(400).json({ message: 'No image data received. Please try again.' });
       }
       
-      const extension = contentType.includes('png') ? 'png' : 
-                       contentType.includes('gif') ? 'gif' : 
-                       contentType.includes('webp') ? 'webp' : 'jpg';
+      const extension = file.mimetype.includes('png') ? 'png' : 
+                       file.mimetype.includes('gif') ? 'gif' : 
+                       file.mimetype.includes('webp') ? 'webp' : 'jpg';
       
       const filename = `gallery_${Date.now()}_${randomBytes(4).toString('hex')}.${extension}`;
       const uploadDir = path.join(process.cwd(), 'attached_assets', 'gallery');
@@ -74,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const filePath = path.join(uploadDir, filename);
-      fs.writeFileSync(filePath, req.body);
+      fs.writeFileSync(filePath, file.buffer);
       
       console.log('Image uploaded successfully:', filePath);
       const imageUrl = `/attached_assets/gallery/${filename}`;

@@ -34,6 +34,9 @@ async function comparePasswords(supplied: string, stored: string) {
 export function setupAuth(app: Express) {
   const sessionSecret = process.env.SESSION_SECRET || "wellness-center-secret";
   
+  // In Replit environment, even dev mode is served over HTTPS via proxy
+  const isReplit = !!process.env.REPL_ID || !!process.env.REPLIT_DEV_DOMAIN;
+  
   const sessionSettings: session.SessionOptions = {
     secret: sessionSecret,
     resave: false,
@@ -41,8 +44,9 @@ export function setupAuth(app: Express) {
     store: storage.sessionStore,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24, // 1 day
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      // Always use secure cookies in Replit (even dev is HTTPS)
+      secure: isReplit || process.env.NODE_ENV === "production",
+      sameSite: "lax",
       httpOnly: true
     }
   };

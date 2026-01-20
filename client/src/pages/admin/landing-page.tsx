@@ -590,6 +590,10 @@ export default function LandingPageManagement() {
         <TabsList>
           <TabsTrigger value="content">Page Content</TabsTrigger>
           <TabsTrigger value="promotions">Promotions</TabsTrigger>
+          <TabsTrigger value="gallery">
+            <Image className="h-4 w-4 mr-1" />
+            Image Carousel
+          </TabsTrigger>
           <TabsTrigger value="settings">Site Settings</TabsTrigger>
         </TabsList>
 
@@ -1150,6 +1154,11 @@ export default function LandingPageManagement() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Gallery/Image Carousel Tab */}
+        <TabsContent value="gallery" className="space-y-6">
+          <AdminGallery />
         </TabsContent>
 
         {/* Site Settings Tab */}

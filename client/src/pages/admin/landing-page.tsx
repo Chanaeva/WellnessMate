@@ -27,8 +27,10 @@ import {
   Clock,
   Building2,
   Copyright,
-  Instagram
+  Instagram,
+  Image
 } from "lucide-react";
+import AdminGallery from "./gallery";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";

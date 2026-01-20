@@ -30,7 +30,9 @@ import { z } from "zod";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
-  CardElement,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
@@ -573,6 +575,33 @@ function PaymentForm({
   const [readerMessage, setReaderMessage] = useState<string>('');
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [connectedReader, setConnectedReader] = useState<any>(null);
+  const [billingZip, setBillingZip] = useState('');
+  const [cardError, setCardError] = useState<string | null>(null);
+  
+  // Card element styling to match checkout form
+  const elementOptions = {
+    style: {
+      base: {
+        fontSize: '18px',
+        color: '#1f2937',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        lineHeight: '1.5',
+        '::placeholder': {
+          color: '#6b7280',
+        },
+        iconColor: '#374151',
+        padding: '16px 0',
+      },
+      invalid: {
+        color: '#ef4444',
+        iconColor: '#ef4444',
+      },
+      complete: {
+        color: '#059669',
+        iconColor: '#059669',
+      },
+    },
+  };
   
   // Calculate final price with discount
   const originalPrice = packageData.price; // in cents
@@ -844,8 +873,13 @@ function PaymentForm({
     if (!stripe || !elements) return;
 
     setIsProcessing(true);
-    const cardElement = elements.getElement(CardElement);
-    if (!cardElement) return;
+    setCardError(null);
+    
+    const cardNumberElement = elements.getElement(CardNumberElement);
+    if (!cardNumberElement) {
+      setIsProcessing(false);
+      return;
+    }
 
     try {
       const response = await apiRequest(
@@ -873,11 +907,14 @@ function PaymentForm({
         clientSecret,
         {
           payment_method: {
-            card: cardElement,
+            card: cardNumberElement,
             billing_details: {
               name: `${memberData.firstName} ${memberData.lastName}`,
               email: memberData.email,
               phone: memberData.phoneNumber,
+              address: {
+                postal_code: billingZip,
+              },
             },
           },
         },
@@ -1072,38 +1109,89 @@ function PaymentForm({
         </div>
       ) : (
         <form onSubmit={handleManualPayment} className="space-y-6">
-          <div className="p-6 border rounded-lg">
-            <Label className="text-sm font-medium mb-4 block">
-              Card Information
-            </Label>
-            <CardElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: "18px",
-                    color: "#424770",
-                    "::placeholder": {
-                      color: "#aab7c4",
-                    },
-                  },
-                },
-              }}
-            />
-          </div>
+          <Card className="bg-white border-gray-200 shadow-lg">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-xl text-gray-900 flex items-center justify-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Enter Payment Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-base font-medium text-gray-900 block">Card Number</Label>
+                  <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                    <CardNumberElement 
+                      options={elementOptions} 
+                      onChange={(e) => {
+                        if (e.error) {
+                          setCardError(e.error.message);
+                        } else {
+                          setCardError(null);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium text-gray-900 block">Expiry Date</Label>
+                    <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                      <CardExpiryElement options={elementOptions} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium text-gray-900 block">CVC</Label>
+                    <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                      <CardCvcElement options={elementOptions} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium text-gray-900 block">ZIP Code</Label>
+                    <Input
+                      type="text"
+                      placeholder="12345"
+                      value={billingZip}
+                      onChange={(e) => setBillingZip(e.target.value)}
+                      className="h-[58px] text-lg bg-gray-50 border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/10"
+                      maxLength={10}
+                      data-testid="input-billing-zip"
+                    />
+                  </div>
+                </div>
+
+                {cardError && (
+                  <p className="text-sm text-red-600 mt-2">{cardError}</p>
+                )}
+
+                <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
+                  <Shield className="h-4 w-4" />
+                  <span>Your card information is securely processed by Stripe</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Button
             type="submit"
             disabled={!stripe || isProcessing}
-            className="w-full text-lg py-6"
+            className="w-full text-lg py-6 bg-primary hover:bg-primary/90"
+            size="lg"
             data-testid="button-pay"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Processing...
+                Processing Payment...
               </>
             ) : (
-              `Pay $${(finalPrice / 100).toFixed(2)}`
+              <>
+                <Shield className="h-5 w-5 mr-2" />
+                Pay ${(finalPrice / 100).toFixed(2)}
+              </>
             )}
           </Button>
         </form>

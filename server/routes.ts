@@ -233,6 +233,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(403).json({ message: "Forbidden" });
   };
 
+  // Admin or Staff middleware
+  const isAdminOrStaff = (req: any, res: any, next: any) => {
+    if (req.isAuthenticated() && (req.user.role === 'admin' || req.user.role === 'staff')) {
+      return next();
+    }
+    res.status(403).json({ message: "Forbidden" });
+  };
+
   // Admin-only: Create staff or admin account
   app.post("/api/admin/users", isAdmin, async (req, res) => {
     try {

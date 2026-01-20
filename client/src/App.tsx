@@ -29,6 +29,7 @@ import LandingPageManagement from "@/pages/admin/landing-page";
 import AdminStaffManagement from "@/pages/admin/staff-management";
 import AdminInventory from "@/pages/admin/inventory";
 import AdminSessions from "@/pages/admin/sessions";
+import AdminSessionBookings from "@/pages/admin/session-bookings";
 import AdminGallery from "@/pages/admin/gallery";
 
 import KioskCheckIn from "@/pages/kiosk-checkin";
@@ -92,6 +93,7 @@ function Router() {
       <ProtectedRoute path="/admin/staff-management" component={AdminStaffManagement} />
       <ProtectedRoute path="/admin/inventory" component={AdminInventory} />
       <ProtectedRoute path="/admin/sessions" component={AdminSessions} />
+      <ProtectedRoute path="/admin/session-bookings" component={AdminSessionBookings} />
       <ProtectedRoute path="/admin/gallery" component={AdminGallery} />
 
       <Route path="/kiosk" component={KioskCheckIn} />

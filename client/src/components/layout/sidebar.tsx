@@ -5,6 +5,7 @@ import {
   Users, 
   QrCode, 
   Calendar, 
+  CalendarCheck,
   CreditCard, 
   FileText, 
   Settings,
@@ -58,6 +59,11 @@ const Sidebar = ({ className }: SidebarProps) => {
       title: "Sessions",
       href: "/admin/sessions",
       icon: <Clock className="h-5 w-5" />
+    },
+    {
+      title: "Session Bookings",
+      href: "/admin/session-bookings",
+      icon: <CalendarCheck className="h-5 w-5" />
     },
     {
       title: "Inventory",

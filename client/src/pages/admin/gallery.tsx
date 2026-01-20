@@ -307,7 +307,7 @@ export default function AdminGallery() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-lg sm:max-w-md mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingImage ? "Edit Image" : "Add New Image"}</DialogTitle>
           </DialogHeader>
@@ -324,7 +324,7 @@ export default function AdminGallery() {
             <div className="space-y-2">
               <Label>Image *</Label>
               <div className="space-y-3">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -338,7 +338,7 @@ export default function AdminGallery() {
                     variant="outline"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   >
                     {isUploading ? (
                       <>
@@ -419,13 +419,14 @@ export default function AdminGallery() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={!formData.title || !formData.imageUrl || isPending}
+              className="w-full sm:w-auto"
             >
               {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {editingImage ? "Save Changes" : "Add Image"}

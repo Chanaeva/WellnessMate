@@ -3214,6 +3214,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual punch deduction (without check-in) for staff/admin
+  app.post("/api/admin/manual-punch-deduction", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const { userId, reason } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      const punchCards = await storage.getPunchCardsByUserId(userId);
+      const activeDayPasses = punchCards.filter(card => 
+        card.status === 'active' && card.remainingPunches > 0
+      );
+      
+      if (activeDayPasses.length === 0) {
+        return res.status(400).json({ message: "No day passes available to deduct" });
+      }
+      
+      // Use the oldest day pass
+      const oldestDayPass = activeDayPasses.sort((a, b) => 
+        new Date(a.purchasedAt || new Date()).getTime() - new Date(b.purchasedAt || new Date()).getTime()
+      )[0];
+      
+      const updatedCard = await storage.usePunchCardEntry(oldestDayPass.id);
+      
+      console.log(`Manual punch deduction for user ${userId} by ${req.user.email}. Reason: ${reason || 'Not specified'}`);
+
+      res.status(200).json({ 
+        message: "Punch deducted successfully",
+        member: { 
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email 
+        },
+        remainingPunches: updatedCard.remainingPunches
+      });
+    } catch (error: any) {
+      console.error("Manual punch deduction error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin check-ins route with pagination
   app.get("/api/admin/check-ins", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') {

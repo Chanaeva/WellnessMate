@@ -7,10 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Search, Download, UserPlus, Ticket } from "lucide-react";
+import { Search, Download, UserPlus, Ticket, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface MemberSearchResult {
   id: number;
@@ -28,8 +30,12 @@ export default function AdminCheckIns() {
   const [pageSize] = useState(20);
   const [filterPeriod, setFilterPeriod] = useState("today");
   const [isManualCheckInOpen, setIsManualCheckInOpen] = useState(false);
+  const [isPunchDeductionOpen, setIsPunchDeductionOpen] = useState(false);
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
+  const [punchSearchTerm, setPunchSearchTerm] = useState("");
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+  const [selectedPunchMember, setSelectedPunchMember] = useState<MemberSearchResult | null>(null);
+  const [deductionReason, setDeductionReason] = useState("");
   const { toast } = useToast();
 
   const { data: checkInsData, isLoading } = useQuery({
@@ -55,6 +61,19 @@ export default function AdminCheckIns() {
     staleTime: 0,
   });
 
+  const { data: punchSearchResults, isLoading: isPunchSearching } = useQuery({
+    queryKey: ["/api/admin/member-search", punchSearchTerm],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/member-search?q=${encodeURIComponent(punchSearchTerm)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Search failed');
+      return await res.json();
+    },
+    enabled: punchSearchTerm.length >= 2,
+    staleTime: 0,
+  });
+
   const manualCheckInMutation = useMutation({
     mutationFn: async ({ userId, useDayPass }: { userId: number; useDayPass: boolean }) => {
       const res = await apiRequest("POST", "/api/admin/manual-checkin", { userId, useDayPass });
@@ -77,6 +96,30 @@ export default function AdminCheckIns() {
       toast({
         title: "Check-in Failed",
         description: error.message || "Failed to check in member",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const punchDeductionMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: number; reason: string }) => {
+      const res = await apiRequest("POST", "/api/admin/manual-punch-deduction", { userId, reason });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Punch Deducted",
+        description: `Successfully deducted 1 punch from ${selectedPunchMember?.firstName}'s day pass. ${data.remainingPunches} punches remaining.`,
+      });
+      setIsPunchDeductionOpen(false);
+      setSelectedPunchMember(null);
+      setPunchSearchTerm("");
+      setDeductionReason("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Punch Deduction Failed",
+        description: error.message || "Failed to deduct punch",
         variant: "destructive",
       });
     },
@@ -127,6 +170,12 @@ export default function AdminCheckIns() {
     }
   };
 
+  const handlePunchDeduction = () => {
+    if (selectedPunchMember) {
+      punchDeductionMutation.mutate({ userId: selectedPunchMember.id, reason: deductionReason });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -135,7 +184,7 @@ export default function AdminCheckIns() {
           <p className="text-slate-600">Wolf Mother Wellness Check-in Management</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Today's Total</CardTitle>
@@ -183,6 +232,21 @@ export default function AdminCheckIns() {
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 Check In Member
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-800">Punch Day Pass</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => setIsPunchDeductionOpen(true)}
+                className="w-full bg-amber-600 hover:bg-amber-700"
+              >
+                <Minus className="h-4 w-4 mr-2" />
+                Deduct Punch
               </Button>
             </CardContent>
           </Card>
@@ -434,6 +498,127 @@ export default function AdminCheckIns() {
               setIsManualCheckInOpen(false);
               setSelectedMember(null);
               setMemberSearchTerm("");
+            }}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPunchDeductionOpen} onOpenChange={setIsPunchDeductionOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manual Punch Deduction</DialogTitle>
+            <DialogDescription>
+              Deduct a punch from a member's day pass without creating a check-in record
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by name or email..."
+                value={punchSearchTerm}
+                onChange={(e) => {
+                  setPunchSearchTerm(e.target.value);
+                  setSelectedPunchMember(null);
+                }}
+                className="pl-10"
+              />
+            </div>
+
+            {isPunchSearching && (
+              <div className="text-center py-4 text-muted-foreground">
+                Searching...
+              </div>
+            )}
+
+            {punchSearchResults && punchSearchResults.length > 0 && !selectedPunchMember && (
+              <div className="border rounded-lg max-h-60 overflow-y-auto">
+                {punchSearchResults
+                  .filter((member: MemberSearchResult) => member.dayPassesRemaining > 0)
+                  .map((member: MemberSearchResult) => (
+                  <div
+                    key={member.id}
+                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                    onClick={() => setSelectedPunchMember(member)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{member.firstName} {member.lastName}</div>
+                        <div className="text-sm text-muted-foreground">{member.email}</div>
+                      </div>
+                      <Badge className="bg-amber-100 text-amber-800">
+                        <Ticket className="h-3 w-3 mr-1" />
+                        {member.dayPassesRemaining} passes
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                {punchSearchResults.filter((m: MemberSearchResult) => m.dayPassesRemaining > 0).length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No members with day passes found
+                  </div>
+                )}
+              </div>
+            )}
+
+            {punchSearchTerm.length >= 2 && punchSearchResults?.length === 0 && !isPunchSearching && (
+              <div className="text-center py-4 text-muted-foreground">
+                No members found
+              </div>
+            )}
+
+            {selectedPunchMember && (
+              <div className="border rounded-lg p-4 bg-amber-50">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="font-semibold text-lg">{selectedPunchMember.firstName} {selectedPunchMember.lastName}</div>
+                    <div className="text-sm text-muted-foreground">{selectedPunchMember.email}</div>
+                    <Badge className="bg-amber-100 text-amber-800 mt-2">
+                      <Ticket className="h-3 w-3 mr-1" />
+                      {selectedPunchMember.dayPassesRemaining} passes remaining
+                    </Badge>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedPunchMember(null)}>
+                    Change
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="reason">Reason (optional)</Label>
+                    <Textarea
+                      id="reason"
+                      placeholder="e.g., Check-in failed, system issue..."
+                      value={deductionReason}
+                      onChange={(e) => setDeductionReason(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <Button 
+                    className="w-full bg-amber-600 hover:bg-amber-700"
+                    onClick={handlePunchDeduction}
+                    disabled={punchDeductionMutation.isPending}
+                  >
+                    <Minus className="h-4 w-4 mr-2" />
+                    {punchDeductionMutation.isPending 
+                      ? "Deducting..." 
+                      : "Deduct 1 Punch"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsPunchDeductionOpen(false);
+              setSelectedPunchMember(null);
+              setPunchSearchTerm("");
+              setDeductionReason("");
             }}>
               Cancel
             </Button>

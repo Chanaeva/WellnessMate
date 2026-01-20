@@ -4803,7 +4803,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate agreement data
       const agreementSchema = z.object({
         dateOfBirth: z.string().min(1, "Date of birth is required"),
-        address: z.string().min(1, "Address is required"),
         emergencyContact: z.string().min(1, "Emergency contact is required"),
         emergencyPhone: z.string().min(1, "Emergency phone is required"),
         healthConfirmation: z.boolean().refine(val => val === true, "Health confirmation required"),
@@ -4841,7 +4840,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         membershipAgreementDate: new Date(),
         membershipAgreementData: agreementData,
         dateOfBirth: agreementData?.dateOfBirth,
-        address: agreementData?.address,
         emergencyContact: agreementData?.emergencyContact,
         emergencyPhone: agreementData?.emergencyPhone,
       });

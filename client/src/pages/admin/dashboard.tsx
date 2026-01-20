@@ -45,6 +45,7 @@ import LandingPageManagement from "./landing-page";
 import AdminStaffManagement from "./staff-management";
 import AdminInventory from "./inventory";
 import AdminSessions from "./sessions";
+import AdminSessionBookings from "./session-bookings";
 import StaffItems from "@/pages/staff-items";
 
 // Form schema for adding new member
@@ -249,6 +250,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="members" className="flex-shrink-0">Members</TabsTrigger>
             <TabsTrigger value="staff" className="flex-shrink-0">Staff</TabsTrigger>
             <TabsTrigger value="sessions" className="flex-shrink-0">Sessions</TabsTrigger>
+            <TabsTrigger value="session-bookings" className="flex-shrink-0">Session Bookings</TabsTrigger>
             <TabsTrigger value="item-checkout" className="flex-shrink-0">Item Checkout</TabsTrigger>
             <TabsTrigger value="packages" className="flex-shrink-0">Packages</TabsTrigger>
             <TabsTrigger value="inventory" className="flex-shrink-0">Inventory</TabsTrigger>
@@ -438,6 +440,11 @@ export default function AdminDashboard() {
           {/* Sessions Tab */}
           <TabsContent value="sessions" className="space-y-6">
             <AdminSessions />
+          </TabsContent>
+
+          {/* Session Bookings Tab */}
+          <TabsContent value="session-bookings" className="space-y-6">
+            <AdminSessionBookings />
           </TabsContent>
 
           {/* Item Checkout Tab */}

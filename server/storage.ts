@@ -41,6 +41,7 @@ export interface IStorage {
   updateUser(userId: number, data: Partial<User>): Promise<User>;
   updateUserPassword(userId: number, newPassword: string): Promise<User>;
   deleteUser(userId: number): Promise<void>;
+  deleteExpiredInactiveMembers(): Promise<number>;
   createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string; mustChangePassword?: boolean }): Promise<User>;
   updateStaffAdmin(userId: number, data: Partial<{ email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber: string; mustChangePassword: boolean }>): Promise<User>;
   deleteStaffAdmin(userId: number): Promise<void>;
@@ -1032,6 +1033,32 @@ export class DatabaseStorage implements IStorage {
     
     // Finally delete the user
     await db.delete(users).where(eq(users.id, userId));
+  }
+
+  async deleteExpiredInactiveMembers(): Promise<number> {
+    // Find all members with expired or inactive memberships (excluding staff/admin)
+    const expiredInactiveMemberships = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .innerJoin(users, eq(memberships.userId, users.id))
+      .where(and(
+        or(
+          eq(memberships.status, 'expired'),
+          eq(memberships.status, 'inactive')
+        ),
+        eq(users.role, 'member')
+      ));
+    
+    if (expiredInactiveMemberships.length === 0) {
+      return 0;
+    }
+    
+    // Delete each user and their related data
+    for (const { userId } of expiredInactiveMemberships) {
+      await this.deleteUser(userId);
+    }
+    
+    return expiredInactiveMemberships.length;
   }
 
   // Landing page content methods

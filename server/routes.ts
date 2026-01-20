@@ -1443,6 +1443,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk delete expired/inactive members (Admin only)
+  app.delete("/api/admin/members/bulk/expired-inactive", isAdmin, async (req, res) => {
+    try {
+      const deletedCount = await storage.deleteExpiredInactiveMembers();
+      res.json({ deletedCount, message: `${deletedCount} member(s) deleted successfully` });
+    } catch (error: any) {
+      console.error("Failed to bulk delete members:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get member's payment history (Admin only)
   app.get("/api/admin/members/:id/payments", isAdmin, async (req, res) => {
     try {

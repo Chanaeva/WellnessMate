@@ -118,6 +118,7 @@ export default function AdminMembers() {
   const [isEditMemberOpen, setIsEditMemberOpen] = useState(false);
   const [isViewMemberOpen, setIsViewMemberOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<(User & { membership?: Membership }) | null>(null);
   const itemsPerPage = 10;
 
@@ -252,6 +253,35 @@ export default function AdminMembers() {
     },
   });
 
+  // Bulk delete expired/inactive members mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/admin/members/bulk/expired-inactive");
+      return res.json();
+    },
+    onSuccess: (data: { deletedCount: number }) => {
+      toast({
+        title: "Members Deleted",
+        description: `${data.deletedCount} expired/inactive member(s) have been deleted.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      setIsBulkDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete members",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Count expired/inactive members
+  const expiredInactiveCount = members?.filter(m => 
+    m.membership?.status === 'expired' || m.membership?.status === 'inactive'
+  ).length || 0;
+
   // Handle form submission
   const onSubmitNewMember = (data: NewMemberFormData) => {
     addMemberMutation.mutate(data);
@@ -342,19 +372,30 @@ export default function AdminMembers() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
           <CardTitle className="text-xl font-bold">
             Member Management
           </CardTitle>
-          <Dialog
-            open={isAddMemberOpen}
-            onOpenChange={setIsAddMemberOpen}
-          >
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-member">
-                <UserPlus className="mr-2 h-4 w-4" /> Add New Member
+          <div className="flex flex-wrap gap-2">
+            {expiredInactiveCount > 0 && (
+              <Button 
+                variant="destructive" 
+                onClick={() => setIsBulkDeleteDialogOpen(true)}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> 
+                Delete Expired/Inactive ({expiredInactiveCount})
               </Button>
-            </DialogTrigger>
+            )}
+            <Dialog
+              open={isAddMemberOpen}
+              onOpenChange={setIsAddMemberOpen}
+            >
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90" data-testid="button-add-member">
+                  <UserPlus className="mr-2 h-4 w-4" /> Add New Member
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Add New Member</DialogTitle>
@@ -508,7 +549,8 @@ export default function AdminMembers() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </CardHeader>
 
         <CardContent>
@@ -1296,6 +1338,27 @@ export default function AdminMembers() {
               data-testid="button-confirm-delete"
             >
               {deleteMemberMutation.isPending ? "Deleting..." : "Delete Member"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-bulk-delete-confirmation">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Expired & Inactive Members?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{expiredInactiveCount}</strong> member(s) with expired or inactive memberships, including all their associated data (check-ins, payments, punch cards). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkDeleteMutation.mutate()}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${expiredInactiveCount} Members`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

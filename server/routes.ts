@@ -3654,6 +3654,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get all session bookings with member details
+  app.get("/api/admin/session-bookings", isAdminOrStaff, async (req, res) => {
+    try {
+      const fromDate = req.query.fromDate as string | undefined;
+      const bookings = await storage.getAllSessionBookingsWithUsers(fromDate);
+      res.json(bookings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Cancel a session booking
+  app.delete("/api/admin/session-bookings/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const bookingId = parseInt(req.params.id);
+      const cancelled = await storage.cancelSessionBooking(bookingId);
+      res.json(cancelled);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Member: Get my session bookings
   app.get("/api/session-bookings", async (req, res) => {
     if (!req.isAuthenticated()) {

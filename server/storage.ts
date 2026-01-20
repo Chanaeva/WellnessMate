@@ -186,6 +186,7 @@ export interface IStorage {
   createSessionBooking(booking: InsertSessionBooking): Promise<SessionBooking>;
   getSessionBookingsByUserId(userId: number): Promise<SessionBooking[]>;
   getSessionBookingsForDate(date: string, sessionType?: 'morning' | 'evening'): Promise<SessionBooking[]>;
+  getAllSessionBookingsWithUsers(fromDate?: string): Promise<(SessionBooking & { user?: User })[]>;
   cancelSessionBooking(bookingId: number): Promise<SessionBooking>;
   getSessionBookingById(bookingId: number): Promise<SessionBooking | undefined>;
   getSessionAvailability(date: string, sessionType: 'morning' | 'evening'): Promise<{ booked: number, capacity: number }>;
@@ -1478,6 +1479,29 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(sessionBookings)
       .where(and(...conditions));
+  }
+
+  async getAllSessionBookingsWithUsers(fromDate?: string): Promise<(SessionBooking & { user?: User })[]> {
+    const conditions = [eq(sessionBookings.status, 'confirmed')];
+    
+    if (fromDate) {
+      conditions.push(sql`${sessionBookings.bookingDate} >= ${fromDate}`);
+    }
+    
+    const bookings = await db
+      .select()
+      .from(sessionBookings)
+      .where(and(...conditions))
+      .orderBy(sessionBookings.bookingDate, sessionBookings.sessionType);
+    
+    const enrichedBookings = await Promise.all(
+      bookings.map(async (booking) => {
+        const user = await this.getUserById(booking.userId);
+        return { ...booking, user: user || undefined };
+      })
+    );
+    
+    return enrichedBookings;
   }
 
   async cancelSessionBooking(bookingId: number): Promise<SessionBooking> {

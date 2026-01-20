@@ -45,7 +45,6 @@ import {
 import MemberCard from "@/components/dashboard/member-card";
 import { Link } from "wouter";
 import {
-  QrCode,
   Calendar,
   Users,
   Settings,
@@ -565,9 +564,9 @@ export default function MemberDashboard() {
                   </div>
                 </div>
                 <div>
-                  <Link href="/qr-code">
+                  <Link href="/packages">
                     <Button className="wellness-button-primary flex items-center">
-                      <QrCode className="mr-2 h-4 w-4" /> Check In Now
+                      View Plans
                     </Button>
                   </Link>
                 </div>

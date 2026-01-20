@@ -911,6 +911,46 @@ export default function AdminMembers() {
                     </div>
                   )}
                 </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <Download className="h-4 w-4 mr-2" />
+                    Membership Agreement
+                  </h4>
+                  {selectedMember.membershipAgreementCompleted ? (
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-800">Agreement Signed</p>
+                          <p className="text-xs text-green-600">
+                            {selectedMember.membershipAgreementDate 
+                              ? `Signed on ${format(new Date(selectedMember.membershipAgreementDate), "MMM d, yyyy")}`
+                              : "Agreement completed"}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            window.open(`/api/admin/members/${selectedMember.id}/agreement-pdf`, '_blank');
+                          }}
+                          data-testid="btn-download-agreement"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download PDF
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                      <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                      <p className="text-sm text-yellow-800">No membership agreement on file</p>
+                      <p className="text-xs text-yellow-600">Member has not signed the membership agreement yet</p>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="payments" className="space-y-4" data-testid="tab-content-payments">

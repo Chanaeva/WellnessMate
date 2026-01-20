@@ -1407,6 +1407,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download member's membership agreement PDF (Admin only)
+  app.get("/api/admin/members/:id/agreement-pdf", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const user = await storage.getUserById(memberId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+      
+      if (!user.membershipAgreementCompleted) {
+        return res.status(400).json({ message: "No membership agreement found for this member" });
+      }
+
+      const PDFDocument = (await import('pdfkit')).default;
+      const doc = new PDFDocument({ margin: 50 });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=Wolf_Mother_Wellness_Agreement_${user.firstName}_${user.lastName}.pdf`);
+      
+      doc.pipe(res);
+
+      doc.fontSize(24).font('Helvetica-Bold').text('Wolf Mother Wellness', { align: 'center' });
+      doc.fontSize(16).font('Helvetica').text('Membership Agreement & Waiver', { align: 'center' });
+      doc.moveDown();
+      
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown();
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Member Information');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Name: ${user.firstName} ${user.lastName}`);
+      doc.text(`Email: ${user.email}`);
+      doc.text(`Phone: ${user.phoneNumber || 'Not provided'}`);
+      doc.text(`Date of Birth: ${user.dateOfBirth || 'Not provided'}`);
+      doc.text(`Address: ${user.address || 'Not provided'}`);
+      doc.moveDown();
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Emergency Contact');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Contact Name: ${user.emergencyContact || 'Not provided'}`);
+      doc.text(`Contact Phone: ${user.emergencyPhone || 'Not provided'}`);
+      doc.moveDown();
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Agreement Details');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Membership Type: ${user.preferredMembershipType || 'Standard'}`);
+      doc.text(`Agreement Date: ${user.membershipAgreementDate ? new Date(user.membershipAgreementDate).toLocaleDateString() : 'Not available'}`);
+      doc.moveDown();
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Acknowledgments & Agreements');
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica');
+      
+      const acknowledgments = [
+        'I certify that I am in good physical health and have no medical conditions that would prevent safe participation.',
+        'I have consulted with a healthcare provider if I have any health concerns.',
+        'I understand and accept the inherent risks of thermal wellness activities.',
+        'I confirm I am not pregnant or will notify staff if I become pregnant.',
+        'I voluntarily choose to participate in thermal wellness activities.',
+        'I assume all risks associated with using the facilities.',
+        'I release Wolf Mother Wellness from liability for any injuries.',
+        'I agree to follow all facility rules and guidelines.',
+        'I will behave respectfully toward staff and other members.',
+        'I acknowledge the privacy policy and consent to necessary emergency medical treatment.',
+        'I confirm I am 18 years of age or older.'
+      ];
+
+      acknowledgments.forEach((ack, index) => {
+        doc.text(`${index + 1}. ${ack}`);
+        doc.moveDown(0.3);
+      });
+
+      doc.moveDown();
+
+      doc.fontSize(14).font('Helvetica-Bold').text('Digital Signature');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica');
+      doc.text(`Signed by: ${user.firstName} ${user.lastName}`);
+      doc.text(`Date: ${user.membershipAgreementDate ? new Date(user.membershipAgreementDate).toLocaleDateString() : new Date().toLocaleDateString()}`);
+      doc.text('This document was signed electronically and is legally binding.');
+      
+      doc.moveDown(2);
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+      doc.moveDown(0.5);
+      doc.fontSize(9).font('Helvetica').fillColor('gray');
+      doc.text('Wolf Mother Wellness - Thermal Wellness Center', { align: 'center' });
+      doc.text('This agreement is valid as of the signature date above.', { align: 'center' });
+
+      doc.end();
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
   // Get all check-ins (with pagination)
   app.get("/api/admin/check-ins", isAdmin, async (req, res) => {
     try {
@@ -2822,6 +2921,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const peakHours = await storage.getPeakHoursAnalytics();
       res.json(peakHours);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active day pass holders (admin only)
+  app.get("/api/admin/day-pass-holders", isAdmin, async (req, res) => {
+    try {
+      const holders = await storage.getActiveDayPassHolders();
+      res.json(holders);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

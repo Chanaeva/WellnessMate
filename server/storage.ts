@@ -103,6 +103,7 @@ export interface IStorage {
   createPunchCard(punchCard: InsertPunchCard): Promise<PunchCard>;
   usePunchCardEntry(id: number): Promise<PunchCard>;
   getAvailablePunchCardOptions(): Promise<{name: string, totalPunches: number, totalPrice: number, pricePerPunch: number}[]>;
+  getActiveDayPassHolders(): Promise<(PunchCard & { user?: User })[]>;
 
   // Member preferences methods
   getMemberPreferences(userId: number): Promise<MemberPreferences | undefined>;
@@ -740,6 +741,28 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updatedCard;
+  }
+
+  async getActiveDayPassHolders(): Promise<(PunchCard & { user?: User })[]> {
+    const activePunchCards = await db
+      .select()
+      .from(punchCards)
+      .where(
+        and(
+          eq(punchCards.status, 'active'),
+          sql`${punchCards.remainingPunches} > 0`
+        )
+      )
+      .orderBy(desc(punchCards.purchasedAt));
+    
+    const enrichedCards = await Promise.all(
+      activePunchCards.map(async (card) => {
+        const user = await this.getUserById(card.userId);
+        return { ...card, user: user || undefined };
+      })
+    );
+    
+    return enrichedCards;
   }
 
   async getAllPunchCardTemplates(): Promise<PunchCardTemplate[]> {

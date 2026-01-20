@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Html5QrcodeScanner } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,15 +16,14 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import { 
-  QrCode, 
   CheckCircle, 
-  Camera, 
   Sparkles, 
   User, 
   Clock,
   ArrowLeft,
   Waves,
-  UserPlus
+  UserPlus,
+  Search
 } from "lucide-react";
 import KioskMemberCreation from "./kiosk-member-creation";
 
@@ -80,13 +78,11 @@ const memberFormSchema = z.object({
 type MemberFormData = z.infer<typeof memberFormSchema>;
 
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'scanning' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-drop-in'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-drop-in'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
-  const [scanner, setScanner] = useState<Html5QrcodeScanner | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const [manualSearchTerm, setManualSearchTerm] = useState("");
   const { toast } = useToast();
-  const scannerRef = useRef<HTMLDivElement>(null);
   const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Manual search query for email/membership ID lookup
@@ -153,112 +149,41 @@ export default function KioskCheckIn() {
     }
   };
 
-  const initializeScanner = () => {
-    if (scannerRef.current && !scanner) {
-      const html5QrcodeScanner = new Html5QrcodeScanner(
-        "qr-scanner",
-        {
-          fps: 10,
-          qrbox: { width: 300, height: 300 },
-          aspectRatio: 1.0,
-          showTorchButtonIfSupported: true,
-          showZoomSliderIfSupported: true,
-          defaultZoomValueIfSupported: 2,
-        },
-        false
-      );
-
-      html5QrcodeScanner.render(
-        (decodedText) => {
-          // QR code successfully scanned
-          html5QrcodeScanner.clear();
-          setScanner(null);
-          
-          // Extract membership ID from QR code data
-          let membershipId = decodedText;
-          if (decodedText.includes('membership:')) {
-            membershipId = decodedText.split('membership:')[1];
-          }
-          
-          setPendingMembershipId(membershipId);
-          checkInMutation.mutate({ membershipId });
-        },
-        (error) => {
-          // Scanning failed or no QR code found - this is normal, don't show error
-          console.log("Scanning...", error);
-        }
-      );
-
-      setScanner(html5QrcodeScanner);
-      setScannerMode('scanning');
-    }
-  };
-
-  const resetScanner = () => {
+  const resetToWaiting = () => {
     // Clear any auto-resume timers
     if (autoResumeTimerRef.current) {
       clearTimeout(autoResumeTimerRef.current);
       autoResumeTimerRef.current = null;
     }
     
-    if (scanner) {
-      scanner.clear();
-      setScanner(null);
-    }
     setScannerMode('waiting');
     setScanResult(null);
     setPendingMembershipId(null);
     setManualSearchTerm("");
   };
 
-  const resetAndResume = async () => {
+  const resetAndResume = () => {
     // Clear any auto-resume timers
     if (autoResumeTimerRef.current) {
       clearTimeout(autoResumeTimerRef.current);
       autoResumeTimerRef.current = null;
     }
     
-    // Clean up existing scanner properly
-    if (scanner) {
-      try {
-        await scanner.clear();
-      } catch (e) {
-        console.error("Error clearing scanner:", e);
-      }
-      setScanner(null);
-    }
-    
-    // Reset all state
+    // Reset all state and go back to waiting
     setScanResult(null);
     setPendingMembershipId(null);
     setManualSearchTerm("");
-    
-    // Set mode to scanning - the useEffect will handle initialization
-    setScannerMode('scanning');
+    setScannerMode('waiting');
   };
 
-  // Initialize scanner when mode changes to 'scanning'
-  useEffect(() => {
-    if (scannerMode === 'scanning' && scannerRef.current && !scanner) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        initializeScanner();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [scannerMode]);
-
-  // Cleanup scanner and timers on component unmount
+  // Cleanup timers on component unmount
   useEffect(() => {
     return () => {
-      if (scanner) {
-        scanner.clear();
-      }
       if (autoResumeTimerRef.current) {
         clearTimeout(autoResumeTimerRef.current);
       }
     };
-  }, [scanner]);
+  }, []);
 
   // Show member creation form
   if (scannerMode === 'create-member') {
@@ -294,8 +219,7 @@ export default function KioskCheckIn() {
         <Card className="shadow-2xl border-0 bg-card/95 backdrop-blur-sm">
           <CardHeader className="text-center pb-6">
             <div className="flex justify-center mb-4">
-              {scannerMode === 'waiting' && <QrCode className="h-16 w-16 text-primary" />}
-              {scannerMode === 'scanning' && <Camera className="h-16 w-16 text-primary animate-pulse" />}
+              {scannerMode === 'waiting' && <Search className="h-16 w-16 text-primary" />}
               {scannerMode === 'manual-entry' && <User className="h-16 w-16 text-primary" />}
               {scannerMode === 'confirmation' && <User className="h-16 w-16 text-blue-500" />}
               {scannerMode === 'success' && <CheckCircle className="h-16 w-16 text-green-500" />}
@@ -304,8 +228,7 @@ export default function KioskCheckIn() {
             </div>
             <CardTitle className="text-3xl font-heading font-bold">
               {scannerMode === 'waiting' && 'Ready to Check In'}
-              {scannerMode === 'scanning' && 'Scanning QR Code...'}
-              {scannerMode === 'manual-entry' && 'Manual Check-In'}
+              {scannerMode === 'manual-entry' && 'Member Search'}
               {scannerMode === 'confirmation' && 'Choose Check-In Method'}
               {scannerMode === 'success' && 'Welcome Back!'}
               {scannerMode === 'error' && 'Check-In Issue'}
@@ -318,36 +241,17 @@ export default function KioskCheckIn() {
             {scannerMode === 'waiting' && (
               <div className="text-center space-y-6">
                 <p className="text-xl text-muted-foreground mb-8">
-                  Tap the button below to start scanning your QR code
+                  Welcome! Choose an option below to check in
                 </p>
+                
                 <Button 
                   size="lg" 
-                  onClick={() => setScannerMode('scanning')}
-                  className="bg-primary hover:bg-primary/90 text-white px-12 py-6 text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
-                  data-testid="button-scan-qr"
-                >
-                  <QrCode className="h-8 w-8 mr-4" />
-                  Check In with QR Code
-                </Button>
-                
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-card text-muted-foreground">or</span>
-                  </div>
-                </div>
-                
-                <Button 
                   onClick={() => setScannerMode('manual-entry')}
-                  variant="outline"
-                  size="lg"
-                  className="w-full border-2 text-lg font-semibold py-4"
-                  data-testid="button-manual-entry"
+                  className="bg-primary hover:bg-primary/90 text-white px-12 py-6 text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300 w-full"
+                  data-testid="button-member-checkin"
                 >
-                  <User className="h-5 w-5 mr-3" />
-                  Enter Email or Membership ID
+                  <User className="h-8 w-8 mr-4" />
+                  Member Check-In
                 </Button>
                 
                 <div className="grid grid-cols-2 gap-4 mt-6">
@@ -355,7 +259,7 @@ export default function KioskCheckIn() {
                     onClick={() => setScannerMode('create-member')}
                     variant="outline"
                     size="lg"
-                    className="border-2 border-primary text-primary hover:bg-primary/10 text-base font-semibold py-3"
+                    className="border-2 border-primary text-primary hover:bg-primary/10 text-base font-semibold py-4"
                     data-testid="button-create-member"
                   >
                     <UserPlus className="h-5 w-5 mr-2" />
@@ -366,7 +270,7 @@ export default function KioskCheckIn() {
                     onClick={() => setScannerMode('create-member')}
                     variant="outline"
                     size="lg"
-                    className="border-2 border-green-600 text-green-600 hover:bg-green-50 text-base font-semibold py-3"
+                    className="border-2 border-green-600 text-green-600 hover:bg-green-50 text-base font-semibold py-4"
                     data-testid="button-buy-drop-in"
                   >
                     <Sparkles className="h-5 w-5 mr-2" />
@@ -377,34 +281,6 @@ export default function KioskCheckIn() {
                 <div className="flex items-center justify-center text-sm text-muted-foreground mt-8">
                   <Waves className="h-4 w-4 mr-2" />
                   <span>Sacred waters await your arrival</span>
-                </div>
-              </div>
-            )}
-
-            {/* Scanning State */}
-            {scannerMode === 'scanning' && (
-              <div className="space-y-6">
-                <div className="text-center mb-6">
-                  <p className="text-lg text-muted-foreground">
-                    Hold your phone's QR code up to the camera
-                  </p>
-                </div>
-                
-                <div 
-                  id="qr-scanner" 
-                  ref={scannerRef}
-                  className="border-2 border-dashed border-primary/30 rounded-xl overflow-hidden"
-                ></div>
-                
-                <div className="text-center">
-                  <Button 
-                    variant="outline" 
-                    onClick={resetScanner}
-                    className="border-primary text-primary hover:bg-primary/10"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
                 </div>
               </div>
             )}
@@ -531,7 +407,7 @@ export default function KioskCheckIn() {
                 <div className="text-center">
                   <Button 
                     variant="outline" 
-                    onClick={resetScanner}
+                    onClick={resetToWaiting}
                     className="border-primary text-primary hover:bg-primary/10"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
@@ -608,7 +484,7 @@ export default function KioskCheckIn() {
                   
                   <Button 
                     variant="ghost" 
-                    onClick={resetScanner}
+                    onClick={resetToWaiting}
                     className="mt-4 text-muted-foreground hover:text-foreground"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
@@ -684,7 +560,7 @@ export default function KioskCheckIn() {
                 </div>
                 
                 <Button 
-                  onClick={resetScanner}
+                  onClick={resetToWaiting}
                   className="bg-primary hover:bg-primary/90 text-white px-8 py-3"
                 >
                   Try Again

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { User, Membership, CheckIn, insertUserSchema } from "@shared/schema";
+import { User, Membership, CheckIn, PunchCard, insertUserSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +21,11 @@ import {
   Edit, 
   ChevronLeft, 
   ChevronRight,
-  QrCode,
   CheckCircle,
-  Download,
-  Printer,
   DollarSign,
   Monitor,
-  ExternalLink
+  ExternalLink,
+  Ticket
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -37,7 +35,6 @@ import { z } from "zod";
 import { format } from "date-fns";
 import Header from "@/components/layout/header";
 import { Link } from "wouter";
-import QRCode from "qrcode";
 import PackagesManagement from "./packages";
 import AdminMembers from "./members";
 import AdminNotifications from "./notifications";
@@ -62,7 +59,6 @@ type NewMemberFormData = z.infer<typeof newMemberSchema>;
 export default function AdminDashboard() {
   const { toast } = useToast();
   const [selectedPeriod, setSelectedPeriod] = useState("week");
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
 
   // Queries
@@ -102,6 +98,14 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/dashboard-summary"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/dashboard-summary");
+      return res.json();
+    },
+  });
+
+  const { data: dayPassHolders = [] } = useQuery<(PunchCard & { user?: User })[]>({
+    queryKey: ["/api/admin/day-pass-holders"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/day-pass-holders");
       return res.json();
     },
   });
@@ -162,76 +166,6 @@ export default function AdminDashboard() {
 
   const onSubmitNewMember = (data: NewMemberFormData) => {
     addMemberMutation.mutate(data);
-  };
-
-  // Generate QR code for today's check-in
-  useEffect(() => {
-    const generateQRCode = async () => {
-      try {
-        const today = format(new Date(), "yyyy-MM-dd");
-        const qrData = `checkin:${today}`;
-        const dataUrl = await QRCode.toDataURL(qrData, {
-          width: 200,
-          margin: 2,
-          color: {
-            dark: "#4a6741",
-            light: "#ffffff",
-          },
-        });
-        setQrCodeDataUrl(dataUrl);
-      } catch (error) {
-        console.error("Error generating QR code:", error);
-      }
-    };
-
-    generateQRCode();
-  }, []);
-
-  const downloadQRCode = () => {
-    if (qrCodeDataUrl) {
-      const link = document.createElement("a");
-      link.href = qrCodeDataUrl;
-      link.download = `checkin-qr-${format(new Date(), "yyyy-MM-dd")}.png`;
-      link.click();
-    }
-  };
-
-  const printQRCode = () => {
-    if (qrCodeDataUrl) {
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Daily Check-in QR Code</title>
-              <style>
-                body { 
-                  font-family: Arial, sans-serif; 
-                  text-align: center; 
-                  padding: 20px; 
-                }
-                h1 { color: #4a6741; }
-                .date { 
-                  font-size: 18px; 
-                  margin: 10px 0; 
-                  color: #666; 
-                }
-                img { margin: 20px 0; }
-              </style>
-            </head>
-            <body>
-              <h1>Wolf Mother Wellness</h1>
-              <h2>Daily Check-in QR Code</h2>
-              <div class="date">${format(new Date(), "EEEE, MMMM do, yyyy")}</div>
-              <img src="${qrCodeDataUrl}" alt="Check-in QR Code" />
-              <p>Scan this code to check in to the facility</p>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-      }
-    }
   };
 
   return (
@@ -316,46 +250,58 @@ export default function AdminDashboard() {
               </Card>
             </div>
 
-            {/* Check-in Management Section */}
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <QrCode className="h-5 w-5 mr-2" />
-                    Today's Check-in QR Code
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {format(new Date(), "EEEE, MMMM do, yyyy")}
-                  </p>
-                </CardHeader>
-                <CardContent className="text-center">
-                  {qrCodeDataUrl ? (
-                    <div className="space-y-4">
-                      <img
-                        src={qrCodeDataUrl}
-                        alt="Daily Check-in QR Code"
-                        className="mx-auto rounded-lg border"
-                      />
-                      <div className="flex justify-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={downloadQRCode}>
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={printQRCode}>
-                          <Printer className="h-4 w-4 mr-2" />
-                          Print
-                        </Button>
+            {/* Active Day Pass Holders Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Ticket className="h-5 w-5 mr-2" />
+                  Active Day Pass Holders
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Members with remaining day passes
+                </p>
+              </CardHeader>
+              <CardContent>
+                {dayPassHolders.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Ticket className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">No active day pass holders</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {dayPassHolders.slice(0, 10).map((holder) => (
+                      <div key={holder.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">
+                              {holder.user?.firstName} {holder.user?.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{holder.user?.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant="secondary" className="mb-1">
+                            {holder.remainingPunches} / {holder.totalPunches} remaining
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">{holder.name}</p>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="py-8">
-                      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Generating QR code...</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    ))}
+                    {dayPassHolders.length > 10 && (
+                      <p className="text-center text-sm text-muted-foreground pt-2">
+                        +{dayPassHolders.length - 10} more holders
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
+            {/* Kiosk Section */}
+            <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -382,9 +328,9 @@ export default function AdminDashboard() {
                     </Link>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-1">
-                    <p>• Members scan QR codes to check in</p>
+                    <p>• Members search by name or email to check in</p>
                     <p>• Automatic session welcome messages</p>
-                    <p>• No staff assistance required</p>
+                    <p>• Self-service member registration</p>
                   </div>
                 </CardContent>
               </Card>

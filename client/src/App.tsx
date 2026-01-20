@@ -14,8 +14,6 @@ import AdminLogin from "@/pages/admin-login";
 import ForgotPasswordPage from "@/pages/forgot-password-page";
 import ResetPasswordPage from "@/pages/reset-password-page";
 import MemberDashboard from "@/pages/member-dashboard";
-import QRCodePage from "@/pages/qr-code-page";
-
 
 import PackagesPage from "@/pages/packages-page";
 import CheckoutPage from "@/pages/checkout-page";
@@ -41,7 +39,6 @@ import AdminSetup from "@/pages/admin-setup";
 import SetPassword from "@/pages/set-password";
 import { useLocation } from "wouter";
 
-// Wrapper for KioskMemberCreation to provide required props
 function KioskMemberCreationWrapper() {
   const [, setLocation] = useLocation();
   
@@ -70,8 +67,6 @@ function Router() {
       
       {/* Member routes */}
       <ProtectedRoute path="/dashboard" component={MemberDashboard} />
-      <ProtectedRoute path="/qr-code" component={QRCodePage} />
-
 
       <Route path="/packages" component={PackagesPage} />
       <ProtectedRoute path="/checkout" component={CheckoutPage} />

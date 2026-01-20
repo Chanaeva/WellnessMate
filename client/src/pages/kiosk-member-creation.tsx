@@ -1120,10 +1120,9 @@ export default function KioskMemberCreation({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const [step, setStep] = useState<"form" | "agreement" | "discount" | "payment" | "success">("form");
+  const [step, setStep] = useState<"form" | "agreement" | "payment" | "success">("form");
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [agreementData, setAgreementData] = useState<AgreementFormData | null>(null);
-  const [discountData, setDiscountData] = useState<DiscountData | null>(null);
 
   // Fetch membership plans
   const { data: membershipPlans = [], isLoading: isPlansLoading } = useQuery({
@@ -1198,16 +1197,6 @@ export default function KioskMemberCreation({
 
   const handleAgreementComplete = (data: AgreementFormData) => {
     setAgreementData(data);
-    // For day passes, show discount step; for memberships, go directly to payment
-    if (selectedPackage?.type === "daypass") {
-      setStep("discount");
-    } else {
-      setStep("payment");
-    }
-  };
-  
-  const handleDiscountComplete = (discount: DiscountData | null) => {
-    setDiscountData(discount);
     setStep("payment");
   };
 
@@ -1283,36 +1272,6 @@ export default function KioskMemberCreation({
     );
   }
 
-  if (step === "discount" && selectedPackage && agreementData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-center mb-8">
-            <img
-              src={logoMossGreen}
-              alt="Wolf Mother Wellness"
-              className="h-16 w-16"
-            />
-            <div className="ml-4">
-              <h1 className="text-2xl font-bold">Wolf Mother Wellness</h1>
-              <p className="text-gray-600">Staff Discount</p>
-            </div>
-          </div>
-
-          <Card>
-            <CardContent className="p-8">
-              <DiscountForm
-                packageData={selectedPackage}
-                onComplete={handleDiscountComplete}
-                onBack={() => setStep("agreement")}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   if (step === "payment" && selectedPackage && agreementData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-4">
@@ -1336,9 +1295,9 @@ export default function KioskMemberCreation({
                   memberData={form.getValues()}
                   packageData={selectedPackage}
                   agreementData={agreementData}
-                  discountData={discountData}
+                  discountData={null}
                   onSuccess={handlePaymentSuccess}
-                  onBack={() => selectedPackage?.type === "daypass" ? setStep("discount") : setStep("agreement")}
+                  onBack={() => setStep("agreement")}
                 />
               </Elements>
             </CardContent>

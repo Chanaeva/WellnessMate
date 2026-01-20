@@ -1432,24 +1432,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete member (Admin only)
-  app.delete("/api/admin/members/:id", isAdmin, async (req, res) => {
+  // Archive member (Admin only) - preserves all historical data
+  app.post("/api/admin/members/:id/archive", isAdmin, async (req, res) => {
     try {
       const memberId = parseInt(req.params.id);
-      await storage.deleteUser(memberId);
-      res.json({ message: "Member deleted successfully" });
+      const archived = await storage.archiveUser(memberId);
+      res.json({ message: "Member archived successfully", member: archived });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Bulk delete expired/inactive members (Admin only)
-  app.delete("/api/admin/members/bulk/expired-inactive", isAdmin, async (req, res) => {
-    try {
-      const deletedCount = await storage.deleteExpiredInactiveMembers();
-      res.json({ deletedCount, message: `${deletedCount} member(s) deleted successfully` });
-    } catch (error: any) {
-      console.error("Failed to bulk delete members:", error);
       res.status(500).json({ message: error.message });
     }
   });

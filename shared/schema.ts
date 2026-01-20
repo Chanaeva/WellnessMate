@@ -33,6 +33,9 @@ export const users = pgTable("users", {
   address: text("address"),
   preferredMembershipType: text("preferred_membership_type"),
   
+  isArchived: boolean("is_archived").notNull().default(false),
+  archivedAt: timestamp("archived_at"),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 

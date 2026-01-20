@@ -60,7 +60,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
-  Trash2,
+  Archive,
   Mail,
   Phone,
   Calendar,
@@ -229,15 +229,15 @@ export default function AdminMembers() {
     },
   });
 
-  // Delete member mutation
-  const deleteMemberMutation = useMutation({
+  // Archive member mutation (preserves all historical data)
+  const archiveMemberMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/members/${id}`);
+      await apiRequest("POST", `/api/admin/members/${id}/archive`);
     },
     onSuccess: () => {
       toast({
-        title: "Member Deleted",
-        description: "Member has been successfully deleted.",
+        title: "Member Archived",
+        description: "Member has been archived. All historical data is preserved.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
       setIsDeleteDialogOpen(false);
@@ -246,7 +246,7 @@ export default function AdminMembers() {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete member",
+        description: error.message || "Failed to archive member",
         variant: "destructive",
       });
     },
@@ -287,21 +287,24 @@ export default function AdminMembers() {
     setIsEditMemberOpen(true);
   };
 
-  // Handle delete member
-  const handleDeleteMember = (member: User & { membership?: Membership }) => {
+  // Handle archive member
+  const handleArchiveMember = (member: User & { membership?: Membership }) => {
     setSelectedMember(member);
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmArchive = () => {
     if (selectedMember) {
-      deleteMemberMutation.mutate(selectedMember.id);
+      archiveMemberMutation.mutate(selectedMember.id);
     }
   };
 
-  // Filter and search members
+  // Filter and search members (exclude archived)
   const filteredMembers =
     members?.filter((member) => {
+      // Exclude archived members
+      if ((member as any).isArchived) return false;
+      
       // Apply search filter
       const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
       const email = member.email.toLowerCase();
@@ -696,12 +699,12 @@ export default function AdminMembers() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:text-destructive/80 h-8 w-8 p-0"
-                            title="Delete Member"
-                            onClick={() => handleDeleteMember(member)}
-                            data-testid={`button-delete-${member.id}`}
+                            className="text-amber-600 hover:text-amber-700 h-8 w-8 p-0"
+                            title="Archive Member"
+                            onClick={() => handleArchiveMember(member)}
+                            data-testid={`button-archive-${member.id}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Archive className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -1281,37 +1284,37 @@ export default function AdminMembers() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Archive Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent data-testid="dialog-delete-confirmation">
+        <AlertDialogContent data-testid="dialog-archive-confirmation">
           <AlertDialogHeader>
             <AlertDialogTitle>
               {selectedMember?.membership?.status === 'active' 
                 ? "Warning: Active Membership" 
-                : "Delete Member?"}
+                : "Archive Member?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {selectedMember?.membership?.status === 'active' ? (
                 <>
                   <strong className="text-amber-600">This member has an active membership!</strong>
                   <br /><br />
-                  Deleting <strong>{selectedMember?.firstName} {selectedMember?.lastName}</strong> will cancel their active membership and remove all associated data including check-ins and payment history. This action cannot be undone.
+                  Archiving <strong>{selectedMember?.firstName} {selectedMember?.lastName}</strong> will hide them from the active member list. All historical data (check-ins, payments, membership) will be preserved.
                 </>
               ) : (
                 <>
-                  This will permanently delete <strong>{selectedMember?.firstName} {selectedMember?.lastName}</strong> and all associated data including membership, check-ins, and payment history. This action cannot be undone.
+                  This will archive <strong>{selectedMember?.firstName} {selectedMember?.lastName}</strong> and hide them from the active member list. All historical data will be preserved and can be accessed later.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-archive">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
+              onClick={confirmArchive}
+              className="bg-amber-600 hover:bg-amber-700"
+              data-testid="button-confirm-archive"
             >
-              {deleteMemberMutation.isPending ? "Deleting..." : "Delete Member"}
+              {archiveMemberMutation.isPending ? "Archiving..." : "Archive Member"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

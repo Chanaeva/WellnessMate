@@ -37,7 +37,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve attached_assets as static files
   app.use("/attached_assets", express.static(path.join(process.cwd(), "attached_assets")));
   
-  // File upload endpoint for gallery images (admin only)
+  // Setup Stripe webhooks
+  setupStripeWebhooks(app);
+  
+  // Setup authentication routes (/api/register, /api/login, /api/logout, /api/user)
+  setupAuth(app);
+  
+  // File upload endpoint for gallery images (admin only) - MUST be after setupAuth
   app.post("/api/admin/upload-image", express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/*'], limit: '10mb' }), async (req, res) => {
     if (!req.isAuthenticated() || req.user?.role !== 'admin') {
       return res.sendStatus(403);
@@ -76,12 +82,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Failed to upload image: ' + error.message });
     }
   });
-  
-  // Setup Stripe webhooks
-  setupStripeWebhooks(app);
-  
-  // Setup authentication routes (/api/register, /api/login, /api/logout, /api/user)
-  setupAuth(app);
 
   // Expose Stripe public key to frontend
   app.get("/api/stripe/config", (req, res) => {

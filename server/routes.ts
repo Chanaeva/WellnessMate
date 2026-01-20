@@ -1760,6 +1760,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get all active punch cards with user info
+  app.get("/api/admin/active-punch-cards", isAdmin, async (req, res) => {
+    try {
+      const punchCards = await storage.getActiveDayPassHolders();
+      res.json(punchCards);
+    } catch (error) {
+      console.error("Error fetching active punch cards:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Admin punch card template management
   app.get("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
     try {

@@ -384,8 +384,8 @@ export default function AdminDashboard() {
 
           {/* Sessions Tab - Combined Sessions & Bookings */}
           <TabsContent value="sessions" className="space-y-8">
-            <AdminSessions />
             <AdminSessionBookings />
+            <AdminSessions />
           </TabsContent>
 
           {/* Item Checkout Tab */}

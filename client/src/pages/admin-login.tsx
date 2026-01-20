@@ -27,8 +27,11 @@ export default function AdminLogin() {
       const user = await loginMutation.mutateAsync({ email, password });
       
       if (user && user.role === 'admin') {
+        // Small delay to ensure session cookie is processed by browser
+        await new Promise(resolve => setTimeout(resolve, 100));
         setLocation("/admin");
       } else if (user && user.role === 'staff') {
+        await new Promise(resolve => setTimeout(resolve, 100));
         setLocation("/admin"); // Staff can also access admin dashboard
       } else if (user) {
         setError("Access denied. Admin or staff privileges required.");

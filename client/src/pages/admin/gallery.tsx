@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,13 +27,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Image, Plus, Pencil, Trash2, Loader2, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
+import { Image, Plus, Pencil, Trash2, Loader2, ArrowUp, ArrowDown, Eye, EyeOff, Upload } from "lucide-react";
 
 export default function AdminGallery() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -42,6 +44,50 @@ export default function AdminGallery() {
     sortOrder: 0,
     isActive: true,
   });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Invalid File", description: "Please select an image file", variant: "destructive" });
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Image must be less than 10MB", variant: "destructive" });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const response = await fetch('/api/admin/upload-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const { imageUrl } = await response.json();
+      setFormData({ ...formData, imageUrl });
+      toast({ title: "Upload Successful", description: "Image has been uploaded" });
+    } catch (error: any) {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const { data: images = [], isLoading } = useQuery<GalleryImage[]>({
     queryKey: ["/api/admin/gallery-images"],
@@ -276,16 +322,50 @@ export default function AdminGallery() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="imageUrl">Image URL *</Label>
-              <Input
-                id="imageUrl"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="/attached_assets/image.png"
-              />
-              <p className="text-xs text-muted-foreground">
-                Use paths like /attached_assets/filename.png for uploaded images
-              </p>
+              <Label>Image *</Label>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="flex-1"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Image
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="imageUrl"
+                    value={formData.imageUrl}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    placeholder="Or enter image URL..."
+                    className="text-sm"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload an image or enter a URL directly
+                </p>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>

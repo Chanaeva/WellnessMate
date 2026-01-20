@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { setupAuth, hashPassword } from "./auth";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -35,6 +36,37 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve attached_assets as static files
   app.use("/attached_assets", express.static(path.join(process.cwd(), "attached_assets")));
+  
+  // File upload endpoint for gallery images (admin only)
+  app.post("/api/admin/upload-image", express.raw({ type: 'image/*', limit: '10mb' }), async (req, res) => {
+    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const contentType = req.headers['content-type'] || 'image/jpeg';
+      const extension = contentType.includes('png') ? 'png' : 
+                       contentType.includes('gif') ? 'gif' : 
+                       contentType.includes('webp') ? 'webp' : 'jpg';
+      
+      const filename = `gallery_${Date.now()}_${randomBytes(4).toString('hex')}.${extension}`;
+      const uploadDir = path.join(process.cwd(), 'attached_assets', 'gallery');
+      
+      // Ensure gallery directory exists
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      const filePath = path.join(uploadDir, filename);
+      fs.writeFileSync(filePath, req.body);
+      
+      const imageUrl = `/attached_assets/gallery/${filename}`;
+      res.json({ success: true, imageUrl });
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      res.status(500).json({ message: 'Failed to upload image' });
+    }
+  });
   
   // Setup Stripe webhooks
   setupStripeWebhooks(app);

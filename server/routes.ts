@@ -45,7 +45,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // File upload endpoint for gallery images (admin only) - MUST be after setupAuth
   app.post("/api/admin/upload-image", express.raw({ type: ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/*'], limit: '10mb' }), async (req, res) => {
-    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
+    console.log('Upload request - isAuthenticated:', req.isAuthenticated?.(), 'user:', req.user?.email, 'role:', req.user?.role);
+    if (!req.isAuthenticated || !req.isAuthenticated() || req.user?.role !== 'admin') {
+      console.log('Upload denied - auth check failed');
       return res.sendStatus(403);
     }
     

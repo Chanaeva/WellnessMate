@@ -29,6 +29,7 @@ import AdminInventory from "@/pages/admin/inventory";
 import AdminSessions from "@/pages/admin/sessions";
 import AdminSessionBookings from "@/pages/admin/session-bookings";
 import AdminGallery from "@/pages/admin/gallery";
+import AdminCheckIns from "@/pages/admin/check-ins";
 
 import KioskCheckIn from "@/pages/kiosk-checkin";
 import KioskMemberCreation from "@/pages/kiosk-member-creation";
@@ -90,6 +91,7 @@ function Router() {
       <ProtectedRoute path="/admin/sessions" component={AdminSessions} />
       <ProtectedRoute path="/admin/session-bookings" component={AdminSessionBookings} />
       <ProtectedRoute path="/admin/gallery" component={AdminGallery} />
+      <ProtectedRoute path="/admin/check-ins" component={AdminCheckIns} />
 
       <Route path="/kiosk" component={KioskCheckIn} />
       <Route path="/kiosk-checkin" component={KioskCheckIn} />

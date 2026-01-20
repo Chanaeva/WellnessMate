@@ -29,13 +29,18 @@ export function ProtectedRoute({
     );
   }
 
-  // Check if trying to access admin routes without admin role
-  if (path.startsWith("/admin") && user.role !== "admin") {
-    return (
-      <Route path={path}>
-        <Redirect to="/" />
-      </Route>
-    );
+  // Check if trying to access admin routes without admin or staff role
+  // Some admin routes are accessible to staff (check-ins, inventory)
+  const staffAllowedAdminRoutes = ["/admin/check-ins", "/admin/inventory"];
+  if (path.startsWith("/admin")) {
+    const isStaffAllowed = staffAllowedAdminRoutes.some(route => path.startsWith(route));
+    if (user.role !== "admin" && !(user.role === "staff" && isStaffAllowed)) {
+      return (
+        <Route path={path}>
+          <Redirect to="/" />
+        </Route>
+      );
+    }
   }
 
   // Redirect users who already completed membership agreement away from the agreement page

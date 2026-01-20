@@ -4859,16 +4859,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           autoRenew: true,
         });
       } else if (memberData.packageType === 'daypass') {
-        await storage.createPunchCard({
+        const totalPunches = Math.max(packageData.totalPunches || 5, 1); // Ensure at least 1 punch
+        const punchCard = await storage.createPunchCard({
           userId: newUser.id,
           templateId: parseInt(memberData.packageId),
           name: packageData.name || 'Day Pass Package',
-          totalPunches: packageData.totalPunches || 5,
-          remainingPunches: packageData.totalPunches || 5,
-          pricePerPunch: Math.round((packageData.price || 2000) / (packageData.totalPunches || 5)),
+          totalPunches: totalPunches,
+          remainingPunches: totalPunches, // Start with full punches
+          pricePerPunch: Math.round((packageData.price || 2000) / totalPunches),
           totalPrice: packageData.price || 2000,
           status: 'active',
         });
+        
+        // Automatically check in the day pass user and use one punch
+        await storage.usePunchCardEntry(punchCard.id);
+        await storage.createCheckIn({
+          userId: newUser.id,
+          membershipId: `day-pass-${punchCard.id}`,
+          location: 'Kiosk Registration',
+          method: 'manual',
+        });
+        console.log(`✅ Day pass user ${newUser.firstName} ${newUser.lastName} automatically checked in`);
       }
       
       // Calculate final amount and discount info

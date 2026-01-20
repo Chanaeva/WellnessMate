@@ -1,36 +1,90 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Search, Download, UserPlus, Ticket } from "lucide-react";
 import { format } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+interface MemberSearchResult {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  membershipId: string | null;
+  membershipStatus: string;
+  dayPassesRemaining: number;
+}
 
 export default function AdminCheckIns() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
   const [filterPeriod, setFilterPeriod] = useState("today");
+  const [isManualCheckInOpen, setIsManualCheckInOpen] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState("");
+  const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
+  const { toast } = useToast();
 
-  // Fetch all check-ins with pagination
   const { data: checkInsData, isLoading } = useQuery({
     queryKey: ["/api/admin/check-ins", currentPage, pageSize],
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Fetch today's check-ins for quick overview
   const { data: todayCheckIns } = useQuery({
     queryKey: ["/api/check-ins/today"],
-    staleTime: 1 * 60 * 1000, // 1 minute
+    staleTime: 1 * 60 * 1000,
+  });
+
+  const { data: memberSearchResults, isLoading: isSearching } = useQuery({
+    queryKey: ["/api/admin/member-search", memberSearchTerm],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/member-search?q=${encodeURIComponent(memberSearchTerm)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Search failed');
+      return await res.json();
+    },
+    enabled: memberSearchTerm.length >= 2,
+    staleTime: 0,
+  });
+
+  const manualCheckInMutation = useMutation({
+    mutationFn: async ({ userId, useDayPass }: { userId: number; useDayPass: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/manual-checkin", { userId, useDayPass });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Check-in Successful",
+        description: data.dayPassUsed 
+          ? `${selectedMember?.firstName} checked in using day pass. ${data.remainingPasses} passes remaining.`
+          : `${selectedMember?.firstName} checked in successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/check-ins"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/check-ins/today"] });
+      setIsManualCheckInOpen(false);
+      setSelectedMember(null);
+      setMemberSearchTerm("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Check-in Failed",
+        description: error.message || "Failed to check in member",
+        variant: "destructive",
+      });
+    },
   });
 
   const checkIns = checkInsData?.data || [];
   const totalPages = Math.ceil((checkInsData?.total || 0) / pageSize);
 
-  // Filter check-ins based on search term
   const filteredCheckIns = checkIns.filter((checkIn: any) => {
     if (!searchTerm) return true;
     
@@ -43,7 +97,6 @@ export default function AdminCheckIns() {
   });
 
   const exportCheckIns = () => {
-    // Create CSV data
     const headers = ["Date", "Time", "Member", "Email", "Membership ID", "Method"];
     const csvData = [
       headers.join(","),
@@ -57,7 +110,6 @@ export default function AdminCheckIns() {
       ].join(","))
     ].join("\n");
 
-    // Download CSV
     const blob = new Blob([csvData], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -69,17 +121,21 @@ export default function AdminCheckIns() {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleCheckIn = (useDayPass: boolean) => {
+    if (selectedMember) {
+      manualCheckInMutation.mutate({ userId: selectedMember.id, useDayPass });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-slate-900">Visit Logging</h1>
           <p className="text-slate-600">Wolf Mother Wellness Check-in Management</p>
         </div>
 
-        {/* Today's Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Today's Total</CardTitle>
@@ -115,9 +171,23 @@ export default function AdminCheckIns() {
               <p className="text-sm text-muted-foreground">staff assisted</p>
             </CardContent>
           </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+            <CardHeader>
+              <CardTitle className="text-lg text-emerald-800">Manual Check-in</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => setIsManualCheckInOpen(true)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Check In Member
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Controls */}
         <Card>
           <CardHeader>
             <CardTitle>Check-in History</CardTitle>
@@ -152,7 +222,6 @@ export default function AdminCheckIns() {
               </Button>
             </div>
 
-            {/* Check-ins Table */}
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
@@ -192,7 +261,7 @@ export default function AdminCheckIns() {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            {checkIn.user?.username || "Unknown"}
+                            {checkIn.user?.firstName} {checkIn.user?.lastName || checkIn.user?.username || "Unknown"}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -200,7 +269,11 @@ export default function AdminCheckIns() {
                         </TableCell>
                         <TableCell>
                           <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                            {checkIn.membershipId || "N/A"}
+                            {checkIn.membershipId?.startsWith('day-pass-') ? (
+                              <span className="text-amber-600">Day Pass</span>
+                            ) : (
+                              checkIn.membershipId || "N/A"
+                            )}
                           </code>
                         </TableCell>
                         <TableCell>
@@ -215,7 +288,6 @@ export default function AdminCheckIns() {
               </Table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex justify-center gap-2 mt-6">
                 <Button
@@ -242,6 +314,132 @@ export default function AdminCheckIns() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isManualCheckInOpen} onOpenChange={setIsManualCheckInOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manual Member Check-in</DialogTitle>
+            <DialogDescription>
+              Search for a member to check them in manually
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by name or email..."
+                value={memberSearchTerm}
+                onChange={(e) => {
+                  setMemberSearchTerm(e.target.value);
+                  setSelectedMember(null);
+                }}
+                className="pl-10"
+              />
+            </div>
+
+            {isSearching && (
+              <div className="text-center py-4 text-muted-foreground">
+                Searching...
+              </div>
+            )}
+
+            {memberSearchResults && memberSearchResults.length > 0 && !selectedMember && (
+              <div className="border rounded-lg max-h-60 overflow-y-auto">
+                {memberSearchResults.map((member: MemberSearchResult) => (
+                  <div
+                    key={member.id}
+                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                    onClick={() => setSelectedMember(member)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{member.firstName} {member.lastName}</div>
+                        <div className="text-sm text-muted-foreground">{member.email}</div>
+                      </div>
+                      <div className="text-right">
+                        {member.membershipStatus === 'active' && (
+                          <Badge className="bg-green-100 text-green-800">Active Member</Badge>
+                        )}
+                        {member.dayPassesRemaining > 0 && (
+                          <Badge className="bg-amber-100 text-amber-800 ml-1">
+                            <Ticket className="h-3 w-3 mr-1" />
+                            {member.dayPassesRemaining} passes
+                          </Badge>
+                        )}
+                        {member.membershipStatus !== 'active' && member.dayPassesRemaining === 0 && (
+                          <Badge variant="secondary">No access</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {memberSearchTerm.length >= 2 && memberSearchResults?.length === 0 && !isSearching && (
+              <div className="text-center py-4 text-muted-foreground">
+                No members found
+              </div>
+            )}
+
+            {selectedMember && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="font-semibold text-lg">{selectedMember.firstName} {selectedMember.lastName}</div>
+                    <div className="text-sm text-muted-foreground">{selectedMember.email}</div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedMember(null)}>
+                    Change
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedMember.membershipStatus === 'active' && (
+                    <Button 
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      onClick={() => handleCheckIn(false)}
+                      disabled={manualCheckInMutation.isPending}
+                    >
+                      {manualCheckInMutation.isPending ? "Checking in..." : "Check In (Membership)"}
+                    </Button>
+                  )}
+
+                  {selectedMember.dayPassesRemaining > 0 && (
+                    <Button 
+                      className="w-full bg-amber-600 hover:bg-amber-700"
+                      onClick={() => handleCheckIn(true)}
+                      disabled={manualCheckInMutation.isPending}
+                    >
+                      <Ticket className="h-4 w-4 mr-2" />
+                      {manualCheckInMutation.isPending 
+                        ? "Checking in..." 
+                        : `Check In (Use Day Pass - ${selectedMember.dayPassesRemaining} remaining)`}
+                    </Button>
+                  )}
+
+                  {selectedMember.membershipStatus !== 'active' && selectedMember.dayPassesRemaining === 0 && (
+                    <div className="text-center py-2 text-red-600">
+                      This member has no active membership or day passes
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsManualCheckInOpen(false);
+              setSelectedMember(null);
+              setMemberSearchTerm("");
+            }}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

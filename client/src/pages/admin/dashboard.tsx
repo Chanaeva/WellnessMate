@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -267,30 +268,37 @@ export default function AdminDashboard() {
                     <p className="text-sm text-muted-foreground">No active day pass holders</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {dayPassHolders.slice(0, 10).map((holder) => (
-                      <div key={holder.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Users className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Pass Type</TableHead>
+                          <TableHead className="text-right">Remaining</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dayPassHolders.slice(0, 10).map((holder) => (
+                          <TableRow key={holder.id}>
+                            <TableCell className="font-medium">
                               {holder.user?.firstName} {holder.user?.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{holder.user?.email}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant="secondary" className="mb-1">
-                            {holder.remainingPunches} / {holder.totalPunches} remaining
-                          </Badge>
-                          <p className="text-xs text-muted-foreground">{holder.name}</p>
-                        </div>
-                      </div>
-                    ))}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {holder.user?.email}
+                            </TableCell>
+                            <TableCell>{holder.name}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">
+                                {holder.remainingPunches} / {holder.totalPunches}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                     {dayPassHolders.length > 10 && (
-                      <p className="text-center text-sm text-muted-foreground pt-2">
+                      <p className="text-center text-sm text-muted-foreground pt-3">
                         +{dayPassHolders.length - 10} more holders
                       </p>
                     )}

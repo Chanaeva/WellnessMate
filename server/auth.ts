@@ -214,6 +214,8 @@ export function setupAuth(app: Express) {
       req.login(user, async (err) => {
         if (err) return next(err);
         
+        console.log("Login success - sessionID:", req.sessionID, "userId:", user.id);
+        
         // Record successful login for staff/admin users
         if (user.role === 'staff' || user.role === 'admin') {
           try {
@@ -262,6 +264,7 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
+    console.log("/api/user - sessionID:", req.sessionID, "isAuth:", req.isAuthenticated(), "cookie:", req.headers.cookie?.substring(0, 50));
     if (!req.isAuthenticated()) return res.sendStatus(401);
     // Remove password from response
     const { password, ...userWithoutPassword } = req.user;

@@ -3127,9 +3127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin/Staff member search for manual check-in and punch deduction
   app.get("/api/admin/member-search", async (req, res) => {
-    console.log("Member search - isAuthenticated:", req.isAuthenticated(), "user:", req.user?.email, "role:", req.user?.role);
     if (!req.isAuthenticated() || (req.user?.role !== 'admin' && req.user?.role !== 'staff')) {
-      console.log("Member search - returning 403");
       return res.sendStatus(403);
     }
     
@@ -3141,32 +3139,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Search for members by name or email
-      const allUsers = await storage.getAllUsers();
+      const allMembers = await storage.getAllMembers();
       const searchLower = query.toLowerCase();
       
-      const matchingMembers = allUsers
-        .filter(user => 
-          user.firstName?.toLowerCase().includes(searchLower) ||
-          user.lastName?.toLowerCase().includes(searchLower) ||
-          user.email?.toLowerCase().includes(searchLower)
+      const matchingMembers = allMembers
+        .filter(member => 
+          member.firstName?.toLowerCase().includes(searchLower) ||
+          member.lastName?.toLowerCase().includes(searchLower) ||
+          member.email?.toLowerCase().includes(searchLower)
         )
         .slice(0, 10);
 
-      // Get membership and day pass info for each member
-      const results = await Promise.all(matchingMembers.map(async (user) => {
-        const membership = await storage.getMembershipByUserId(user.id);
-        const punchCards = await storage.getPunchCardsByUserId(user.id);
+      // Get day pass info for each member
+      const results = await Promise.all(matchingMembers.map(async (member) => {
+        const punchCards = await storage.getPunchCardsByUserId(member.id);
         const dayPassesRemaining = punchCards
           .filter(card => card.status === 'active' && card.remainingPunches > 0)
           .reduce((sum, card) => sum + card.remainingPunches, 0);
 
         return {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          membershipId: membership?.membershipId || null,
-          membershipStatus: membership?.status || 'none',
+          id: member.id,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          email: member.email,
+          membershipId: member.membership?.membershipId || null,
+          membershipStatus: member.membership?.status || 'none',
           dayPassesRemaining
         };
       }));

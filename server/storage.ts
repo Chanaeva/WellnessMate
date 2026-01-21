@@ -70,8 +70,8 @@ export interface IStorage {
   // Check-in methods
   getCheckInsByUserId(userId: number): Promise<CheckIn[]>;
   createCheckIn(checkIn: InsertCheckIn): Promise<CheckIn>;
-  getAllCheckIns(page: number, limit: number): Promise<{data: CheckIn[], total: number, page: number, limit: number}>;
-  getTodayCheckIns(): Promise<CheckIn[]>;
+  getAllCheckIns(page: number, limit: number): Promise<{data: any[], total: number, page: number, limit: number}>;
+  getTodayCheckIns(): Promise<any[]>;
 
   // Payment methods
   getPaymentsByUserId(userId: number): Promise<Payment[]>;
@@ -449,8 +449,25 @@ export class DatabaseStorage implements IStorage {
     return checkIn;
   }
 
-  async getAllCheckIns(page: number, limit: number): Promise<{data: CheckIn[], total: number, page: number, limit: number}> {
-    const allCheckIns = await db.select().from(checkIns).orderBy(desc(checkIns.timestamp));
+  async getAllCheckIns(page: number, limit: number): Promise<{data: any[], total: number, page: number, limit: number}> {
+    const allCheckIns = await db.select({
+      id: checkIns.id,
+      userId: checkIns.userId,
+      membershipId: checkIns.membershipId,
+      timestamp: checkIns.timestamp,
+      location: checkIns.location,
+      method: sql<string>`CASE WHEN ${checkIns.location} LIKE '%Manual%' OR ${checkIns.location} LIKE '%Front Desk%' THEN 'manual' ELSE 'qr' END`,
+      user: {
+        firstName: users.firstName,
+        lastName: users.lastName,
+        username: users.username,
+        email: users.email
+      }
+    })
+    .from(checkIns)
+    .leftJoin(users, eq(checkIns.userId, users.id))
+    .orderBy(desc(checkIns.timestamp));
+    
     const total = allCheckIns.length;
     const startIndex = (page - 1) * limit;
     const data = allCheckIns.slice(startIndex, startIndex + limit);

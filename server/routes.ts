@@ -926,9 +926,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Helper function to parse time string to minutes since midnight
+      // Helper function to parse time string to minutes since midnight (used for session booking)
       const parseTimeToMinutes = (timeStr: string): number => {
-        // Handle various formats: "7:00 AM", "7 AM", "7:00AM", "14:00", etc.
         const normalized = timeStr.trim().toUpperCase();
         const isPM = normalized.includes('PM');
         const isAM = normalized.includes('AM');
@@ -944,7 +943,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hours = parseInt(cleaned, 10) || 0;
         }
         
-        // Convert 12-hour to 24-hour format
         if (isPM && hours !== 12) {
           hours += 12;
         } else if (isAM && hours === 12) {
@@ -954,32 +952,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return hours * 60 + minutes;
       };
 
-      const now = new Date();
-      const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-      
       // Determine if user is using a day pass (explicitly or implicitly)
       const hasActiveMembership = membership && membership.status === 'active';
       const hasDayPasses = activeDayPasses.length > 0;
-      const willUseDayPass = useDayPass === true || (!hasActiveMembership && hasDayPasses);
       
-      // Day pass users (explicit choice or day-pass-only users) must check in during day pass hours
-      if (willUseDayPass) {
-        const dayPassHoursConfig = await storage.getDayPassHours();
-        
-        if (dayPassHoursConfig && dayPassHoursConfig.isEnabled) {
-          const dayPassStart = parseTimeToMinutes(dayPassHoursConfig.startTime);
-          const dayPassEnd = parseTimeToMinutes(dayPassHoursConfig.endTime);
-          
-          if (currentTimeMinutes < dayPassStart || currentTimeMinutes >= dayPassEnd) {
-            return res.status(400).json({
-              success: false,
-              message: `Day pass check-in is only available during open hours: ${dayPassHoursConfig.startTime} - ${dayPassHoursConfig.endTime}. Please come back during these hours.`
-            });
-          }
-        }
-        // Day pass hours check passed or not configured - allow check-in
-      }
-      // Members with active membership can check in anytime - no booking requirement
+      // Staff/admin can check in any member (membership or day pass) at any time
+      // No day pass hours restriction since kiosk is staff-operated only
       
       // If user has both membership and day passes, ask which to use
       if ((membership && membership.status === 'active') && activeDayPasses.length > 0 && useDayPass === undefined) {

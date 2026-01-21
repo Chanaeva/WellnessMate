@@ -918,13 +918,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         card.status === 'active' && card.remainingPunches > 0
       );
       
-      // User needs either active monthly membership or day passes
-      if ((!membership || membership.status !== 'active') && activeDayPasses.length === 0) {
-        return res.status(400).json({ 
-          success: false,
-          message: "No active membership or day passes found. Please purchase a membership or day pass package." 
-        });
-      }
+      // Staff can check in any member - membership/day pass status is for information only
+      // Punches on day passes don't count as check-ins, so we allow all members to check in
 
       // Helper function to parse time string to minutes since midnight (used for session booking)
       const parseTimeToMinutes = (timeStr: string): number => {
@@ -1009,11 +1004,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      let membershipType = membership?.planType || 'Day Pass';
+      let membershipType = membership?.planType || (activeDayPasses.length > 0 ? 'Day Pass' : 'Guest');
       let usedDayPass = false;
       
-      // Process day pass usage if requested or if only option
-      if ((useDayPass === true) || ((!membership || membership.status !== 'active') && activeDayPasses.length > 0)) {
+      // Process day pass usage ONLY if explicitly requested (useDayPass === true)
+      // Punches don't count as check-ins, so we don't automatically deduct
+      if (useDayPass === true && activeDayPasses.length > 0) {
         const oldestDayPass = activeDayPasses.sort((a, b) => 
           new Date(a.purchasedAt || '1970-01-01').getTime() - new Date(b.purchasedAt || '1970-01-01').getTime()
         )[0];
@@ -1075,6 +1071,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
 
+      // Determine the appropriate membership status for display
+      let membershipStatus = membership?.status || (activeDayPasses.length > 0 ? 'day-pass' : 'guest');
+      
       res.json({
         success: true,
         member: {
@@ -1082,7 +1081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           membershipType: membershipType,
-          membershipStatus: membership?.status || 'day-pass'
+          membershipStatus: membershipStatus
         },
         dayPassInfo: dayPassInfo,
         message: `Welcome back, ${user.firstName}! Enjoy your session ✨`
@@ -4795,8 +4794,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kiosk member creation endpoint - supports both online card entry and Terminal card reader
   app.post("/api/kiosk/create-member-payment", async (req, res) => {
     try {
-      const { memberData, packageData, discountData, useTerminal } = req.body;
-      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData, discountData, useTerminal });
+      const { memberData, packageData, discountData, useTerminal, existingMemberId } = req.body;
+      console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData, discountData, useTerminal, existingMemberId });
       
       // Validate the request data
       const memberFormSchema = z.object({
@@ -4811,10 +4810,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedMemberData = memberFormSchema.parse(memberData);
       console.log('✅ Validated member data:', validatedMemberData);
       
-      // Check if email already exists
-      const existingUser = await storage.getUserByEmail(validatedMemberData.email);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email already exists" });
+      // Skip email check for existing members (they're purchasing additional day passes)
+      if (!existingMemberId) {
+        // Check if email already exists only for new members
+        const existingUser = await storage.getUserByEmail(validatedMemberData.email);
+        if (existingUser) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
       }
       
       // Calculate final amount with discount
@@ -4876,8 +4878,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Confirm member creation after successful payment
   app.post("/api/kiosk/confirm-member-creation", async (req, res) => {
     try {
-      const { paymentIntentId, memberData, packageData, agreementData, discountData } = req.body;
-      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, memberData, packageData, agreementData, discountData });
+      const { paymentIntentId, memberData, packageData, agreementData, discountData, existingMemberId } = req.body;
+      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, memberData, packageData, agreementData, discountData, existingMemberId });
       
       // Validate agreement data
       const agreementSchema = z.object({
@@ -4901,27 +4903,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Payment not completed" });
       }
       
-      // Create the member account with agreement data
-      const salt = randomBytes(16).toString('hex');
-      const tempPassword = Math.random().toString(36).slice(-8);
-      const key = await scryptAsync(tempPassword, salt, 64) as Buffer;
+      let targetUser;
       
-      const newUser = await storage.createUser({
-        username: memberData.email,
-        email: memberData.email,
-        password: `${key.toString('hex')}:${salt}`,
-        firstName: memberData.firstName,
-        lastName: memberData.lastName,
-        phoneNumber: memberData.phoneNumber || undefined,
-        role: 'member',
-        // Agreement is completed during kiosk registration
-        membershipAgreementCompleted: true,
-        membershipAgreementDate: new Date(),
-        membershipAgreementData: agreementData,
-        dateOfBirth: agreementData?.dateOfBirth,
-        emergencyContact: agreementData?.emergencyContact,
-        emergencyPhone: agreementData?.emergencyPhone,
-      });
+      // Check if we're adding a day pass to an existing member or creating new member
+      if (existingMemberId) {
+        console.log('📦 Adding day pass to existing member:', existingMemberId);
+        targetUser = await storage.getUser(existingMemberId);
+        if (!targetUser) {
+          return res.status(404).json({ message: "Existing member not found" });
+        }
+      } else {
+        // Create the member account with agreement data
+        const salt = randomBytes(16).toString('hex');
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const key = await scryptAsync(tempPassword, salt, 64) as Buffer;
+        
+        targetUser = await storage.createUser({
+          username: memberData.email,
+          email: memberData.email,
+          password: `${key.toString('hex')}:${salt}`,
+          firstName: memberData.firstName,
+          lastName: memberData.lastName,
+          phoneNumber: memberData.phoneNumber || undefined,
+          role: 'member',
+          // Agreement is completed during kiosk registration
+          membershipAgreementCompleted: true,
+          membershipAgreementDate: new Date(),
+          membershipAgreementData: agreementData,
+          dateOfBirth: agreementData?.dateOfBirth,
+          emergencyContact: agreementData?.emergencyContact,
+          emergencyPhone: agreementData?.emergencyPhone,
+        });
+      }
+      
+      // Use targetUser instead of newUser for remainder of function
+      const newUser = targetUser;
       
       // Create membership or punch card based on package type
       if (memberData.packageType === 'membership') {

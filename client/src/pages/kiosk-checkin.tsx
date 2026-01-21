@@ -25,7 +25,7 @@ import {
   UserPlus,
   Search
 } from "lucide-react";
-import KioskMemberCreation from "./kiosk-member-creation";
+import KioskMemberCreation, { ExistingMember } from "./kiosk-member-creation";
 
 interface CheckInResponse {
   success?: boolean;
@@ -78,11 +78,13 @@ const memberFormSchema = z.object({
 type MemberFormData = z.infer<typeof memberFormSchema>;
 
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-drop-in'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-daypass'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [manualSearchTerm, setManualSearchTerm] = useState("");
+  const [dayPassSearchTerm, setDayPassSearchTerm] = useState("");
+  const [selectedExistingMember, setSelectedExistingMember] = useState<ExistingMember | null>(null);
   const { toast } = useToast();
   const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -97,6 +99,22 @@ export default function KioskCheckIn() {
       return await res.json();
     },
     enabled: scannerMode === 'manual-entry' && manualSearchTerm.trim().length >= 3,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Day pass search query for existing member lookup
+  const { data: dayPassSearchResults, isLoading: dayPassSearchLoading } = useQuery({
+    queryKey: ['/api/kiosk/search-member', dayPassSearchTerm, 'daypass'],
+    queryFn: async () => {
+      const res = await fetch(`/api/kiosk/search-member?query=${encodeURIComponent(dayPassSearchTerm)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Member not found');
+      return await res.json();
+    },
+    enabled: scannerMode === 'buy-daypass' && dayPassSearchTerm.trim().length >= 3 && !selectedExistingMember,
     retry: false,
     staleTime: 0,
     gcTime: 0,
@@ -166,6 +184,8 @@ export default function KioskCheckIn() {
     setPendingMembershipId(null);
     setPendingUserId(null);
     setManualSearchTerm("");
+    setDayPassSearchTerm("");
+    setSelectedExistingMember(null);
   };
 
   const resetAndResume = () => {
@@ -180,6 +200,8 @@ export default function KioskCheckIn() {
     setPendingMembershipId(null);
     setPendingUserId(null);
     setManualSearchTerm("");
+    setDayPassSearchTerm("");
+    setSelectedExistingMember(null);
     setScannerMode('waiting');
   };
 
@@ -198,6 +220,26 @@ export default function KioskCheckIn() {
       <KioskMemberCreation
         onBack={() => setScannerMode('waiting')}
         onSuccess={() => setScannerMode('waiting')}
+      />
+    );
+  }
+
+  // Show day pass purchase form for selected existing member
+  if (selectedExistingMember) {
+    return (
+      <KioskMemberCreation
+        onBack={() => {
+          setSelectedExistingMember(null);
+          setDayPassSearchTerm("");
+          setScannerMode('buy-daypass');
+        }}
+        onSuccess={() => {
+          setSelectedExistingMember(null);
+          setDayPassSearchTerm("");
+          setScannerMode('waiting');
+        }}
+        existingMember={selectedExistingMember}
+        dayPassOnly={true}
       />
     );
   }
@@ -231,7 +273,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'confirmation' && <User className="h-16 w-16 text-blue-500" />}
               {scannerMode === 'success' && <CheckCircle className="h-16 w-16 text-green-500" />}
               {scannerMode === 'error' && <User className="h-16 w-16 text-red-500" />}
-              {scannerMode === 'buy-drop-in' && <Sparkles className="h-16 w-16 text-green-600" />}
+              {scannerMode === 'buy-daypass' && <Sparkles className="h-16 w-16 text-green-600" />}
             </div>
             <CardTitle className="text-3xl font-heading font-bold">
               {scannerMode === 'waiting' && 'Ready to Check In'}
@@ -239,7 +281,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'confirmation' && 'Choose Check-In Method'}
               {scannerMode === 'success' && 'Welcome Back!'}
               {scannerMode === 'error' && 'Check-In Issue'}
-              {scannerMode === 'buy-drop-in' && 'Purchase Day Pass'}
+              {scannerMode === 'buy-daypass' && 'Purchase Day Pass'}
             </CardTitle>
           </CardHeader>
           
@@ -274,7 +316,7 @@ export default function KioskCheckIn() {
                   </Button>
                   
                   <Button 
-                    onClick={() => setScannerMode('create-member')}
+                    onClick={() => setScannerMode('buy-daypass')}
                     variant="outline"
                     size="lg"
                     className="border-2 border-green-600 text-green-600 hover:bg-green-50 text-base font-semibold py-4"
@@ -337,20 +379,14 @@ export default function KioskCheckIn() {
                               setPendingMembershipId(member.membershipId);
                               setPendingUserId(null);
                               checkInMutation.mutate({ membershipId: member.membershipId });
-                            } else if (member.dayPassesRemaining > 0) {
-                              // Day pass user without membership - check in by userId
+                            } else {
+                              // Check in by userId (works for day pass users or members without active membership)
                               setPendingMembershipId(null);
                               setPendingUserId(member.id);
                               checkInMutation.mutate({ userId: member.id });
-                            } else {
-                              toast({
-                                title: "Cannot Check In",
-                                description: "This member doesn't have an active membership or day passes.",
-                                variant: "destructive"
-                              });
                             }
                           }}
-                          disabled={checkInMutation.isPending || (member.membershipStatus === 'none' && member.dayPassesRemaining === 0)}
+                          disabled={checkInMutation.isPending}
                           className="w-full text-left p-4 hover:bg-primary/5 border-b last:border-b-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           data-testid={`member-result-${member.id}`}
                         >
@@ -421,6 +457,108 @@ export default function KioskCheckIn() {
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Buy Day Pass State */}
+            {scannerMode === 'buy-daypass' && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <p className="text-lg text-muted-foreground">
+                    Search for an existing member or create a new account
+                  </p>
+                </div>
+                
+                <div className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={dayPassSearchTerm}
+                    onChange={(e) => setDayPassSearchTerm(e.target.value)}
+                    className="text-lg py-6"
+                    data-testid="input-daypass-search"
+                    autoFocus
+                  />
+                  
+                  {dayPassSearchLoading && (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">Searching...</p>
+                    </div>
+                  )}
+                  
+                  {/* Search Results */}
+                  {dayPassSearchResults?.members && dayPassSearchResults.members.length > 0 && (
+                    <div className="border rounded-xl overflow-hidden bg-white shadow-lg max-h-60 overflow-y-auto">
+                      {dayPassSearchResults.members.map((member: {
+                        id: number;
+                        firstName: string;
+                        lastName: string;
+                        email: string;
+                        phoneNumber?: string;
+                        membershipStatus: string;
+                        dayPassesRemaining: number;
+                      }) => (
+                        <button
+                          key={member.id}
+                          onClick={() => {
+                            setSelectedExistingMember({
+                              id: member.id,
+                              firstName: member.firstName,
+                              lastName: member.lastName,
+                              email: member.email,
+                              phoneNumber: member.phoneNumber,
+                            });
+                          }}
+                          className="w-full text-left p-4 hover:bg-green-50 border-b last:border-b-0 transition-colors"
+                          data-testid={`daypass-member-${member.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-semibold text-foreground">
+                                {member.firstName} {member.lastName}
+                              </div>
+                              <div className="text-sm text-muted-foreground">{member.email}</div>
+                            </div>
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                              Select
+                            </Badge>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No Results */}
+                  {dayPassSearchResults?.members && dayPassSearchResults.members.length === 0 && dayPassSearchTerm.length >= 3 && (
+                    <Card className="bg-yellow-50 border-yellow-200">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-yellow-700 font-medium">No members found</p>
+                        <p className="text-sm text-yellow-600 mt-1">
+                          You can create a new member below.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                
+                <div className="flex gap-4 justify-center mt-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={resetToWaiting}
+                    className="border-primary text-primary hover:bg-primary/10"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setScannerMode('create-member')}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    New Member
                   </Button>
                 </div>
               </div>

@@ -558,6 +558,7 @@ function PaymentForm({
   discountData,
   onSuccess,
   onBack,
+  existingMemberId,
 }: {
   memberData: MemberFormData;
   packageData: any;
@@ -565,6 +566,7 @@ function PaymentForm({
   discountData?: DiscountData | null;
   onSuccess: () => void;
   onBack: () => void;
+  existingMemberId?: number;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -775,6 +777,7 @@ function PaymentForm({
             amountCents: discountAmountCents,
           } : null,
           useTerminal: true, // Use Terminal (card_present) payment method
+          existingMemberId, // Pass existing member ID if purchasing for existing member
         },
       );
       
@@ -820,6 +823,7 @@ function PaymentForm({
               reason: discountData.reason,
               amountCents: discountAmountCents,
             } : null,
+            existingMemberId,
           },
         );
 
@@ -899,6 +903,7 @@ function PaymentForm({
             reason: discountData.reason,
             amountCents: discountAmountCents,
           } : null,
+          existingMemberId,
         },
       );
       const { clientSecret } = await response.json();
@@ -945,6 +950,7 @@ function PaymentForm({
               reason: discountData.reason,
               amountCents: discountAmountCents,
             } : null,
+            existingMemberId,
           },
         );
 
@@ -1200,12 +1206,24 @@ function PaymentForm({
   );
 }
 
+export interface ExistingMember {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+}
+
 export default function KioskMemberCreation({
   onBack,
   onSuccess,
+  existingMember,
+  dayPassOnly = false,
 }: {
   onBack: () => void;
   onSuccess: () => void;
+  existingMember?: ExistingMember;
+  dayPassOnly?: boolean;
 }) {
   const { toast } = useToast();
   const [step, setStep] = useState<"form" | "agreement" | "payment" | "success">("form");
@@ -1234,11 +1252,11 @@ export default function KioskMemberCreation({
   const form = useForm<MemberFormData>({
     resolver: zodResolver(memberFormSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phoneNumber: "",
-      packageType: "membership",
+      firstName: existingMember?.firstName || "",
+      lastName: existingMember?.lastName || "",
+      email: existingMember?.email || "",
+      phoneNumber: existingMember?.phoneNumber || "",
+      packageType: dayPassOnly ? "daypass" : "membership",
       packageId: "",
     },
   });
@@ -1386,6 +1404,7 @@ export default function KioskMemberCreation({
                   discountData={null}
                   onSuccess={handlePaymentSuccess}
                   onBack={() => setStep("agreement")}
+                  existingMemberId={existingMember?.id}
                 />
               </Elements>
             </CardContent>

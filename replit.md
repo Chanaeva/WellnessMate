@@ -41,6 +41,7 @@ Wolf Mother Wellness is a full-stack web application designed for managing a the
 - **Hours of Operation Management**: Administrators can set and update daily hours of operation, including members-only hours and closed days, which are then displayed on the public landing page.
 - **User Experience**: Themed form placeholders, streamlined dashboards, consolidated payment/membership views, and a promotional landing page.
 - **Registration Flow**: A two-step process involving account creation followed by membership agreement, simplified using email as the primary identifier.
+- **Account Claim Flow**: Kiosk-created members can claim their account at /claim-account using SMS verification to set a portal password. Rate limiting (3 requests per 15 min, 5 verification attempts per 15 min) prevents brute-force attacks. Staff can optionally set a password during kiosk member creation for immediate portal access.
 
 ## External Dependencies
 

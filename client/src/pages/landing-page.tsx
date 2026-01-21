@@ -384,6 +384,18 @@ export default function LandingPage() {
     },
   });
 
+  // Fetch FAQ items
+  const { data: faqItems } = useQuery<{ id: number; question: string; answer: string; category?: string }[]>({
+    queryKey: ["/api/faq-items"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/faq-items");
+      return await res.json();
+    },
+  });
+
+  // FAQ accordion state
+  const [openFaqId, setOpenFaqId] = useState<number | null>(null);
+
   // Fetch active notifications
   const { data: activeNotifications } = useQuery<Notification[]>({
     queryKey: ["/api/notifications/active"],
@@ -887,6 +899,48 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* FAQ Section */}
+      {faqItems && faqItems.length > 0 && (
+        <section className="py-16 px-4 bg-background">
+          <div className="max-w-3xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-xl text-muted-foreground font-body">
+                Everything you need to know about Wolf Mother Wellness
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {faqItems.map((faq) => (
+                <div
+                  key={faq.id}
+                  className="border rounded-lg overflow-hidden bg-card"
+                >
+                  <button
+                    onClick={() => setOpenFaqId(openFaqId === faq.id ? null : faq.id)}
+                    className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="font-semibold text-foreground">{faq.question}</span>
+                    <ArrowRight
+                      className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
+                        openFaqId === faq.id ? 'rotate-90' : ''
+                      }`}
+                    />
+                  </button>
+                  {openFaqId === faq.id && (
+                    <div className="px-6 pb-4 text-muted-foreground font-body leading-relaxed">
+                      {faq.answer}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Call to Action */}
       <section className="py-20 px-4 bg-primary text-white">

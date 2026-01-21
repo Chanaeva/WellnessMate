@@ -4138,33 +4138,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FAQ item routes (Admin)
+  app.get("/api/admin/faq-items", isAdminOrStaff, async (req, res) => {
+    try {
+      const items = await storage.getAllFaqItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/faq-items", isAdminOrStaff, async (req, res) => {
+    try {
+      const { insertFaqItemSchema } = await import("@shared/schema");
+      const validatedData = insertFaqItemSchema.parse(req.body);
+      const item = await storage.createFaqItem(validatedData);
+      res.status(201).json(item);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/admin/faq-items/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const item = await storage.updateFaqItem(id, req.body);
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/faq-items/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteFaqItem(id);
+      res.json({ message: "FAQ item deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public FAQ route
+  app.get("/api/faq-items", async (req, res) => {
+    try {
+      const items = await storage.getActiveFaqItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Site settings route (Admin only)
   app.post("/api/admin/site-settings", isAdmin, async (req, res) => {
     try {
       const settings = req.body;
+      console.log('📝 Saving site settings:', settings);
+      
+      // Get existing settings to merge with updates
+      const existingFooterSettings = await storage.getLandingPageContentBySection('footer');
+      const existingValues: Record<string, string> = {};
+      for (const setting of existingFooterSettings) {
+        existingValues[setting.key] = setting.value;
+      }
+      console.log('📋 Existing values:', existingValues);
+      
+      // Only update fields that are explicitly provided (not undefined)
+      // This prevents accidentally overwriting with empty strings
       const settingsToSave = [
-        { section: 'footer', key: 'hoursOfOperation', value: settings.hoursOfOperation, isActive: true },
-        { section: 'footer', key: 'hoursMembers', value: settings.hoursMembers, isActive: true },
-        { section: 'footer', key: 'hoursDayPass', value: settings.hoursDayPass, isActive: true },
-        { section: 'footer', key: 'address', value: settings.address, isActive: true },
-        { section: 'footer', key: 'addressLine2', value: settings.addressLine2, isActive: true },
-        { section: 'footer', key: 'copyrightYear', value: settings.copyrightYear, isActive: true },
-        { section: 'footer', key: 'instagramHandle', value: settings.instagramHandle, isActive: true },
+        { section: 'footer', key: 'hoursOfOperation', value: settings.hoursOfOperation !== undefined ? settings.hoursOfOperation : existingValues.hoursOfOperation || '', isActive: true },
+        { section: 'footer', key: 'hoursMembers', value: settings.hoursMembers !== undefined ? settings.hoursMembers : existingValues.hoursMembers || '', isActive: true },
+        { section: 'footer', key: 'hoursDayPass', value: settings.hoursDayPass !== undefined ? settings.hoursDayPass : existingValues.hoursDayPass || '', isActive: true },
+        { section: 'footer', key: 'address', value: settings.address !== undefined ? settings.address : existingValues.address || '', isActive: true },
+        { section: 'footer', key: 'addressLine2', value: settings.addressLine2 !== undefined ? settings.addressLine2 : existingValues.addressLine2 || '', isActive: true },
+        { section: 'footer', key: 'copyrightYear', value: settings.copyrightYear !== undefined ? settings.copyrightYear : existingValues.copyrightYear || '', isActive: true },
+        { section: 'footer', key: 'instagramHandle', value: settings.instagramHandle !== undefined ? settings.instagramHandle : existingValues.instagramHandle || '', isActive: true },
       ];
 
       // Delete existing footer settings
-      const existingFooterSettings = await storage.getLandingPageContentBySection('footer');
+      console.log('🗑️ Deleting existing footer settings:', existingFooterSettings.length);
       for (const setting of existingFooterSettings) {
         await storage.deleteLandingPageContent(setting.id);
       }
 
       // Create new settings
+      console.log('✅ Creating new settings:', settingsToSave.map(s => ({ key: s.key, value: s.value })));
       for (const setting of settingsToSave) {
         await storage.createLandingPageContent(setting);
       }
 
       res.json({ message: 'Site settings saved successfully' });
     } catch (error: any) {
+      console.error('❌ Error saving site settings:', error);
       res.status(500).json({ message: error.message });
     }
   });

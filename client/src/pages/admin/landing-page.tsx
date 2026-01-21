@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LandingPageContent, insertLandingPageContentSchema, Promotion, insertPromotionSchema } from "@shared/schema";
+import { LandingPageContent, insertLandingPageContentSchema, Promotion, insertPromotionSchema, FaqItem, insertFaqItemSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,12 +50,108 @@ const promotionFormSchema = insertPromotionSchema.extend({
 type LandingPageContentFormData = z.infer<typeof landingPageContentFormSchema>;
 type PromotionFormData = z.infer<typeof promotionFormSchema>;
 
+// FAQ Form Schema
+const faqFormSchema = insertFaqItemSchema.extend({
+  isActive: z.boolean().default(true),
+});
+
+type FaqFormData = z.infer<typeof faqFormSchema>;
+
+// FAQ Form Component
+function FaqForm({ 
+  initialData, 
+  onSubmit, 
+  isLoading 
+}: { 
+  initialData: FaqItem | null; 
+  onSubmit: (data: FaqFormData) => void; 
+  isLoading: boolean;
+}) {
+  const [question, setQuestion] = useState(initialData?.question || '');
+  const [answer, setAnswer] = useState(initialData?.answer || '');
+  const [category, setCategory] = useState(initialData?.category || '');
+  const [sortOrder, setSortOrder] = useState(initialData?.sortOrder || 0);
+  const [isActive, setIsActive] = useState(initialData?.isActive ?? true);
+
+  useEffect(() => {
+    setQuestion(initialData?.question || '');
+    setAnswer(initialData?.answer || '');
+    setCategory(initialData?.category || '');
+    setSortOrder(initialData?.sortOrder || 0);
+    setIsActive(initialData?.isActive ?? true);
+  }, [initialData]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ question, answer, category: category || undefined, sortOrder, isActive });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="question">Question</Label>
+        <Input 
+          id="question"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Enter the question"
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="answer">Answer</Label>
+        <Textarea 
+          id="answer"
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          placeholder="Enter the answer"
+          rows={4}
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="category">Category (optional)</Label>
+          <Input 
+            id="category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="e.g., Membership, Hours, Services"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="sortOrder">Sort Order</Label>
+          <Input 
+            id="sortOrder"
+            type="number"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
+          />
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Switch 
+          id="isActive"
+          checked={isActive}
+          onCheckedChange={setIsActive}
+        />
+        <Label htmlFor="isActive">Active (visible on landing page)</Label>
+      </div>
+      <Button type="submit" disabled={isLoading} className="w-full">
+        {isLoading ? "Saving..." : (initialData ? "Update FAQ" : "Create FAQ")}
+      </Button>
+    </form>
+  );
+}
+
 export default function LandingPageManagement() {
   const { toast } = useToast();
   const [editingContent, setEditingContent] = useState<LandingPageContent | null>(null);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const [editingFaq, setEditingFaq] = useState<FaqItem | null>(null);
   const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
+  const [isFaqDialogOpen, setIsFaqDialogOpen] = useState(false);
   
   // Site settings state
   const [siteSettings, setSiteSettings] = useState({
@@ -149,6 +245,15 @@ export default function LandingPageManagement() {
     queryKey: ["/api/admin/promotions"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/promotions");
+      return await res.json();
+    },
+  });
+
+  // Fetch FAQ items
+  const { data: faqItems = [], isLoading: isFaqLoading } = useQuery<FaqItem[]>({
+    queryKey: ["/api/admin/faq-items"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/faq-items");
       return await res.json();
     },
   });
@@ -389,6 +494,73 @@ export default function LandingPageManagement() {
     },
   });
 
+  // FAQ mutations
+  const createFaqMutation = useMutation({
+    mutationFn: async (data: { question: string; answer: string; category?: string; sortOrder?: number; isActive?: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/faq-items", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/faq-items"] });
+      setIsFaqDialogOpen(false);
+      setEditingFaq(null);
+      toast({
+        title: "Success",
+        description: "FAQ item created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create FAQ item",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateFaqMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<FaqItem> }) => {
+      const res = await apiRequest("PUT", `/api/admin/faq-items/${id}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/faq-items"] });
+      setIsFaqDialogOpen(false);
+      setEditingFaq(null);
+      toast({
+        title: "Success",
+        description: "FAQ item updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update FAQ item",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteFaqMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/faq-items/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/faq-items"] });
+      toast({
+        title: "Success",
+        description: "FAQ item deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete FAQ item",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Site settings mutation
   const saveSettingsMutation = useMutation({
     mutationFn: async (settings: typeof siteSettings) => {
@@ -594,6 +766,7 @@ export default function LandingPageManagement() {
             <Image className="h-4 w-4 mr-1" />
             Image Carousel
           </TabsTrigger>
+          <TabsTrigger value="faq">FAQ</TabsTrigger>
           <TabsTrigger value="settings">Site Settings</TabsTrigger>
         </TabsList>
 
@@ -1159,6 +1332,96 @@ export default function LandingPageManagement() {
         {/* Gallery/Image Carousel Tab */}
         <TabsContent value="gallery" className="space-y-6">
           <AdminGallery />
+        </TabsContent>
+
+        {/* FAQ Tab */}
+        <TabsContent value="faq" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Frequently Asked Questions</h3>
+            <Dialog open={isFaqDialogOpen} onOpenChange={setIsFaqDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => setEditingFaq(null)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add FAQ Item
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingFaq ? "Edit FAQ Item" : "Add FAQ Item"}
+                  </DialogTitle>
+                </DialogHeader>
+                <FaqForm
+                  initialData={editingFaq}
+                  onSubmit={(data) => {
+                    const cleanData = {
+                      ...data,
+                      category: data.category || undefined,
+                    };
+                    if (editingFaq) {
+                      updateFaqMutation.mutate({ id: editingFaq.id, data: cleanData });
+                    } else {
+                      createFaqMutation.mutate(cleanData);
+                    }
+                  }}
+                  isLoading={createFaqMutation.isPending || updateFaqMutation.isPending}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {isFaqLoading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading FAQ items...</p>
+            </div>
+          ) : faqItems.length > 0 ? (
+            <div className="space-y-4">
+              {faqItems.map((faq) => (
+                <Card key={faq.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{faq.question}</CardTitle>
+                        {faq.category && (
+                          <Badge variant="outline" className="mt-1">{faq.category}</Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge variant={faq.isActive ? "default" : "secondary"}>
+                          {faq.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingFaq(faq);
+                            setIsFaqDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteFaqMutation.mutate(faq.id)}
+                          disabled={deleteFaqMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No FAQ items yet. Create your first one!</p>
+            </div>
+          )}
         </TabsContent>
 
         {/* Site Settings Tab */}

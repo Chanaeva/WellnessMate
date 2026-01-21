@@ -224,6 +224,18 @@ export const galleryImages = pgTable("gallery_images", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// FAQ items table for landing page
+export const faqItems = pgTable("faq_items", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  category: text("category"), // Optional category for grouping FAQs
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -540,6 +552,15 @@ export const insertGalleryImageSchema = createInsertSchema(galleryImages).omit({
 
 export type GalleryImage = typeof galleryImages.$inferSelect;
 export type InsertGalleryImage = z.infer<typeof insertGalleryImageSchema>;
+
+// FAQ item schema and types
+export const insertFaqItemSchema = createInsertSchema(faqItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type FaqItem = typeof faqItems.$inferSelect;
+export type InsertFaqItem = z.infer<typeof insertFaqItemSchema>;
 
 // Inventory item type enum
 export const itemTypeEnum = pgEnum('item_type', ['robe', 'shoes', 'other']);

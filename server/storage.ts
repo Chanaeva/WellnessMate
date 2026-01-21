@@ -16,6 +16,7 @@ import {
   landingPageContent, type LandingPageContent, type InsertLandingPageContent,
   promotions, type Promotion, type InsertPromotion,
   galleryImages, type GalleryImage, type InsertGalleryImage,
+  faqItems, type FaqItem, type InsertFaqItem,
   inventoryItems, type InventoryItem, type InsertInventoryItem,
   itemCheckouts, type ItemCheckout, type InsertItemCheckout,
   loginEvents, type LoginEvent, type InsertLoginEvent,
@@ -162,6 +163,14 @@ export interface IStorage {
   createGalleryImage(image: InsertGalleryImage): Promise<GalleryImage>;
   updateGalleryImage(id: number, data: Partial<GalleryImage>): Promise<GalleryImage>;
   deleteGalleryImage(id: number): Promise<void>;
+
+  // FAQ item methods
+  getAllFaqItems(): Promise<FaqItem[]>;
+  getActiveFaqItems(): Promise<FaqItem[]>;
+  getFaqItemById(id: number): Promise<FaqItem | undefined>;
+  createFaqItem(item: InsertFaqItem): Promise<FaqItem>;
+  updateFaqItem(id: number, data: Partial<FaqItem>): Promise<FaqItem>;
+  deleteFaqItem(id: number): Promise<void>;
 
   // Inventory item methods
   getAllInventoryItems(): Promise<InventoryItem[]>;
@@ -1171,6 +1180,48 @@ export class DatabaseStorage implements IStorage {
 
   async deleteGalleryImage(id: number): Promise<void> {
     await db.delete(galleryImages).where(eq(galleryImages.id, id));
+  }
+
+  // FAQ item methods
+  async getAllFaqItems(): Promise<FaqItem[]> {
+    return await db
+      .select()
+      .from(faqItems)
+      .orderBy(faqItems.sortOrder, faqItems.createdAt);
+  }
+
+  async getActiveFaqItems(): Promise<FaqItem[]> {
+    return await db
+      .select()
+      .from(faqItems)
+      .where(eq(faqItems.isActive, true))
+      .orderBy(faqItems.sortOrder, faqItems.createdAt);
+  }
+
+  async getFaqItemById(id: number): Promise<FaqItem | undefined> {
+    const [item] = await db.select().from(faqItems).where(eq(faqItems.id, id));
+    return item || undefined;
+  }
+
+  async createFaqItem(item: InsertFaqItem): Promise<FaqItem> {
+    const [created] = await db
+      .insert(faqItems)
+      .values(item)
+      .returning();
+    return created;
+  }
+
+  async updateFaqItem(id: number, data: Partial<FaqItem>): Promise<FaqItem> {
+    const [updated] = await db
+      .update(faqItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(faqItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFaqItem(id: number): Promise<void> {
+    await db.delete(faqItems).where(eq(faqItems.id, id));
   }
 
   // Inventory item methods

@@ -4983,8 +4983,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Create the member account with agreement data
         const salt = randomBytes(16).toString('hex');
-        const tempPassword = Math.random().toString(36).slice(-8);
-        const key = await scryptAsync(tempPassword, salt, 64) as Buffer;
+        // Use provided password if set, otherwise generate a random one
+        const passwordToHash = memberData.password && memberData.password.trim() 
+          ? memberData.password 
+          : Math.random().toString(36).slice(-8);
+        const key = await scryptAsync(passwordToHash, salt, 64) as Buffer;
         
         targetUser = await storage.createUser({
           username: memberData.email,
@@ -5002,6 +5005,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emergencyContact: agreementData?.emergencyContact,
           emergencyPhone: agreementData?.emergencyPhone,
         });
+        
+        // Log whether a password was set for debugging
+        console.log(`Member created with ${memberData.password ? 'custom' : 'random'} password`);
       }
       
       // Use targetUser instead of newUser for remainder of function

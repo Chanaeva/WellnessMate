@@ -23,7 +23,8 @@ import {
   ArrowLeft,
   Waves,
   UserPlus,
-  Search
+  Search,
+  Crown
 } from "lucide-react";
 import KioskMemberCreation, { ExistingMember } from "./kiosk-member-creation";
 
@@ -78,7 +79,9 @@ const memberFormSchema = z.object({
 type MemberFormData = z.infer<typeof memberFormSchema>;
 
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-daypass'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'create-member' | 'buy-daypass' | 'buy-membership'>('waiting');
+  const [membershipSearchTerm, setMembershipSearchTerm] = useState("");
+  const [selectedMemberForMembership, setSelectedMemberForMembership] = useState<ExistingMember | null>(null);
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
@@ -115,6 +118,22 @@ export default function KioskCheckIn() {
       return await res.json();
     },
     enabled: scannerMode === 'buy-daypass' && dayPassSearchTerm.trim().length >= 3 && !selectedExistingMember,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Membership search query for existing member lookup
+  const { data: membershipSearchResults, isLoading: membershipSearchLoading } = useQuery({
+    queryKey: ['/api/kiosk/search-member', membershipSearchTerm, 'membership'],
+    queryFn: async () => {
+      const res = await fetch(`/api/kiosk/search-member?query=${encodeURIComponent(membershipSearchTerm)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Member not found');
+      return await res.json();
+    },
+    enabled: scannerMode === 'buy-membership' && membershipSearchTerm.trim().length >= 3 && !selectedMemberForMembership,
     retry: false,
     staleTime: 0,
     gcTime: 0,
@@ -201,7 +220,9 @@ export default function KioskCheckIn() {
     setPendingUserId(null);
     setManualSearchTerm("");
     setDayPassSearchTerm("");
+    setMembershipSearchTerm("");
     setSelectedExistingMember(null);
+    setSelectedMemberForMembership(null);
     setScannerMode('waiting');
   };
 
@@ -244,6 +265,26 @@ export default function KioskCheckIn() {
     );
   }
 
+  // Show membership purchase form for selected existing member
+  if (selectedMemberForMembership) {
+    return (
+      <KioskMemberCreation
+        onBack={() => {
+          setSelectedMemberForMembership(null);
+          setMembershipSearchTerm("");
+          setScannerMode('buy-membership');
+        }}
+        onSuccess={() => {
+          setSelectedMemberForMembership(null);
+          setMembershipSearchTerm("");
+          setScannerMode('waiting');
+        }}
+        existingMember={selectedMemberForMembership}
+        dayPassOnly={false}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl mx-auto">
@@ -274,6 +315,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'success' && <CheckCircle className="h-16 w-16 text-green-500" />}
               {scannerMode === 'error' && <User className="h-16 w-16 text-red-500" />}
               {scannerMode === 'buy-daypass' && <Sparkles className="h-16 w-16 text-green-600" />}
+              {scannerMode === 'buy-membership' && <Crown className="h-16 w-16 text-primary" />}
             </div>
             <CardTitle className="text-3xl font-heading font-bold">
               {scannerMode === 'waiting' && 'Ready to Check In'}
@@ -282,6 +324,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'success' && 'Welcome Back!'}
               {scannerMode === 'error' && 'Check-In Issue'}
               {scannerMode === 'buy-daypass' && 'Purchase Day Pass'}
+              {scannerMode === 'buy-membership' && 'Purchase Membership'}
             </CardTitle>
           </CardHeader>
           
@@ -324,6 +367,17 @@ export default function KioskCheckIn() {
                   >
                     <Sparkles className="h-5 w-5 mr-2" />
                     Buy Day Pass
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setScannerMode('buy-membership')}
+                    variant="outline"
+                    size="lg"
+                    className="border-2 border-primary text-primary hover:bg-primary/10 text-base font-semibold py-4"
+                    data-testid="button-buy-membership"
+                  >
+                    <Crown className="h-5 w-5 mr-2" />
+                    Buy Membership
                   </Button>
                 </div>
                 
@@ -556,6 +610,113 @@ export default function KioskCheckIn() {
                   <Button 
                     onClick={() => setScannerMode('create-member')}
                     className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    New Member
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Buy Membership State */}
+            {scannerMode === 'buy-membership' && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <p className="text-lg text-muted-foreground">
+                    Search for an existing member to purchase a membership
+                  </p>
+                </div>
+                
+                <div className="space-y-4">
+                  <Input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={membershipSearchTerm}
+                    onChange={(e) => setMembershipSearchTerm(e.target.value)}
+                    className="text-lg py-6"
+                    data-testid="input-membership-search"
+                    autoFocus
+                  />
+                  
+                  {membershipSearchLoading && (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">Searching...</p>
+                    </div>
+                  )}
+                  
+                  {/* Search Results */}
+                  {membershipSearchResults?.members && membershipSearchResults.members.length > 0 && (
+                    <div className="border rounded-xl overflow-hidden bg-white shadow-lg max-h-60 overflow-y-auto">
+                      {membershipSearchResults.members.map((member: {
+                        id: number;
+                        firstName: string;
+                        lastName: string;
+                        email: string;
+                        phoneNumber?: string;
+                        membershipStatus: string;
+                        dayPassesRemaining: number;
+                      }) => (
+                        <button
+                          key={member.id}
+                          onClick={() => {
+                            setSelectedMemberForMembership({
+                              id: member.id,
+                              firstName: member.firstName,
+                              lastName: member.lastName,
+                              email: member.email,
+                              phoneNumber: member.phoneNumber,
+                            });
+                          }}
+                          className="w-full text-left p-4 hover:bg-primary/10 border-b last:border-b-0 transition-colors"
+                          data-testid={`membership-member-${member.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-semibold text-foreground">
+                                {member.firstName} {member.lastName}
+                              </div>
+                              <div className="text-sm text-muted-foreground">{member.email}</div>
+                              {member.membershipStatus && (
+                                <Badge variant={member.membershipStatus === 'active' ? 'default' : 'secondary'} className="mt-1">
+                                  {member.membershipStatus}
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge className="bg-primary/10 text-primary hover:bg-primary/20">
+                              Select
+                            </Badge>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No Results */}
+                  {membershipSearchResults?.members && membershipSearchResults.members.length === 0 && membershipSearchTerm.length >= 3 && (
+                    <Card className="bg-yellow-50 border-yellow-200">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-yellow-700 font-medium">No members found</p>
+                        <p className="text-sm text-yellow-600 mt-1">
+                          You can create a new member using the New Member option.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                
+                <div className="flex gap-4 justify-center mt-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={resetToWaiting}
+                    className="border-primary text-primary hover:bg-primary/10"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setScannerMode('create-member')}
+                    className="bg-primary hover:bg-primary/90 text-white"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
                     New Member

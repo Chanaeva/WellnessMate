@@ -340,6 +340,17 @@ function AuthPage() {
                             Register here
                           </Button>
                         </p>
+                        <p className="text-sm text-muted-foreground">
+                          Registered at our kiosk?{" "}
+                          <Link href="/claim-account">
+                            <Button
+                              variant="link"
+                              className="p-0"
+                            >
+                              Set up your login here
+                            </Button>
+                          </Link>
+                        </p>
                         <div className="border-t border-border pt-3 mt-3">
                           <Link href="/admin-login">
                             <Button

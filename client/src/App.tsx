@@ -13,6 +13,7 @@ import AuthPage from "@/pages/auth-page";
 import AdminLogin from "@/pages/admin-login";
 import ForgotPasswordPage from "@/pages/forgot-password-page";
 import ResetPasswordPage from "@/pages/reset-password-page";
+import ClaimAccountPage from "@/pages/claim-account";
 import MemberDashboard from "@/pages/member-dashboard";
 
 import PackagesPage from "@/pages/packages-page";
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      <Route path="/claim-account" component={ClaimAccountPage} />
       <ProtectedRoute path="/set-password" component={SetPassword} />
       
       {/* Member routes */}

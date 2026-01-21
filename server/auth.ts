@@ -547,4 +547,184 @@ export function setupAuth(app: Express) {
       next(error);
     }
   });
+
+  // Simple in-memory rate limiting for claim account requests
+  const claimAttempts = new Map<string, { count: number; lastAttempt: Date }>();
+  const MAX_CLAIM_ATTEMPTS = 3;
+  const CLAIM_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Claim account - request verification code for kiosk-created members
+  app.post("/api/claim-account/request", async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Rate limiting by email
+      const normalizedEmail = email.toLowerCase().trim();
+      const now = new Date();
+      const attempts = claimAttempts.get(normalizedEmail);
+      
+      if (attempts) {
+        const timeSinceFirst = now.getTime() - attempts.lastAttempt.getTime();
+        if (timeSinceFirst < CLAIM_WINDOW_MS && attempts.count >= MAX_CLAIM_ATTEMPTS) {
+          console.log(`Rate limit exceeded for ${normalizedEmail}`);
+          return res.status(429).json({ 
+            message: "Too many attempts. Please wait 15 minutes before trying again.",
+            rateLimited: true
+          });
+        }
+        if (timeSinceFirst >= CLAIM_WINDOW_MS) {
+          claimAttempts.set(normalizedEmail, { count: 1, lastAttempt: now });
+        } else {
+          attempts.count++;
+          attempts.lastAttempt = now;
+        }
+      } else {
+        claimAttempts.set(normalizedEmail, { count: 1, lastAttempt: now });
+      }
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(200).json({ 
+          message: "No account found with that email.",
+          notFound: true
+        });
+      }
+
+      // Check if user is a member (not staff/admin)
+      if (user.role !== 'member') {
+        return res.status(200).json({ 
+          message: "Staff and admin accounts should use the admin login page.",
+          notMember: true
+        });
+      }
+
+      // Check if user has a phone number for SMS
+      if (!user.phoneNumber) {
+        console.log(`Account claim requested for user ${user.id} but no phone number on file`);
+        return res.status(200).json({ 
+          message: "No phone number on file. Please visit our front desk to add your phone number.",
+          needsPhone: true
+        });
+      }
+
+      // Generate a 6-digit verification code
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      // Invalidate any existing unused tokens for this user before creating a new one
+      // (The storage method should mark all previous tokens as used)
+      
+      // Store token
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        token: verificationCode,
+        expiresAt,
+        used: false
+      });
+
+      // Send SMS via Twilio
+      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+      if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
+        console.error("Twilio credentials not configured");
+        return res.status(500).json({ message: "SMS service not configured. Please contact support." });
+      }
+
+      try {
+        const twilioClient = Twilio(twilioAccountSid, twilioAuthToken);
+        
+        await twilioClient.messages.create({
+          body: `Your Wolf Mother Wellness verification code is: ${verificationCode}. This code expires in 15 minutes.`,
+          from: twilioPhoneNumber,
+          to: user.phoneNumber
+        });
+
+        console.log(`Account claim verification SMS sent to ${user.phoneNumber} for user ${user.id}`);
+        
+        res.status(200).json({ 
+          message: "A verification code has been sent to your phone.",
+          phoneLastFour: user.phoneNumber.slice(-4)
+        });
+      } catch (smsError: any) {
+        console.error("Failed to send SMS:", smsError.message);
+        return res.status(500).json({ message: "Failed to send verification code. Please try again or contact support." });
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Rate limiting for verification attempts
+  const verifyAttempts = new Map<string, { count: number; lastAttempt: Date }>();
+  const MAX_VERIFY_ATTEMPTS = 5;
+  const VERIFY_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Claim account - verify code and set password
+  app.post("/api/claim-account/verify", async (req, res, next) => {
+    try {
+      const { email, code, newPassword } = req.body;
+
+      if (!email || !code || !newPassword) {
+        return res.status(400).json({ message: "Email, code, and password are required" });
+      }
+
+      // Rate limiting by email
+      const normalizedEmail = email.toLowerCase().trim();
+      const now = new Date();
+      const attempts = verifyAttempts.get(normalizedEmail);
+      
+      if (attempts) {
+        const timeSinceFirst = now.getTime() - attempts.lastAttempt.getTime();
+        if (timeSinceFirst < VERIFY_WINDOW_MS && attempts.count >= MAX_VERIFY_ATTEMPTS) {
+          console.log(`Verification rate limit exceeded for ${normalizedEmail}`);
+          return res.status(429).json({ 
+            message: "Too many verification attempts. Please wait 15 minutes before trying again.",
+            rateLimited: true
+          });
+        }
+        if (timeSinceFirst >= VERIFY_WINDOW_MS) {
+          verifyAttempts.set(normalizedEmail, { count: 1, lastAttempt: now });
+        } else {
+          attempts.count++;
+          attempts.lastAttempt = now;
+        }
+      } else {
+        verifyAttempts.set(normalizedEmail, { count: 1, lastAttempt: now });
+      }
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid email or verification code" });
+      }
+
+      // Find and validate token - lookup by userId first, then verify code matches
+      const resetToken = await storage.getPasswordResetToken(code);
+      if (!resetToken || resetToken.userId !== user.id || resetToken.used || new Date() > new Date(resetToken.expiresAt!)) {
+        return res.status(400).json({ message: "Invalid or expired verification code" });
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Update user password
+      await storage.updateUserPassword(user.id, hashedPassword);
+
+      // Mark token as used
+      await storage.markTokenAsUsed(resetToken.id);
+
+      console.log(`Account claimed successfully for user ${user.id} (${user.email})`);
+
+      res.status(200).json({ message: "Account activated successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
 }

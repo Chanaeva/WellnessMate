@@ -65,6 +65,7 @@ const memberFormSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Valid email is required"),
   phoneNumber: z.string().optional(),
+  password: z.string().optional(),
   packageType: z.enum(["membership", "daypass"]),
   packageId: z.string().min(1, "Please select a package"),
 });
@@ -1256,6 +1257,7 @@ export default function KioskMemberCreation({
       lastName: existingMember?.lastName || "",
       email: existingMember?.email || "",
       phoneNumber: existingMember?.phoneNumber || "",
+      password: "",
       packageType: dayPassOnly ? "daypass" : "membership",
       packageId: "",
     },
@@ -1523,6 +1525,30 @@ export default function KioskMemberCreation({
                       </FormItem>
                     )}
                   />
+
+                  {!existingMember && (
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Portal Password (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="Set a password for portal login"
+                              {...field}
+                              className="text-lg py-3"
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            If set, member can log in to the portal. Leave blank to set up later.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={form.control}

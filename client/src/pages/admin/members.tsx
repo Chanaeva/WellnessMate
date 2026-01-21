@@ -68,6 +68,7 @@ import {
   Activity,
   AlertCircle,
   Ticket,
+  Link2,
 } from "lucide-react";
 import {
   Select,
@@ -705,6 +706,23 @@ export default function AdminMembers() {
                             data-testid={`button-archive-${member.id}`}
                           >
                             <Archive className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-600 hover:text-purple-700 h-8 w-8 p-0"
+                            title="Copy Claim Account Link"
+                            onClick={() => {
+                              const claimUrl = `${window.location.origin}/claim-account`;
+                              navigator.clipboard.writeText(claimUrl);
+                              toast({
+                                title: "Link Copied",
+                                description: "Claim account link copied to clipboard",
+                              });
+                            }}
+                            data-testid={`button-claim-link-${member.id}`}
+                          >
+                            <Link2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>

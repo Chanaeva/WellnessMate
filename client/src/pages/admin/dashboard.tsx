@@ -25,7 +25,8 @@ import {
   CheckCircle,
   DollarSign,
   Monitor,
-  ExternalLink
+  ExternalLink,
+  QrCode
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -45,6 +46,7 @@ import AdminSessions from "./sessions";
 import AdminSessionBookings from "./session-bookings";
 import StaffItems from "@/pages/staff-items";
 import AdminDayPasses from "./day-passes";
+import AdminCheckIns from "./check-ins";
 // Hidden for now - Card Readers requires WiFi reader hardware
 // import AdminCardReaders from "./card-readers";
 
@@ -178,6 +180,7 @@ export default function AdminDashboard() {
           <TabsList className="flex w-full overflow-x-auto gap-1 px-1 whitespace-nowrap">
             <TabsTrigger value="overview" className="flex-shrink-0">Overview</TabsTrigger>
             <TabsTrigger value="members" className="flex-shrink-0">Members</TabsTrigger>
+            <TabsTrigger value="check-ins" className="flex-shrink-0">Check-ins</TabsTrigger>
             <TabsTrigger value="day-passes" className="flex-shrink-0">Day Passes</TabsTrigger>
             <TabsTrigger value="staff" className="flex-shrink-0">Staff</TabsTrigger>
             <TabsTrigger value="sessions" className="flex-shrink-0">Sessions</TabsTrigger>
@@ -322,6 +325,11 @@ export default function AdminDashboard() {
           {/* Members Tab */}
           <TabsContent value="members" className="space-y-6">
             <AdminMembers />
+          </TabsContent>
+
+          {/* Check-ins Tab */}
+          <TabsContent value="check-ins" className="space-y-6">
+            <AdminCheckIns />
           </TabsContent>
 
           {/* Day Passes Tab */}

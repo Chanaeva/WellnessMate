@@ -111,6 +111,7 @@ export default function AdminCheckIns() {
         title: "Punch Deducted",
         description: `Successfully deducted 1 punch from ${selectedPunchMember?.firstName}'s day pass. ${data.remainingPunches} punches remaining.`,
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/member-search"] });
       setIsPunchDeductionOpen(false);
       setSelectedPunchMember(null);
       setPunchSearchTerm("");

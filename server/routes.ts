@@ -3267,7 +3267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin check-ins route with pagination
   app.get("/api/admin/check-ins", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'admin') {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
       return res.sendStatus(403);
     }
     

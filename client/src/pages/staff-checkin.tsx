@@ -82,6 +82,9 @@ export default function StaffCheckIn() {
       
       // Invalidate search results to refresh day pass counts
       queryClient.invalidateQueries({ queryKey: ['/api/staff/search-members'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/check-ins"] });
       
       // Clear selected member and close dialogs
       setSelectedMember(null);

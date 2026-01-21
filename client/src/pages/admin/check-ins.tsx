@@ -88,6 +88,8 @@ export default function AdminCheckIns() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/check-ins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/check-ins/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
       setIsManualCheckInOpen(false);
       setSelectedMember(null);
       setMemberSearchTerm("");
@@ -112,6 +114,8 @@ export default function AdminCheckIns() {
         description: `Successfully deducted 1 punch from ${selectedPunchMember?.firstName}'s day pass. ${data.remainingPunches} punches remaining.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/member-search"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
       setIsPunchDeductionOpen(false);
       setSelectedPunchMember(null);
       setPunchSearchTerm("");

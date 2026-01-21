@@ -153,6 +153,8 @@ export default function KioskCheckIn() {
       } else if (data.success) {
         setScannerMode('success');
         queryClient.invalidateQueries({ queryKey: ["/api/check-ins"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
         
         // Auto-resume scanning after 30 seconds to allow time for item checkout
         autoResumeTimerRef.current = setTimeout(() => {

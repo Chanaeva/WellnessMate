@@ -3127,7 +3127,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin/Staff member search for manual check-in and punch deduction
   app.get("/api/admin/member-search", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
+    console.log("Member search - isAuthenticated:", req.isAuthenticated(), "user:", req.user?.email, "role:", req.user?.role);
+    if (!req.isAuthenticated() || (req.user?.role !== 'admin' && req.user?.role !== 'staff')) {
+      console.log("Member search - returning 403");
       return res.sendStatus(403);
     }
     

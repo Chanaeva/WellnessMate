@@ -3125,6 +3125,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin/Staff member search for manual check-in and punch deduction
+  app.get("/api/admin/member-search", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const query = (req.query.q as string || '').trim();
+      
+      if (query.length < 2) {
+        return res.json([]);
+      }
+
+      // Search for members by name or email
+      const allUsers = await storage.getAllUsers();
+      const searchLower = query.toLowerCase();
+      
+      const matchingMembers = allUsers
+        .filter(user => 
+          user.firstName?.toLowerCase().includes(searchLower) ||
+          user.lastName?.toLowerCase().includes(searchLower) ||
+          user.email?.toLowerCase().includes(searchLower)
+        )
+        .slice(0, 10);
+
+      // Get membership and day pass info for each member
+      const results = await Promise.all(matchingMembers.map(async (user) => {
+        const membership = await storage.getMembershipByUserId(user.id);
+        const punchCards = await storage.getPunchCardsByUserId(user.id);
+        const dayPassesRemaining = punchCards
+          .filter(card => card.status === 'active' && card.remainingPunches > 0)
+          .reduce((sum, card) => sum + card.remainingPunches, 0);
+
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          membershipId: membership?.membershipId || null,
+          membershipStatus: membership?.status || 'none',
+          dayPassesRemaining
+        };
+      }));
+
+      res.json(results);
+    } catch (error: any) {
+      console.error("Admin member search error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Manual check-in for staff (enhanced with day pass support)
   app.post("/api/admin/manual-checkin", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'staff')) {

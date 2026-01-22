@@ -197,8 +197,8 @@ export default function LandingPage() {
         hoursOfOperation: data.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
         hoursMembers: data.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
         hoursDayPass: data.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
-        address: data.find((s: any) => s.key === 'address')?.value || '2124 W Admiral',
-        addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
+        address: data.find((s: any) => s.key === 'address')?.value || '',
+        addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || '',
         copyrightYear: data.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
         instagramHandle: data.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
       };
@@ -943,7 +943,7 @@ export default function LandingPage() {
                 Visit Us
               </h3>
               <p className="text-muted-foreground font-body">
-                {footerSettings?.address || '2124 E Admiral'}
+                {footerSettings?.address}
                 <br />
                 {footerSettings?.addressLine2?.split('\n').map((line: string, i: number) => (
                   <span key={i}>

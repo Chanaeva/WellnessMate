@@ -283,8 +283,8 @@ export default function LandingPageManagement() {
         hoursOfOperation: footerData.find((s: any) => s.key === 'hoursOfOperation')?.value || '6:00 AM - 10:00 PM',
         hoursMembers: footerData.find((s: any) => s.key === 'hoursMembers')?.value || '6:00 AM - 9:00 AM',
         hoursDayPass: footerData.find((s: any) => s.key === 'hoursDayPass')?.value || '9:00 AM - 10:00 PM',
-        address: footerData.find((s: any) => s.key === 'address')?.value || '2124 W Admiral',
-        addressLine2: footerData.find((s: any) => s.key === 'addressLine2')?.value || 'Kendall Whitter Neighborhood\nTulsa, OK',
+        address: footerData.find((s: any) => s.key === 'address')?.value || '',
+        addressLine2: footerData.find((s: any) => s.key === 'addressLine2')?.value || '',
         copyrightYear: footerData.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
         instagramHandle: footerData.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
       };

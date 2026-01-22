@@ -195,19 +195,26 @@ export default function AdminMembers() {
     mutationFn: async (data: EditMemberFormData & { id: number }) => {
       const { id, membershipStatus, membershipPlanType, membershipStartDate, membershipEndDate, ...userData } = data;
       
-      // Update user data
+      // Update user data first
       await apiRequest("PUT", `/api/admin/members/${id}`, userData);
       
-      // Update membership if it exists and any membership fields changed
-      if (selectedMember?.membership?.id && (membershipStatus || membershipPlanType || membershipStartDate || membershipEndDate)) {
+      // Only update membership if member actually has one and fields have values
+      if (selectedMember?.membership?.id) {
         const membershipUpdate: any = {};
         if (membershipStatus) membershipUpdate.status = membershipStatus;
         if (membershipPlanType) membershipUpdate.planType = membershipPlanType;
         if (membershipStartDate) membershipUpdate.startDate = membershipStartDate;
         if (membershipEndDate) membershipUpdate.endDate = membershipEndDate;
         
-        // Use numeric membership ID, not membershipId string
-        await apiRequest("PATCH", `/api/admin/memberships/${selectedMember.membership.id}`, membershipUpdate);
+        // Only make the request if there are actual updates
+        if (Object.keys(membershipUpdate).length > 0) {
+          try {
+            await apiRequest("PATCH", `/api/admin/memberships/${selectedMember.membership.id}`, membershipUpdate);
+          } catch (error) {
+            // Log but don't fail the whole operation if membership update fails
+            console.warn("Membership update failed, member data was updated successfully");
+          }
+        }
       }
       
       return { success: true };
@@ -572,44 +579,43 @@ export default function AdminMembers() {
               <p className="text-gray-500">Loading members...</p>
             </div>
           ) : filteredMembers.length > 0 ? (
-            <div className="border rounded-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
+            <div className="border rounded-lg overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Member
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell"
                     >
-                      {" "}
                       ID
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Status
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell"
                     >
                       Plan
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell"
                     >
                       End Date
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Actions
                     </th>
@@ -622,26 +628,26 @@ export default function AdminMembers() {
                       className={index % 2 === 1 ? "bg-gray-50" : ""}
                       data-testid={`row-member-${member.id}`}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-full bg-primary text-white flex items-center justify-center font-medium">
+                          <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-primary text-white flex items-center justify-center font-medium text-xs md:text-sm">
                             {member.firstName.charAt(0)}
                             {member.lastName.charAt(0)}
                           </div>
-                          <div className="ml-3">
+                          <div className="ml-2 md:ml-3">
                             <div className="text-sm font-medium text-gray-900" data-testid={`text-member-name-${member.id}`}>
                               {member.firstName} {member.lastName}
                             </div>
-                            <div className="text-xs text-gray-500" data-testid={`text-member-email-${member.id}`}>
+                            <div className="text-xs text-gray-500 truncate max-w-[120px] md:max-w-none" data-testid={`text-member-email-${member.id}`}>
                               {member.email}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-testid={`text-membership-id-${member.id}`}>
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap text-gray-900 hidden sm:table-cell" data-testid={`text-membership-id-${member.id}`}>
                         {member.membership?.membershipId || "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap">
                         <Badge
                           className={
                             member.membership?.status === "active"
@@ -661,13 +667,13 @@ export default function AdminMembers() {
                                 .charAt(0)
                                 .toUpperCase() +
                               member.membership.status.slice(1)
-                            : "No Membership"}
+                            : "None"}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize" data-testid={`text-plan-type-${member.id}`}>
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap text-gray-900 capitalize hidden md:table-cell" data-testid={`text-plan-type-${member.id}`}>
                         {member.membership?.planType || "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900" data-testid={`text-end-date-${member.id}`}>
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap text-gray-900 hidden lg:table-cell" data-testid={`text-end-date-${member.id}`}>
                         {member.membership?.endDate
                           ? format(
                               new Date(member.membership.endDate),
@@ -675,8 +681,8 @@ export default function AdminMembers() {
                             )
                           : "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex space-x-2">
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap">
+                        <div className="flex space-x-1 md:space-x-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1099,7 +1105,7 @@ export default function AdminMembers() {
             <form onSubmit={editMemberForm.handleSubmit(onSubmitEditMember)} className="space-y-6">
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Personal Information</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={editMemberForm.control}
                     name="firstName"
@@ -1142,7 +1148,7 @@ export default function AdminMembers() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <FormField
                     control={editMemberForm.control}
                     name="username"
@@ -1201,7 +1207,7 @@ export default function AdminMembers() {
 
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Membership Details</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={editMemberForm.control}
                     name="membershipStatus"
@@ -1250,7 +1256,7 @@ export default function AdminMembers() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <FormField
                     control={editMemberForm.control}
                     name="membershipStartDate"

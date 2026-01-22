@@ -1466,7 +1466,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/members/:id", isAdmin, async (req, res) => {
     try {
       const memberId = parseInt(req.params.id);
-      const { password, ...updateData } = req.body;
+      const { password, email, ...updateData } = req.body;
+      
+      // If email is being changed, check if it's already in use
+      if (email) {
+        const existingUser = await storage.getUserByEmail(email);
+        if (existingUser && existingUser.id !== memberId) {
+          return res.status(400).json({ message: "This email address is already in use by another member" });
+        }
+        updateData.email = email;
+      }
       
       // If password is provided, hash it
       if (password && password.trim()) {
@@ -1478,6 +1487,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedUser = await storage.updateUser(memberId, updateData);
       res.json(updatedUser);
     } catch (error: any) {
+      // Handle unique constraint violation
+      if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
+        return res.status(400).json({ message: "This email or username is already in use" });
+      }
       res.status(500).json({ message: error.message });
     }
   });

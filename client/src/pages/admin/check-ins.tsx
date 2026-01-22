@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Search, Download, UserPlus, Ticket, Minus } from "lucide-react";
+import { Search, Download, UserPlus, Ticket, Minus, User } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +46,17 @@ export default function AdminCheckIns() {
   const { data: todayCheckIns } = useQuery({
     queryKey: ["/api/check-ins/today"],
     staleTime: 1 * 60 * 1000,
+  });
+
+  // Guest waiver queries
+  const { data: todayGuestWaivers, isLoading: isLoadingGuestWaivers } = useQuery<any[]>({
+    queryKey: ["/api/admin/guest-waivers/today"],
+    staleTime: 1 * 60 * 1000,
+  });
+
+  const { data: guestWaiverAnalytics } = useQuery<{totalWaivers: number; todayWaivers: number; weekWaivers: number; monthWaivers: number}>({
+    queryKey: ["/api/admin/guest-waivers/analytics"],
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: memberSearchResults, isLoading: isSearching } = useQuery({
@@ -189,7 +200,7 @@ export default function AdminCheckIns() {
           <p className="text-slate-600">Wolf Mother Wellness Check-in Management</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Today's Total</CardTitle>
@@ -223,6 +234,18 @@ export default function AdminCheckIns() {
                 {todayCheckIns?.filter((c: any) => c.method === "manual").length || 0}
               </div>
               <p className="text-sm text-muted-foreground">staff assisted</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Guest Waivers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600">
+                {todayGuestWaivers?.length || 0}
+              </div>
+              <p className="text-sm text-muted-foreground">waivers today</p>
             </CardContent>
           </Card>
 
@@ -380,6 +403,95 @@ export default function AdminCheckIns() {
                 </Button>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Guest Waivers Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-purple-600" />
+                  Guest Waivers Today
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Walk-in guests who signed liability waivers
+                </p>
+              </div>
+              {guestWaiverAnalytics && (
+                <div className="flex gap-4 text-sm">
+                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.weekWaivers}</div>
+                    <div className="text-muted-foreground text-xs">This Week</div>
+                  </div>
+                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.monthWaivers}</div>
+                    <div className="text-muted-foreground text-xs">This Month</div>
+                  </div>
+                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.totalWaivers}</div>
+                    <div className="text-muted-foreground text-xs">All Time</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Guest Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Signature</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingGuestWaivers ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        Loading guest waivers...
+                      </TableCell>
+                    </TableRow>
+                  ) : !todayGuestWaivers || todayGuestWaivers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No guest waivers signed today
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    todayGuestWaivers.map((waiver: any) => (
+                      <TableRow key={waiver.id}>
+                        <TableCell>
+                          <div className="font-medium">
+                            {format(new Date(waiver.waiverSignedAt), "h:mm a")}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {waiver.firstName} {waiver.lastName}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {waiver.email}
+                        </TableCell>
+                        <TableCell>
+                          {waiver.phoneNumber || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                            Signed
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -933,8 +933,7 @@ export default function LandingPage() {
                   className="border rounded-lg overflow-hidden bg-card"
                 >
                   <button
-                    onClick={() => setOpenFaqId(openFaqId === faq
-                                              .id ? null : faq.id)}
+                    onClick={() => setOpenFaqId(openFaqId === faq.id ? null : faq.id)}
                     className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-muted/50 transition-colors"
                   >
                     <span className="font-semibold text-foreground">{faq.question}</span>

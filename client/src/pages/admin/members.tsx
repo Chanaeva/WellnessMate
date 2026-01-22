@@ -15,6 +15,7 @@ import Footer from "@/components/layout/footer";
 import Sidebar from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -69,6 +70,8 @@ import {
   AlertCircle,
   Ticket,
   Link2,
+  Key,
+  RotateCcw,
 } from "lucide-react";
 import {
   Select,
@@ -114,6 +117,9 @@ export default function AdminMembers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isEditMemberOpen, setIsEditMemberOpen] = useState(false);
@@ -307,11 +313,56 @@ export default function AdminMembers() {
     }
   };
 
-  // Filter and search members (exclude archived)
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: number; password: string }) => {
+      await apiRequest("PUT", `/api/admin/members/${userId}`, { password });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Password Reset",
+        description: "Member's password has been successfully reset.",
+      });
+      setIsResetPasswordOpen(false);
+      setNewPassword("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reset password",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Unarchive member mutation
+  const unarchiveMemberMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("POST", `/api/admin/members/${id}/unarchive`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Member Restored",
+        description: "Member has been restored from archive.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to restore member",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Filter and search members
   const filteredMembers =
     members?.filter((member) => {
-      // Exclude archived members
-      if ((member as any).isArchived) return false;
+      // Handle archived filter
+      const isArchived = (member as any).isArchived;
+      if (!showArchived && isArchived) return false;
+      if (showArchived && !isArchived) return false;
       
       // Apply search filter
       const fullName = `${member.firstName} ${member.lastName}`.toLowerCase();
@@ -570,6 +621,16 @@ export default function AdminMembers() {
               <Button variant="outline" className="flex items-center" data-testid="button-export">
                 <Download className="mr-2 h-4 w-4" /> Export
               </Button>
+              
+              <Button 
+                variant={showArchived ? "default" : "outline"} 
+                className={`flex items-center ${showArchived ? "bg-amber-600 hover:bg-amber-700" : ""}`}
+                onClick={() => setShowArchived(!showArchived)}
+                data-testid="button-toggle-archived"
+              >
+                <Archive className="mr-2 h-4 w-4" /> 
+                {showArchived ? "Viewing Archived" : "Show Archived"}
+              </Button>
             </div>
           </div>
 
@@ -706,30 +767,58 @@ export default function AdminMembers() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-amber-600 hover:text-amber-700 h-8 w-8 p-0"
-                            title="Archive Member"
-                            onClick={() => handleArchiveMember(member)}
-                            data-testid={`button-archive-${member.id}`}
-                          >
-                            <Archive className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-purple-600 hover:text-purple-700 h-8 w-8 p-0"
-                            title="Copy Claim Account Link"
+                            className="text-blue-600 hover:text-blue-700 h-8 w-8 p-0"
+                            title="Reset Password"
                             onClick={() => {
-                              const claimUrl = `${window.location.origin}/claim-account`;
-                              navigator.clipboard.writeText(claimUrl);
-                              toast({
-                                title: "Link Copied",
-                                description: "Claim account link copied to clipboard",
-                              });
+                              setSelectedMember(member);
+                              setIsResetPasswordOpen(true);
                             }}
-                            data-testid={`button-claim-link-${member.id}`}
+                            data-testid={`button-reset-password-${member.id}`}
                           >
-                            <Link2 className="h-4 w-4" />
+                            <Key className="h-4 w-4" />
                           </Button>
+                          {(member as any).isArchived ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-green-600 hover:text-green-700 h-8 w-8 p-0"
+                              title="Restore Member"
+                              onClick={() => unarchiveMemberMutation.mutate(member.id)}
+                              data-testid={`button-unarchive-${member.id}`}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-amber-600 hover:text-amber-700 h-8 w-8 p-0"
+                                title="Archive Member"
+                                onClick={() => handleArchiveMember(member)}
+                                data-testid={`button-archive-${member.id}`}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-purple-600 hover:text-purple-700 h-8 w-8 p-0"
+                                title="Copy Claim Account Link"
+                                onClick={() => {
+                                  const claimUrl = `${window.location.origin}/claim-account`;
+                                  navigator.clipboard.writeText(claimUrl);
+                                  toast({
+                                    title: "Link Copied",
+                                    description: "Claim account link copied to clipboard",
+                                  });
+                                }}
+                                data-testid={`button-claim-link-${member.id}`}
+                              >
+                                <Link2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1343,6 +1432,68 @@ export default function AdminMembers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordOpen} onOpenChange={(open) => {
+        setIsResetPasswordOpen(open);
+        if (!open) setNewPassword("");
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {selectedMember?.firstName} {selectedMember?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter new password..."
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                data-testid="input-new-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Password must be at least 6 characters long
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsResetPasswordOpen(false);
+                setNewPassword("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedMember && newPassword.length >= 6) {
+                  resetPasswordMutation.mutate({
+                    userId: selectedMember.id,
+                    password: newPassword,
+                  });
+                } else if (newPassword.length < 6) {
+                  toast({
+                    title: "Password too short",
+                    description: "Password must be at least 6 characters",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={resetPasswordMutation.isPending || newPassword.length < 6}
+              data-testid="button-confirm-reset-password"
+            >
+              {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

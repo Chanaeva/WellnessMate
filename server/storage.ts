@@ -44,6 +44,7 @@ export interface IStorage {
   updateUserPassword(userId: number, newPassword: string): Promise<User>;
   deleteUser(userId: number): Promise<void>;
   archiveUser(userId: number): Promise<User>;
+  unarchiveUser(userId: number): Promise<User>;
   createStaffAdmin(data: { email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber?: string; mustChangePassword?: boolean }): Promise<User>;
   updateStaffAdmin(userId: number, data: Partial<{ email: string; password: string; firstName: string; lastName: string; role: 'staff' | 'admin'; phoneNumber: string; mustChangePassword: boolean }>): Promise<User>;
   deleteStaffAdmin(userId: number): Promise<void>;
@@ -1081,6 +1082,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return archived;
+  }
+
+  async unarchiveUser(userId: number): Promise<User> {
+    const [restored] = await db
+      .update(users)
+      .set({ 
+        isArchived: false, 
+        archivedAt: null 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return restored;
   }
 
   // Landing page content methods

@@ -1521,6 +1521,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Unarchive/Restore member (Admin only)
+  app.post("/api/admin/members/:id/unarchive", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const restored = await storage.unarchiveUser(memberId);
+      res.json({ message: "Member restored successfully", member: restored });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get member's payment history (Admin only)
   app.get("/api/admin/members/:id/payments", isAdmin, async (req, res) => {
     try {

@@ -377,26 +377,6 @@ export default function LandingPage() {
     },
   });
 
-  // Fetch partners content
-  const { data: partnersContent } = useQuery({
-    queryKey: ["/api/landing-content/partners"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/landing-content/partners");
-      const data = await res.json();
-      
-      return [
-        {
-          name: data.find((s: any) => s.key === 'partner1Name')?.value || '',
-          description: data.find((s: any) => s.key === 'partner1Description')?.value || '',
-        },
-        {
-          name: data.find((s: any) => s.key === 'partner2Name')?.value || '',
-          description: data.find((s: any) => s.key === 'partner2Description')?.value || '',
-        },
-      ];
-    },
-  });
-
   // Fetch FAQ items
   const { data: faqItems } = useQuery<{ id: number; question: string; answer: string; category?: string }[]>({
     queryKey: ["/api/faq-items"],
@@ -849,42 +829,6 @@ export default function LandingPage() {
           </div>
         </section>
       )}
-      {/* Partners Section */}
-      <section className="py-16 px-4 bg-gradient-to-br from-background to-muted/30">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
-              Our Partners
-            </h2>
-            <p className="text-xl text-muted-foreground font-body">
-              We are working with industry-leading wellness providers
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {partnersContent?.map((partner, index) => (
-              <Card key={index} className="overflow-hidden border-2 hover:border-primary/20 transition-all duration-300 hover:shadow-xl">
-                <div className="aspect-video overflow-hidden">
-                  <img
-                    src={index === 0 ? coldPlungeImg : saunaImg}
-                    alt={partner.name}
-                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <CardContent className="p-6">
-                  <h3 className="text-2xl font-heading font-bold text-foreground mb-3">
-                    {partner.name}
-                  </h3>
-                  <p className="text-muted-foreground font-body leading-relaxed">
-                    {partner.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Features Section */}
       <section className="py-16 px-4 bg-muted/30">
         <div className="max-w-6xl mx-auto">

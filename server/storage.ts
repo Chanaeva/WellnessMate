@@ -23,6 +23,7 @@ import {
   sessionConfigs, type SessionConfig, type InsertSessionConfig,
   sessionBookings, type SessionBooking, type InsertSessionBooking,
   dayPassHours, type DayPassHours,
+  guestWaivers, type GuestWaiver, type InsertGuestWaiver,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -207,6 +208,14 @@ export interface IStorage {
   // Day pass hours methods
   getDayPassHours(): Promise<DayPassHours | undefined>;
   updateDayPassHours(data: Partial<DayPassHours>): Promise<DayPassHours>;
+  
+  // Guest waiver methods
+  createGuestWaiver(waiver: InsertGuestWaiver): Promise<GuestWaiver>;
+  getAllGuestWaivers(): Promise<GuestWaiver[]>;
+  getGuestWaiverById(id: number): Promise<GuestWaiver | undefined>;
+  getGuestWaiversByEmail(email: string): Promise<GuestWaiver[]>;
+  getTodayGuestWaivers(): Promise<GuestWaiver[]>;
+  getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }>;
   
   // Session store
   sessionStore: any;
@@ -1708,6 +1717,90 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Guest waiver methods
+  async createGuestWaiver(waiver: InsertGuestWaiver): Promise<GuestWaiver> {
+    const [created] = await db
+      .insert(guestWaivers)
+      .values(waiver)
+      .returning();
+    return created;
+  }
+
+  async getAllGuestWaivers(): Promise<GuestWaiver[]> {
+    return await db
+      .select()
+      .from(guestWaivers)
+      .orderBy(desc(guestWaivers.checkInTimestamp));
+  }
+
+  async getGuestWaiverById(id: number): Promise<GuestWaiver | undefined> {
+    const [waiver] = await db
+      .select()
+      .from(guestWaivers)
+      .where(eq(guestWaivers.id, id));
+    return waiver;
+  }
+
+  async getGuestWaiversByEmail(email: string): Promise<GuestWaiver[]> {
+    return await db
+      .select()
+      .from(guestWaivers)
+      .where(eq(guestWaivers.email, email.toLowerCase()))
+      .orderBy(desc(guestWaivers.checkInTimestamp));
+  }
+
+  async getTodayGuestWaivers(): Promise<GuestWaiver[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return await db
+      .select()
+      .from(guestWaivers)
+      .where(
+        and(
+          gte(guestWaivers.checkInTimestamp, today),
+          lt(guestWaivers.checkInTimestamp, tomorrow)
+        )
+      )
+      .orderBy(desc(guestWaivers.checkInTimestamp));
+  }
+
+  async getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }> {
+    const now = new Date();
+    
+    // Today
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    
+    // This week (start of week - Sunday)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    
+    // This month
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const [totalResult] = await db.select({ count: sql<number>`count(*)` }).from(guestWaivers);
+    const [todayResult] = await db.select({ count: sql<number>`count(*)` })
+      .from(guestWaivers)
+      .where(gte(guestWaivers.checkInTimestamp, todayStart));
+    const [weekResult] = await db.select({ count: sql<number>`count(*)` })
+      .from(guestWaivers)
+      .where(gte(guestWaivers.checkInTimestamp, weekStart));
+    const [monthResult] = await db.select({ count: sql<number>`count(*)` })
+      .from(guestWaivers)
+      .where(gte(guestWaivers.checkInTimestamp, monthStart));
+    
+    return {
+      total: Number(totalResult?.count || 0),
+      today: Number(todayResult?.count || 0),
+      thisWeek: Number(weekResult?.count || 0),
+      thisMonth: Number(monthResult?.count || 0),
+    };
   }
 }
 

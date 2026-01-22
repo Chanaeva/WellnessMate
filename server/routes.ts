@@ -1230,6 +1230,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // GUEST WAIVER ROUTES
+  // ============================================
+
+  // Create a guest waiver (kiosk - public endpoint for walk-in guests)
+  app.post("/api/kiosk/guest-waiver", async (req, res) => {
+    try {
+      const waiverSchema = z.object({
+        email: z.string().email("Valid email is required"),
+        phoneNumber: z.string().optional(),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        waiverAgreed: z.boolean().refine(val => val === true, "Waiver must be agreed to"),
+        notes: z.string().optional(),
+      });
+      
+      const validatedData = waiverSchema.parse(req.body);
+      
+      // Store email in lowercase for consistency
+      const waiver = await storage.createGuestWaiver({
+        ...validatedData,
+        email: validatedData.email.toLowerCase(),
+      });
+      
+      console.log(`Guest waiver signed: ${waiver.firstName} ${waiver.lastName} (${waiver.email})`);
+      
+      res.json({ 
+        success: true, 
+        message: "Guest checked in successfully!",
+        waiver 
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      console.error("Guest waiver error:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Get all guest waivers (Admin/Staff only)
+  app.get("/api/admin/guest-waivers", isStaff, async (req, res) => {
+    try {
+      const waivers = await storage.getAllGuestWaivers();
+      res.json(waivers);
+    } catch (error: any) {
+      console.error("Error fetching guest waivers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get today's guest waivers (Admin/Staff only)
+  app.get("/api/admin/guest-waivers/today", isStaff, async (req, res) => {
+    try {
+      const waivers = await storage.getTodayGuestWaivers();
+      res.json(waivers);
+    } catch (error: any) {
+      console.error("Error fetching today's guest waivers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get guest waiver analytics (Admin only)
+  app.get("/api/admin/guest-waivers/analytics", isAdmin, async (req, res) => {
+    try {
+      const analytics = await storage.getGuestWaiverAnalytics();
+      res.json(analytics);
+    } catch (error: any) {
+      console.error("Error fetching guest waiver analytics:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Search guest waivers by email (Admin/Staff only)
+  app.get("/api/admin/guest-waivers/search", isStaff, async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      if (!email) {
+        return res.status(400).json({ message: "Email parameter is required" });
+      }
+      const waivers = await storage.getGuestWaiversByEmail(email);
+      res.json(waivers);
+    } catch (error: any) {
+      console.error("Error searching guest waivers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Check in using QR code (authenticated users)
   app.post("/api/check-in", isAuthenticated, async (req, res) => {
     try {

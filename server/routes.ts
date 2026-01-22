@@ -1271,7 +1271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all guest waivers (Admin/Staff only)
-  app.get("/api/admin/guest-waivers", isStaff, async (req, res) => {
+  app.get("/api/admin/guest-waivers", isAdminOrStaff, async (req, res) => {
     try {
       const waivers = await storage.getAllGuestWaivers();
       res.json(waivers);
@@ -1282,7 +1282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get today's guest waivers (Admin/Staff only)
-  app.get("/api/admin/guest-waivers/today", isStaff, async (req, res) => {
+  app.get("/api/admin/guest-waivers/today", isAdminOrStaff, async (req, res) => {
     try {
       const waivers = await storage.getTodayGuestWaivers();
       res.json(waivers);
@@ -1304,7 +1304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Search guest waivers by email (Admin/Staff only)
-  app.get("/api/admin/guest-waivers/search", isStaff, async (req, res) => {
+  app.get("/api/admin/guest-waivers/search", isAdminOrStaff, async (req, res) => {
     try {
       const email = req.query.email as string;
       if (!email) {

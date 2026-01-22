@@ -78,8 +78,235 @@ const memberFormSchema = z.object({
 
 type MemberFormData = z.infer<typeof memberFormSchema>;
 
+// Guest waiver form schema
+const guestWaiverSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Valid email is required"),
+  phoneNumber: z.string().optional(),
+  waiverAgreed: z.boolean().refine((val) => val === true, {
+    message: "You must agree to the waiver to continue",
+  }),
+});
+
+type GuestWaiverFormData = z.infer<typeof guestWaiverSchema>;
+
+interface GuestWaiverFormProps {
+  onSuccess: () => void;
+  onCancel: () => void;
+}
+
+function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
+  const { toast } = useToast();
+  const [showWaiverText, setShowWaiverText] = useState(false);
+  
+  const form = useForm<GuestWaiverFormData>({
+    resolver: zodResolver(guestWaiverSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phoneNumber: "",
+      waiverAgreed: false,
+    },
+  });
+
+  const guestWaiverMutation = useMutation({
+    mutationFn: async (data: GuestWaiverFormData) => {
+      const response = await apiRequest("POST", "/api/kiosk/guest-waiver", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Welcome!",
+        description: "Your waiver has been signed. Enjoy your visit!",
+      });
+      onSuccess();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to sign waiver",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: GuestWaiverFormData) => {
+    guestWaiverMutation.mutate(data);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center mb-4">
+        <p className="text-lg text-muted-foreground">
+          Please complete this form and sign the waiver to check in as a guest
+        </p>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter first name..." 
+                      {...field} 
+                      className="text-lg py-5"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter last name..." 
+                      {...field} 
+                      className="text-lg py-5"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email Address</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="email"
+                    placeholder="Enter email address..." 
+                    {...field} 
+                    className="text-lg py-5"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="phoneNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number (Optional)</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="tel"
+                    placeholder="Enter phone number..." 
+                    {...field} 
+                    className="text-lg py-5"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Waiver Agreement Section */}
+          <div className="border rounded-xl p-4 bg-amber-50 border-amber-200">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-amber-800">Liability Waiver</h4>
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => setShowWaiverText(!showWaiverText)}
+                className="text-amber-700"
+              >
+                {showWaiverText ? "Hide" : "Read Full Waiver"}
+              </Button>
+            </div>
+            
+            {showWaiverText && (
+              <div className="text-sm text-amber-900 bg-white border border-amber-200 rounded-lg p-4 mb-4 max-h-48 overflow-y-auto">
+                <p className="mb-2">
+                  <strong>WOLF MOTHER WELLNESS LIABILITY WAIVER AND RELEASE</strong>
+                </p>
+                <p className="mb-2">
+                  By signing this waiver, I acknowledge and agree to the following:
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>I understand that the use of thermal pools, saunas, and other wellness facilities involves inherent risks.</li>
+                  <li>I am in good physical health and have no medical conditions that would prevent me from safely using these facilities.</li>
+                  <li>I agree to follow all posted rules and staff instructions.</li>
+                  <li>I release Wolf Mother Wellness, its owners, employees, and agents from any liability for injuries or damages that may occur during my visit.</li>
+                  <li>I am at least 18 years of age or have parental/guardian consent.</li>
+                  <li>I understand that alcohol consumption is prohibited before using the facilities.</li>
+                </ul>
+                <p className="mt-2">
+                  This waiver is valid for this visit only.
+                </p>
+              </div>
+            )}
+
+            <FormField
+              control={form.control}
+              name="waiverAgreed"
+              render={({ field }) => (
+                <FormItem className="flex items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <input
+                      type="checkbox"
+                      checked={field.value}
+                      onChange={field.onChange}
+                      className="h-5 w-5 mt-0.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-amber-900 font-medium cursor-pointer">
+                      I have read and agree to the liability waiver
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button 
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="flex-1 py-5 text-lg"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Cancel
+            </Button>
+            <Button 
+              type="submit"
+              disabled={guestWaiverMutation.isPending}
+              className="flex-1 py-5 text-lg bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {guestWaiverMutation.isPending ? "Signing..." : "Sign Waiver & Check In"}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+}
+
 export default function KioskCheckIn() {
-  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'new-purchase'>('waiting');
+  const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'new-purchase' | 'guest-waiver'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
@@ -275,6 +502,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'success' && <CheckCircle className="h-16 w-16 text-green-500" />}
               {scannerMode === 'error' && <User className="h-16 w-16 text-red-500" />}
               {scannerMode === 'new-purchase' && <UserPlus className="h-16 w-16 text-primary" />}
+              {scannerMode === 'guest-waiver' && <User className="h-16 w-16 text-amber-500" />}
             </div>
             <CardTitle className="text-3xl font-heading font-bold">
               {scannerMode === 'waiting' && 'Ready to Check In'}
@@ -283,6 +511,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'success' && 'Welcome Back!'}
               {scannerMode === 'error' && 'Check-In Issue'}
               {scannerMode === 'new-purchase' && 'New Purchase'}
+              {scannerMode === 'guest-waiver' && 'Guest Check-In'}
             </CardTitle>
           </CardHeader>
           
@@ -313,6 +542,17 @@ export default function KioskCheckIn() {
                 >
                   <UserPlus className="h-6 w-6 mr-3" />
                   New Purchase
+                </Button>
+                
+                <Button 
+                  onClick={() => setScannerMode('guest-waiver')}
+                  variant="outline"
+                  size="lg"
+                  className="border-2 border-amber-500 text-amber-600 hover:bg-amber-50 text-xl font-semibold py-6 w-full mt-4"
+                  data-testid="button-guest-checkin"
+                >
+                  <User className="h-6 w-6 mr-3" />
+                  Guest Check-In (Waiver Only)
                 </Button>
                 
                 <div className="flex items-center justify-center text-sm text-muted-foreground mt-8">
@@ -737,6 +977,21 @@ export default function KioskCheckIn() {
                   You may now proceed to the changing area
                 </p>
               </div>
+            )}
+
+            {/* Guest Waiver State */}
+            {scannerMode === 'guest-waiver' && (
+              <GuestWaiverForm 
+                onSuccess={() => {
+                  setScannerMode('success');
+                  setScanResult({
+                    success: true,
+                    message: 'Guest waiver signed successfully! Welcome to Wolf Mother Wellness.',
+                    checkInType: 'guest-waiver'
+                  });
+                }}
+                onCancel={resetToWaiting}
+              />
             )}
 
             {/* Error State */}

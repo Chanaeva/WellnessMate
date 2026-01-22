@@ -63,21 +63,37 @@ export default function AdminGallery() {
 
     setIsUploading(true);
     try {
-      const uploadFormData = new FormData();
-      uploadFormData.append('image', file);
-      
-      const response = await fetch('/api/admin/upload-image', {
+      // Step 1: Get presigned upload URL from Object Storage
+      const urlResponse = await fetch('/api/admin/gallery/upload-url', {
         method: 'POST',
-        body: uploadFormData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
         credentials: 'include',
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
+      if (!urlResponse.ok) {
+        throw new Error('Failed to get upload URL');
       }
 
-      const { imageUrl } = await response.json();
-      setFormData({ ...formData, imageUrl });
+      const { uploadURL, objectPath } = await urlResponse.json();
+
+      // Step 2: Upload file directly to Object Storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload to storage');
+      }
+
+      // Use the object path as the image URL (served via /objects/:path route)
+      setFormData({ ...formData, imageUrl: objectPath });
       toast({ title: "Upload Successful", description: "Image has been uploaded" });
     } catch (error: any) {
       toast({ title: "Upload Failed", description: error.message, variant: "destructive" });

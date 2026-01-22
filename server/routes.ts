@@ -13,6 +13,7 @@ import { setupStripeWebhooks } from "./stripe-webhooks";
 import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
 import multer from "multer";
+import { ObjectStorageService } from "./replit_integrations/object_storage";
 
 const scryptAsync = promisify(scrypt);
 
@@ -28,6 +29,9 @@ const galleryUpload = multer({
     }
   }
 });
+
+// Initialize object storage service
+const objectStorageService = new ObjectStorageService();
 import { 
   insertMembershipSchema, 
   insertCheckInSchema, 
@@ -57,7 +61,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes (/api/register, /api/login, /api/logout, /api/user)
   setupAuth(app);
   
+  // Serve uploaded objects from Object Storage (public for gallery images)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error: any) {
+      console.error("Error serving object:", error);
+      if (error.name === "ObjectNotFoundError") {
+        return res.status(404).json({ error: "Object not found" });
+      }
+      return res.status(500).json({ error: "Failed to serve object" });
+    }
+  });
+
   // File upload endpoint for gallery images (admin only) - MUST be after setupAuth
+  // Uses presigned URL upload to Object Storage for production persistence
+  app.post("/api/admin/gallery/upload-url", async (req, res) => {
+    console.log('Gallery upload URL request - isAuthenticated:', req.isAuthenticated?.(), 'user:', req.user?.email, 'role:', req.user?.role);
+    if (!req.isAuthenticated || !req.isAuthenticated() || req.user?.role !== 'admin') {
+      console.log('Upload denied - auth check failed');
+      return res.sendStatus(403);
+    }
+    
+    try {
+      const { name, size, contentType } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Missing required field: name" });
+      }
+
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+      res.json({
+        uploadURL,
+        objectPath,
+        metadata: { name, size, contentType },
+      });
+    } catch (error: any) {
+      console.error('Gallery upload URL error:', error);
+      res.status(500).json({ message: 'Failed to generate upload URL: ' + error.message });
+    }
+  });
+  
+  // Legacy file upload endpoint for gallery images (admin only) - MUST be after setupAuth
   // Uses multer middleware which properly preserves session/auth unlike express.raw()
   app.post("/api/admin/upload-image", galleryUpload.single('image'), async (req, res) => {
     console.log('Upload request - isAuthenticated:', req.isAuthenticated?.(), 'user:', req.user?.email, 'role:', req.user?.role);

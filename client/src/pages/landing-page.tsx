@@ -43,6 +43,7 @@ import {
 function GalleryCarousel({ images }: { images: GalleryImage[] }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: "center" });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [imagesLoaded, setImagesLoaded] = useState(0);
 
   const scrollPrev = () => emblaApi?.scrollPrev();
   const scrollNext = () => emblaApi?.scrollNext();
@@ -53,6 +54,12 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
     setSelectedIndex(emblaApi.selectedScrollSnap());
   }, [emblaApi]);
 
+  // Reinitialize carousel when images change or load
+  useEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.reInit();
+  }, [emblaApi, images, imagesLoaded]);
+
   useEffect(() => {
     if (!emblaApi) return;
     onSelect();
@@ -61,6 +68,11 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
       emblaApi.off("select", onSelect);
     };
   }, [emblaApi, onSelect]);
+
+  // Handle image load events
+  const handleImageLoad = useCallback(() => {
+    setImagesLoaded(prev => prev + 1);
+  }, []);
 
   return (
     <section className="py-16 px-4 bg-gradient-to-br from-muted/30 to-background">
@@ -89,6 +101,7 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
                         src={image.imageUrl}
                         alt={image.altText || image.title}
                         className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                        onLoad={handleImageLoad}
                       />
                     </div>
                   </div>

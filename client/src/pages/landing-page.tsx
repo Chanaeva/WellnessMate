@@ -1066,7 +1066,8 @@ export default function LandingPage() {
 
           <div className="text-center pt-6 border-t border-muted-foreground/20">
             <p className="text-muted-foreground font-body text-sm">
-              © {footerSettings?.copyrightYear || '2025'} Wolf Mother Wellness. Where legends are born and wellness thrives.
+              © {footerSettings?.copyrightYear } 
+Wolf Mother Wellness. Where legends are born and wellness thrives.
             </p>
           </div>
         </div>

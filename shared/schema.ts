@@ -740,3 +740,27 @@ export const insertDayPassHoursSchema = createInsertSchema(dayPassHours).omit({
 
 export type DayPassHours = typeof dayPassHours.$inferSelect;
 export type InsertDayPassHours = z.infer<typeof insertDayPassHoursSchema>;
+
+// Guest waivers table - for walk-in guests who sign waivers without creating accounts
+export const guestWaivers = pgTable("guest_waivers", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  phoneNumber: text("phone_number"),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  waiverSignedAt: timestamp("waiver_signed_at").notNull().defaultNow(),
+  waiverAgreed: boolean("waiver_agreed").notNull().default(true),
+  checkInTimestamp: timestamp("check_in_timestamp").notNull().defaultNow(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGuestWaiverSchema = createInsertSchema(guestWaivers).omit({
+  id: true,
+  createdAt: true,
+  waiverSignedAt: true,
+  checkInTimestamp: true,
+});
+
+export type GuestWaiver = typeof guestWaivers.$inferSelect;
+export type InsertGuestWaiver = z.infer<typeof insertGuestWaiverSchema>;

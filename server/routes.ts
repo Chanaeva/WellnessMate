@@ -4261,6 +4261,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid session type" });
       }
       
+      // Validate bookingDate is a valid date string
+      if (!bookingDate || typeof bookingDate !== 'string') {
+        return res.status(400).json({ message: "Booking date is required" });
+      }
+      
+      const bookingDateObj = new Date(bookingDate);
+      if (isNaN(bookingDateObj.getTime())) {
+        return res.status(400).json({ message: "Invalid booking date format" });
+      }
+      
+      // Check if session is enabled first
+      const config = await storage.getSessionConfigByType(sessionType);
+      if (!config || !config.isEnabled) {
+        return res.status(400).json({ message: "This session is not available" });
+      }
+      
+      // Validate booking date is not in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      bookingDateObj.setHours(0, 0, 0, 0);
+      
+      if (bookingDateObj < today) {
+        return res.status(400).json({ message: "Cannot book sessions for past dates" });
+      }
+      
+      // Parse session time to minutes helper
+      const parseTimeToMinutes = (timeStr: string): number => {
+        const normalized = timeStr.trim().toUpperCase();
+        const isPM = normalized.includes('PM');
+        const isAM = normalized.includes('AM');
+        const cleaned = normalized.replace(/\s?(AM|PM)/gi, '').trim();
+        
+        let hours: number, minutes: number = 0;
+        
+        if (cleaned.includes(':')) {
+          const parts = cleaned.split(':');
+          hours = parseInt(parts[0], 10) || 0;
+          minutes = parseInt(parts[1], 10) || 0;
+        } else {
+          hours = parseInt(cleaned, 10) || 0;
+        }
+        
+        if (isPM && hours !== 12) {
+          hours += 12;
+        } else if (isAM && hours === 12) {
+          hours = 0;
+        }
+        
+        return hours * 60 + minutes;
+      };
+      
+      // For same-day bookings, check if the session time window is still open for booking
+      if (bookingDateObj.getTime() === today.getTime()) {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const sessionStartMinutes = parseTimeToMinutes(config.startTime);
+        const sessionEndMinutes = parseTimeToMinutes(config.endTime);
+        
+        // Block if the session has already started (can't book a session in progress)
+        if (currentMinutes >= sessionStartMinutes) {
+          return res.status(400).json({ 
+            message: `The ${sessionType} session has already started. Please book a future session.` 
+          });
+        }
+        
+        // Also block if the session has ended (shouldn't happen given the above, but safety check)
+        if (currentMinutes >= sessionEndMinutes) {
+          return res.status(400).json({ 
+            message: `The ${sessionType} session has already ended. Please book a future session.` 
+          });
+        }
+      }
+      
       // Check if user already has a booking for this session
       const hasBooking = await storage.hasUserBookedSession(req.user!.id, bookingDate, sessionType);
       if (hasBooking) {
@@ -4271,12 +4344,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const availability = await storage.getSessionAvailability(bookingDate, sessionType);
       if (availability.booked >= availability.capacity) {
         return res.status(400).json({ message: "This session is fully booked" });
-      }
-      
-      // Check if session is enabled
-      const config = await storage.getSessionConfigByType(sessionType);
-      if (!config || !config.isEnabled) {
-        return res.status(400).json({ message: "This session is not available" });
       }
       
       const booking = await storage.createSessionBooking({

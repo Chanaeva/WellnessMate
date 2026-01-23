@@ -176,7 +176,7 @@ const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
     await storage.updateMembership(membership.membershipId, {
       status: membershipStatus,
       stripeSubscriptionId: subscription.id,
-      endDate: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : undefined,
+      endDate: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0] : undefined,
       autoRenew: !subscription.cancel_at_period_end,
     });
     
@@ -201,7 +201,7 @@ const handleSubscriptionDeleted = async (subscription: Stripe.Subscription) => {
     if (!membership) return;
     
     // Mark membership as expired
-    await storage.updateMembership(membership.id, {
+    await storage.updateMembership(membership.membershipId, {
       status: 'expired',
       autoRenew: false,
     });
@@ -247,9 +247,9 @@ const handleInvoicePaymentSucceeded = async (invoice: Stripe.Invoice) => {
       if (membership && membership.stripeSubscriptionId === subscriptionId) {
         const periodEnd = (invoice.lines.data[0] as any)?.period?.end;
         if (periodEnd) {
-          await storage.updateMembership(membership.id, {
+          await storage.updateMembership(membership.membershipId, {
             status: 'active',
-            endDate: new Date(periodEnd * 1000),
+            endDate: new Date(periodEnd * 1000).toISOString().split('T')[0],
           });
           console.log('📅 Membership renewed until:', new Date(periodEnd * 1000));
         }
@@ -285,7 +285,7 @@ const handleInvoicePaymentFailed = async (invoice: Stripe.Invoice) => {
     // Optionally freeze the membership after payment failure
     const membership = await storage.getMembershipByUserId(user.id);
     if (membership) {
-      await storage.updateMembership(membership.id, {
+      await storage.updateMembership(membership.membershipId, {
         status: 'frozen',
       });
       console.log('⚠️ Membership frozen due to payment failure for user:', user.email);

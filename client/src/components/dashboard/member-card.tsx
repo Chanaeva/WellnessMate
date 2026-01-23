@@ -15,6 +15,7 @@ interface MemberCardProps {
   userPunchCards?: PunchCard[];
   payments?: Payment[];
   onCancelMembership?: () => void;
+  billingInterval?: string; // 'month' or 'year'
 }
 
 const MemberCard = ({
@@ -27,10 +28,12 @@ const MemberCard = ({
   userPunchCards = [],
   payments = [],
   onCancelMembership,
-  isLoading = false
+  isLoading = false,
+  billingInterval = 'month',
 }: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
   const membershipPrice = currentPlan?.monthlyPrice ? (currentPlan.monthlyPrice / 100).toFixed(0) : '65';
+  const billingLabel = billingInterval === 'year' ? 'Yearly' : 'Monthly';
   
   // Check if user has any purchased items
   const hasPurchasedItems = userPunchCards.length > 0 || payments.length > 0;
@@ -86,7 +89,7 @@ const MemberCard = ({
             </h3>
           </div>
           <div className="text-right">
-            <div className="text-white/80 text-xs sm:text-sm">Monthly</div>
+            <div className="text-white/80 text-xs sm:text-sm">{billingLabel}</div>
             <div className="text-lg sm:text-xl md:text-2xl font-bold text-white">${membershipPrice}</div>
           </div>
         </div>

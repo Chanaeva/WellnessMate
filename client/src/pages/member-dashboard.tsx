@@ -209,6 +209,7 @@ export default function MemberDashboard() {
     source: string;
     subscriptionStatus?: string;
     cancelAtPeriodEnd?: boolean;
+    billingInterval?: string; // 'month' or 'year'
   }>({
     queryKey: ["/api/membership/billing-info"],
     enabled: !!user && !!membership,
@@ -939,6 +940,7 @@ export default function MemberDashboard() {
               payments={payments}
               onCancelMembership={() => setShowCancelMembershipDialog(true)}
               isLoading={isMembershipLoading}
+              billingInterval={billingInfo?.billingInterval}
             />
 
             {/* Your Day Pass Packages */}

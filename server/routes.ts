@@ -526,24 +526,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fetch subscription from Stripe to get the actual next billing date
       try {
-        const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+        const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId, {
+          expand: ['items.data.price']
+        });
         
         if (subscription.status === 'active' || subscription.status === 'trialing') {
           // Type assertion for current_period_end since Stripe types don't always expose it
           const currentPeriodEnd = (subscription as any).current_period_end as number;
           const nextBillingDate = new Date(currentPeriodEnd * 1000).toISOString().split('T')[0];
+          
+          // Get billing interval from the subscription's price
+          const subscriptionItem = subscription.items?.data?.[0];
+          const price = subscriptionItem?.price as any;
+          const billingInterval = price?.recurring?.interval || 'month';
+          
           return res.json({
             nextBillingDate,
             source: 'stripe',
             subscriptionStatus: subscription.status,
-            cancelAtPeriodEnd: subscription.cancel_at_period_end
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            billingInterval: billingInterval, // 'month' or 'year'
           });
         } else {
           // Subscription not active, return database date
           return res.json({
             nextBillingDate: membership.endDate,
             source: 'database',
-            subscriptionStatus: subscription.status
+            subscriptionStatus: subscription.status,
+            billingInterval: 'month',
           });
         }
       } catch (stripeError: any) {

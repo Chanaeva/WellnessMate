@@ -5020,6 +5020,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Kiosk member creation endpoint - supports both online card entry and Terminal card reader
+  // For memberships: Creates Stripe Subscription for recurring billing
+  // For day passes: Creates one-time PaymentIntent
   app.post("/api/kiosk/create-member-payment", async (req, res) => {
     try {
       const { memberData, packageData, discountData, useTerminal, existingMemberId } = req.body;
@@ -5060,9 +5062,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountDescription = ` (${discountLabel}${discountData.reason ? ` - ${discountData.reason}` : ''})`;
       }
       
-      // Create payment intent - use card_present for Terminal, automatic_payment_methods for online
+      // MEMBERSHIPS: Create Stripe Subscription for recurring billing
+      if (validatedMemberData.packageType === 'membership') {
+        // Get the membership plan to get the Stripe price ID
+        const plans = await storage.getAllMembershipPlans();
+        const plan = plans.find(p => p.id.toString() === validatedMemberData.packageId || p.planType === packageData.planType);
+        
+        if (!plan) {
+          return res.status(400).json({ message: `Invalid membership plan: ${validatedMemberData.packageId}` });
+        }
+        
+        if (!plan.stripePriceId) {
+          return res.status(400).json({ 
+            message: "Membership plan not configured for payments. Admin needs to sync with Stripe." 
+          });
+        }
+        
+        console.log('📋 Creating subscription for membership plan:', { planId: plan.id, planType: plan.planType, stripePriceId: plan.stripePriceId });
+        
+        // Create or get Stripe customer
+        let customerId: string;
+        
+        if (existingMemberId) {
+          // Existing member - get their customer ID
+          const existingUser = await storage.getUser(existingMemberId);
+          if (existingUser?.stripeCustomerId) {
+            customerId = existingUser.stripeCustomerId;
+          } else {
+            // Create new customer for existing user
+            const customer = await stripe.customers.create({
+              email: validatedMemberData.email,
+              name: `${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
+              phone: validatedMemberData.phoneNumber,
+              metadata: { source: 'kiosk', existingMemberId: existingMemberId.toString() }
+            });
+            customerId = customer.id;
+          }
+        } else {
+          // New member - create Stripe customer
+          const customer = await stripe.customers.create({
+            email: validatedMemberData.email,
+            name: `${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
+            phone: validatedMemberData.phoneNumber,
+            metadata: { source: 'kiosk' }
+          });
+          customerId = customer.id;
+        }
+        
+        console.log('👤 Using Stripe customer:', customerId);
+        
+        // For Terminal payments, we need to use PaymentIntent with setup_future_usage
+        // and then create the subscription after payment succeeds
+        if (useTerminal) {
+          // Terminal: Create PaymentIntent that saves the card for future use
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(finalAmount),
+            currency: 'usd',
+            customer: customerId,
+            payment_method_types: ['card_present'],
+            capture_method: 'automatic',
+            setup_future_usage: 'off_session', // Save card for subscription
+            description: `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
+            metadata: {
+              memberFirstName: validatedMemberData.firstName,
+              memberLastName: validatedMemberData.lastName,
+              memberEmail: validatedMemberData.email,
+              memberPhone: validatedMemberData.phoneNumber || '',
+              packageType: 'membership',
+              packageId: validatedMemberData.packageId,
+              packageName: packageData.name,
+              planType: plan.planType,
+              stripePriceId: plan.stripePriceId,
+              customerId: customerId,
+              isSubscription: 'true',
+              useTerminal: 'true',
+            },
+          });
+          
+          console.log('💳 Created Terminal PaymentIntent for subscription:', paymentIntent.id);
+          
+          res.json({ 
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+            customerId: customerId,
+            isSubscription: true,
+            stripePriceId: plan.stripePriceId,
+          });
+        } else {
+          // Online: Create Subscription directly with incomplete status
+          const subscription = await stripe.subscriptions.create({
+            customer: customerId,
+            items: [{ price: plan.stripePriceId }],
+            collection_method: 'charge_automatically',
+            payment_behavior: 'default_incomplete',
+            payment_settings: {
+              payment_method_types: ['card'],
+              save_default_payment_method: 'on_subscription',
+            },
+            expand: ['latest_invoice.payment_intent'],
+            metadata: {
+              source: 'kiosk',
+              memberFirstName: validatedMemberData.firstName,
+              memberLastName: validatedMemberData.lastName,
+              memberEmail: validatedMemberData.email,
+              planType: plan.planType,
+            },
+          });
+          
+          const invoice = subscription.latest_invoice as any;
+          const paymentIntent = invoice?.payment_intent;
+          
+          console.log('📋 Created subscription:', { 
+            subscriptionId: subscription.id, 
+            status: subscription.status,
+            invoiceId: invoice?.id,
+            paymentIntentId: paymentIntent?.id 
+          });
+          
+          res.json({ 
+            clientSecret: paymentIntent?.client_secret,
+            paymentIntentId: paymentIntent?.id,
+            subscriptionId: subscription.id,
+            customerId: customerId,
+            isSubscription: true,
+          });
+        }
+        return;
+      }
+      
+      // DAY PASSES: Create one-time PaymentIntent (existing behavior)
       const paymentIntentConfig: any = {
-        amount: Math.round(finalAmount), // Final price after discount in cents
+        amount: Math.round(finalAmount),
         currency: 'usd',
         description: `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
         metadata: {
@@ -5083,11 +5213,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       if (useTerminal) {
-        // Terminal (card reader) payment
         paymentIntentConfig.payment_method_types = ['card_present'];
         paymentIntentConfig.capture_method = 'automatic';
       } else {
-        // Online card entry payment
         paymentIntentConfig.automatic_payment_methods = { enabled: true };
       }
       
@@ -5095,7 +5223,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ 
         clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id 
+        paymentIntentId: paymentIntent.id,
+        isSubscription: false,
       });
     } catch (error: any) {
       console.error("Kiosk member creation error:", error);
@@ -5104,10 +5233,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Confirm member creation after successful payment
+  // Handles both subscription (membership) and one-time (day pass) payments
   app.post("/api/kiosk/confirm-member-creation", async (req, res) => {
     try {
-      const { paymentIntentId, memberData, packageData, agreementData, discountData, existingMemberId } = req.body;
-      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, memberData, packageData, agreementData, discountData, existingMemberId });
+      const { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, customerId, isSubscription, stripePriceId } = req.body;
+      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, isSubscription });
       
       // Validate agreement data
       const agreementSchema = z.object({
@@ -5129,6 +5259,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('💳 Payment Intent status:', paymentIntent.status);
       if (paymentIntent.status !== 'succeeded') {
         return res.status(400).json({ message: "Payment not completed" });
+      }
+      
+      // For Terminal subscription payments, create the subscription now
+      let finalSubscriptionId = subscriptionId;
+      if (isSubscription && !subscriptionId && paymentIntent.metadata?.isSubscription === 'true') {
+        // Terminal payment - need to create subscription with saved payment method
+        const savedPaymentMethodId = paymentIntent.payment_method as string;
+        const customerIdFromIntent = paymentIntent.customer as string || customerId;
+        const priceId = paymentIntent.metadata?.stripePriceId || stripePriceId;
+        
+        if (savedPaymentMethodId && customerIdFromIntent && priceId) {
+          console.log('📋 Creating subscription after Terminal payment:', { customerIdFromIntent, priceId, savedPaymentMethodId });
+          
+          // Set the payment method as default for the customer
+          await stripe.customers.update(customerIdFromIntent, {
+            invoice_settings: { default_payment_method: savedPaymentMethodId }
+          });
+          
+          // Create subscription starting from next billing cycle (first month already paid)
+          const subscription = await stripe.subscriptions.create({
+            customer: customerIdFromIntent,
+            items: [{ price: priceId }],
+            collection_method: 'charge_automatically',
+            default_payment_method: savedPaymentMethodId,
+            billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
+            proration_behavior: 'none',
+            metadata: {
+              source: 'kiosk_terminal',
+              memberEmail: memberData.email,
+              firstPaymentIntentId: paymentIntentId,
+            },
+          });
+          
+          finalSubscriptionId = subscription.id;
+          console.log('✅ Created subscription after Terminal payment:', finalSubscriptionId);
+        }
       }
       
       let targetUser;
@@ -5178,6 +5344,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
         const membershipId = `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
         
+        // Get Stripe customer ID from payment intent or provided customerId
+        const stripeCustomerId = (paymentIntent.customer as string) || customerId;
+        
+        // Update user with Stripe customer ID if not already set
+        if (stripeCustomerId && !newUser.stripeCustomerId) {
+          await storage.updateUserStripeCustomerId(newUser.id, stripeCustomerId);
+        }
+        
         await storage.createMembership({
           membershipId: membershipId,
           userId: newUser.id,
@@ -5186,7 +5360,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           startDate: new Date().toISOString().split('T')[0],
           endDate: endDate.toISOString().split('T')[0],
           autoRenew: true,
+          stripeSubscriptionId: finalSubscriptionId || undefined, // Save subscription ID for recurring billing
         });
+        
+        console.log('✅ Membership created with subscription:', { membershipId, subscriptionId: finalSubscriptionId });
       } else if (memberData.packageType === 'daypass') {
         const totalPunches = Math.max(packageData.totalPunches || 5, 1); // Ensure at least 1 punch
         const punchCard = await storage.createPunchCard({

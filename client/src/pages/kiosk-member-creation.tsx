@@ -782,7 +782,8 @@ function PaymentForm({
         },
       );
       
-      const { clientSecret, paymentIntentId } = await piResponse.json();
+      const paymentData = await piResponse.json();
+      const { clientSecret, paymentIntentId, subscriptionId, customerId, isSubscription, stripePriceId } = paymentData;
       
       if (!clientSecret) {
         throw new Error('Failed to create payment intent');
@@ -811,6 +812,10 @@ function PaymentForm({
           "/api/kiosk/confirm-member-creation",
           {
             paymentIntentId: processResult.paymentIntent.id,
+            subscriptionId,
+            customerId,
+            isSubscription,
+            stripePriceId,
             memberData,
             packageData: {
               ...packageData,
@@ -907,7 +912,8 @@ function PaymentForm({
           existingMemberId,
         },
       );
-      const { clientSecret } = await response.json();
+      const paymentData = await response.json();
+      const { clientSecret, subscriptionId, customerId, isSubscription, stripePriceId } = paymentData;
 
       const { error, paymentIntent } = await stripe.confirmCardPayment(
         clientSecret,
@@ -938,6 +944,10 @@ function PaymentForm({
           "/api/kiosk/confirm-member-creation",
           {
             paymentIntentId: paymentIntent.id,
+            subscriptionId,
+            customerId,
+            isSubscription,
+            stripePriceId,
             memberData,
             packageData: {
               ...packageData,

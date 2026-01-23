@@ -27,7 +27,7 @@ import {
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike } from "drizzle-orm";
+import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -69,6 +69,7 @@ export interface IStorage {
   createMembership(membership: InsertMembership): Promise<Membership>;
   updateMembership(id: string, data: Partial<Membership>): Promise<Membership>;
   getAllMembers(): Promise<(User & {membership?: Membership})[]>;
+  getMembershipsWithoutSubscription(): Promise<(Membership & { user: User })[]>;
 
   // Check-in methods
   getCheckInsByUserId(userId: number): Promise<CheckIn[]>;
@@ -452,6 +453,32 @@ export class DatabaseStorage implements IStorage {
     for (const user of allUsers) {
       const membership = await this.getMembershipByUserId(user.id);
       result.push({ ...user, membership });
+    }
+    
+    return result;
+  }
+
+  async getMembershipsWithoutSubscription(): Promise<(Membership & { user: User })[]> {
+    // Get all active memberships that don't have a Stripe subscription
+    const membershipsWithoutSub = await db.select()
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.status, 'active'),
+          or(
+            isNull(memberships.stripeSubscriptionId),
+            eq(memberships.stripeSubscriptionId, '')
+          )
+        )
+      );
+    
+    const result: (Membership & { user: User })[] = [];
+    
+    for (const membership of membershipsWithoutSub) {
+      const user = await this.getUser(membership.userId);
+      if (user) {
+        result.push({ ...membership, user });
+      }
     }
     
     return result;

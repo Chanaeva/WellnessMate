@@ -356,6 +356,28 @@ export default function AdminMembers() {
     },
   });
 
+  // Create subscription for membership without one
+  const createSubscriptionMutation = useMutation({
+    mutationFn: async (membershipId: string) => {
+      const response = await apiRequest("POST", `/api/admin/memberships/${membershipId}/create-subscription`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Subscription Created",
+        description: `Subscription created successfully. Next billing: ${data.nextBillingDate}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Creating Subscription",
+        description: error.message || "Failed to create subscription. The member may need to add a payment method first.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Filter and search members
   const filteredMembers =
     members?.filter((member) => {
@@ -1022,6 +1044,26 @@ export default function AdminMembers() {
                             ? format(new Date(selectedMember.membership.endDate), "MMM d, yyyy")
                             : "N/A"}
                         </p>
+                      </div>
+                      <div className="col-span-2">
+                        <h5 className="text-xs font-medium text-gray-500 mb-1">Stripe Subscription</h5>
+                        {selectedMember.membership.stripeSubscriptionId ? (
+                          <Badge className="bg-green-100 text-green-800">
+                            Active: {selectedMember.membership.stripeSubscriptionId.slice(0, 20)}...
+                          </Badge>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-yellow-100 text-yellow-800">No Subscription</Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => createSubscriptionMutation.mutate(selectedMember.membership!.membershipId)}
+                              disabled={createSubscriptionMutation.isPending}
+                            >
+                              {createSubscriptionMutation.isPending ? "Creating..." : "Create Subscription"}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (

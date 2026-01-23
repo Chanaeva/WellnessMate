@@ -1907,6 +1907,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get memberships without Stripe subscriptions
+  app.get("/api/admin/memberships-without-subscription", isAdmin, async (req, res) => {
+    try {
+      const memberships = await storage.getMembershipsWithoutSubscription();
+      res.json(memberships);
+    } catch (error: any) {
+      console.error('Failed to get memberships without subscription:', error);
+      res.status(500).json({ message: "Failed to get memberships: " + error.message });
+    }
+  });
+
+  // Migrate a membership to have a Stripe subscription
+  app.post("/api/admin/memberships/:membershipId/create-subscription", isAdmin, async (req, res) => {
+    try {
+      const { membershipId } = req.params;
+      const freshStripe = createStripeClient();
+      
+      // Get the membership
+      const membership = await storage.getMembershipById(membershipId);
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found" });
+      }
+      
+      if (membership.stripeSubscriptionId) {
+        return res.status(400).json({ message: "Membership already has a subscription" });
+      }
+      
+      // Get the user
+      const user = await storage.getUser(membership.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get the plan for this membership
+      const plans = await storage.getAllMembershipPlans();
+      const plan = plans.find(p => p.planType === membership.planType);
+      
+      if (!plan || !plan.stripePriceId) {
+        return res.status(400).json({ 
+          message: "No Stripe price configured for this plan. Please sync membership plans with Stripe first." 
+        });
+      }
+      
+      // Create or get Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await freshStripe.customers.create({
+          email: user.email || undefined,
+          name: `${user.firstName} ${user.lastName}`,
+          phone: user.phoneNumber || undefined,
+          metadata: {
+            userId: user.id.toString(),
+            membershipId: membership.membershipId,
+          },
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomerId(user.id, customerId);
+      }
+      
+      // Check if user has a payment method
+      const paymentMethods = await freshStripe.paymentMethods.list({
+        customer: customerId,
+        type: 'card',
+      });
+      
+      if (paymentMethods.data.length === 0) {
+        // No payment method, return info for manual setup
+        return res.status(400).json({ 
+          message: "No payment method on file. The member needs to add a card before creating a subscription.",
+          customerId,
+          needsPaymentMethod: true
+        });
+      }
+      
+      // Set default payment method
+      const defaultPaymentMethod = paymentMethods.data[0].id;
+      await freshStripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: defaultPaymentMethod }
+      });
+      
+      // Calculate billing anchor based on membership end date
+      const endDate = new Date(membership.endDate);
+      const now = new Date();
+      
+      // If end date is in the future, use it as billing anchor; otherwise start immediately
+      let billingAnchor: number;
+      if (endDate > now) {
+        billingAnchor = Math.floor(endDate.getTime() / 1000);
+      } else {
+        // End date is in the past or today, start billing in 30 days
+        billingAnchor = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+      }
+      
+      // Create subscription
+      const subscription = await freshStripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: plan.stripePriceId }],
+        collection_method: 'charge_automatically',
+        default_payment_method: defaultPaymentMethod,
+        billing_cycle_anchor: billingAnchor,
+        proration_behavior: 'none',
+        metadata: {
+          source: 'admin_migration',
+          membershipId: membership.membershipId,
+          userId: user.id.toString(),
+        },
+      });
+      
+      // Update membership with subscription ID
+      await storage.updateMembership(membership.membershipId, {
+        stripeSubscriptionId: subscription.id,
+      });
+      
+      console.log(`✅ Created subscription for membership ${membershipId}:`, subscription.id);
+      
+      res.json({ 
+        message: "Subscription created successfully",
+        subscriptionId: subscription.id,
+        nextBillingDate: new Date(billingAnchor * 1000).toISOString().split('T')[0],
+      });
+    } catch (error: any) {
+      console.error('Failed to create subscription:', error);
+      res.status(500).json({ message: "Failed to create subscription: " + error.message });
+    }
+  });
+
   // Admin: Get all active punch cards with user info
   app.get("/api/admin/active-punch-cards", isAdmin, async (req, res) => {
     try {

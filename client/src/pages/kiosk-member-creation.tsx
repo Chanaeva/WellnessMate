@@ -27,15 +27,17 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { z } from "zod";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, PaymentRequest } from "@stripe/stripe-js";
 import {
   Elements,
   CardNumberElement,
   CardExpiryElement,
   CardCvcElement,
+  PaymentRequestButtonElement,
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+import { Separator } from "@/components/ui/separator";
 import { loadStripeTerminal, Terminal } from "@stripe/terminal-js";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import {
@@ -52,6 +54,7 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  Smartphone,
 } from "lucide-react";
 
 // Stripe setup - fetch the public key from the server to support test/live key switching
@@ -573,13 +576,15 @@ function PaymentForm({
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('reader');
+  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual' | 'wallet'>('reader');
   const [readerStatus, setReaderStatus] = useState<'connecting' | 'connected' | 'waiting' | 'processing' | 'error' | 'idle'>('idle');
   const [readerMessage, setReaderMessage] = useState<string>('');
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [connectedReader, setConnectedReader] = useState<any>(null);
   const [billingZip, setBillingZip] = useState('');
   const [cardError, setCardError] = useState<string | null>(null);
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [canMakeWalletPayment, setCanMakeWalletPayment] = useState(false);
   
   // Card element styling to match checkout form
   const elementOptions = {
@@ -742,6 +747,163 @@ function PaymentForm({
       }
     };
   }, []);
+
+  // Initialize Apple Pay / Google Pay
+  useEffect(() => {
+    if (!stripe || finalPrice <= 0) return;
+
+    const pr = stripe.paymentRequest({
+      country: 'US',
+      currency: 'usd',
+      total: {
+        label: 'Wolf Mother Wellness',
+        amount: finalPrice,
+      },
+      requestPayerName: true,
+      requestPayerEmail: true,
+    });
+
+    // Check if the browser supports Apple Pay or Google Pay
+    pr.canMakePayment().then((result) => {
+      if (result) {
+        setPaymentRequest(pr);
+        setCanMakeWalletPayment(true);
+      } else {
+        setPaymentRequest(null);
+        setCanMakeWalletPayment(false);
+      }
+    });
+
+    // Handle the payment when user approves
+    const handlePaymentMethod = async (ev: any) => {
+      setIsProcessing(true);
+      let paymentCompleted = false;
+      try {
+        // Create payment intent using kiosk endpoint (uses card_not_present mode)
+        const piResponse = await apiRequest(
+          "POST",
+          "/api/kiosk/create-member-payment",
+          {
+            memberData,
+            packageData: {
+              ...packageData,
+              finalPrice,
+              originalPrice,
+            },
+            agreementData,
+            discountData: discountData ? {
+              type: discountData.type,
+              value: discountData.value,
+              reason: discountData.reason,
+              amountCents: discountAmountCents,
+            } : null,
+            useTerminal: false,
+            existingMemberId,
+          },
+        );
+        
+        const paymentData = await piResponse.json();
+        const { clientSecret, paymentIntentId, subscriptionId, customerId, isSubscription, stripePriceId } = paymentData;
+
+        if (!clientSecret) {
+          ev.complete('fail');
+          paymentCompleted = true;
+          throw new Error('Failed to create payment intent');
+        }
+
+        // Confirm the payment with the payment method from Apple Pay/Google Pay
+        const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+          clientSecret,
+          { payment_method: ev.paymentMethod.id },
+          { handleActions: false }
+        );
+
+        if (confirmError) {
+          ev.complete('fail');
+          paymentCompleted = true;
+          throw new Error(confirmError.message);
+        }
+
+        // Mark as success before handling additional actions
+        ev.complete('success');
+        paymentCompleted = true;
+
+        if (paymentIntent?.status === 'requires_action') {
+          // Handle additional authentication if needed (SCA)
+          try {
+            const { error: actionError } = await stripe.confirmCardPayment(clientSecret);
+            if (actionError) {
+              throw new Error(actionError.message);
+            }
+          } catch (scaError: any) {
+            throw new Error(scaError.message || "Authentication failed");
+          }
+        }
+
+        if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'requires_capture') {
+          // Confirm member creation
+          const confirmResponse = await apiRequest(
+            "POST",
+            "/api/kiosk/confirm-member-creation",
+            {
+              paymentIntentId: paymentIntent.id,
+              subscriptionId,
+              customerId,
+              isSubscription,
+              stripePriceId,
+              memberData,
+              packageData: {
+                ...packageData,
+                finalPrice,
+                originalPrice,
+              },
+              agreementData,
+              discountData: discountData ? {
+                type: discountData.type,
+                value: discountData.value,
+                reason: discountData.reason,
+                amountCents: discountAmountCents,
+              } : null,
+              existingMemberId,
+            },
+          );
+
+          if (confirmResponse.ok) {
+            toast({
+              title: "Payment Successful",
+              description: `Welcome, ${memberData.firstName}! Your account has been created.`,
+            });
+            onSuccess();
+          } else {
+            const errorData = await confirmResponse.json();
+            throw new Error(errorData.message || 'Failed to create member account');
+          }
+        } else {
+          throw new Error('Payment was not successful');
+        }
+      } catch (error: any) {
+        console.error('Wallet payment error:', error);
+        // Make sure we complete the payment request if not already done
+        if (!paymentCompleted) {
+          ev.complete('fail');
+        }
+        toast({
+          title: "Payment Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    pr.on('paymentmethod', handlePaymentMethod);
+
+    // Cleanup: remove listener when dependencies change
+    return () => {
+      pr.off('paymentmethod', handlePaymentMethod);
+    };
+  }, [stripe, finalPrice, memberData, packageData, agreementData, discountData, existingMemberId, onSuccess, toast]);
 
   // Handle card reader payment
   const handleReaderPayment = async () => {
@@ -1065,6 +1227,18 @@ function PaymentForm({
           <CreditCard className="h-4 w-4 mr-2" />
           Manual Entry
         </Button>
+        {canMakeWalletPayment && (
+          <Button
+            type="button"
+            variant={paymentMethod === 'wallet' ? 'default' : 'outline'}
+            onClick={() => setPaymentMethod('wallet')}
+            disabled={isProcessing}
+            className="flex-1"
+          >
+            <Smartphone className="h-4 w-4 mr-2" />
+            Apple/Google Pay
+          </Button>
+        )}
       </div>
 
       {paymentMethod === 'reader' ? (
@@ -1124,7 +1298,7 @@ function PaymentForm({
             )}
           </Button>
         </div>
-      ) : (
+      ) : paymentMethod === 'manual' ? (
         <form onSubmit={handleManualPayment} className="space-y-6">
           <Card className="bg-white border-gray-200 shadow-lg">
             <CardHeader className="text-center pb-4">
@@ -1212,7 +1386,49 @@ function PaymentForm({
             )}
           </Button>
         </form>
-      )}
+      ) : paymentMethod === 'wallet' && paymentRequest ? (
+        <div className="space-y-6">
+          <Card className="bg-white border-gray-200 shadow-lg">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-xl text-gray-900 flex items-center justify-center gap-2">
+                <Smartphone className="h-5 w-5 text-primary" />
+                Apple Pay / Google Pay
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6">
+              {isProcessing ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+                  <p className="text-lg font-medium text-gray-700">Processing Payment...</p>
+                  <p className="text-sm text-muted-foreground mt-2">Please wait while we complete your transaction</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-center text-muted-foreground mb-4">
+                    Use your device's digital wallet for a quick and secure payment
+                  </p>
+                  <PaymentRequestButtonElement
+                    options={{
+                      paymentRequest,
+                      style: {
+                        paymentRequestButton: {
+                          type: 'default',
+                          theme: 'dark',
+                          height: '56px',
+                        },
+                      },
+                    }}
+                  />
+                </>
+              )}
+              <div className="flex items-center gap-2 text-sm text-gray-500 mt-4 justify-center">
+                <Shield className="h-4 w-4" />
+                <span>Your payment is securely processed by Stripe</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

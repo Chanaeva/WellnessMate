@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { useStripe, useElements, CardNumberElement, CardExpiryElement, CardCvcElement } from "@stripe/react-stripe-js";
+import { useState, useEffect } from "react";
+import { useStripe, useElements, CardNumberElement, CardExpiryElement, CardCvcElement, PaymentRequestButtonElement } from "@stripe/react-stripe-js";
+import { PaymentRequest } from "@stripe/stripe-js";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CreditCard, Loader2, Shield } from "lucide-react";
+import { CreditCard, Loader2, Shield, Smartphone } from "lucide-react";
 
 const elementOptions = {
   style: {
@@ -53,6 +55,138 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel, bil
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [canMakePayment, setCanMakePayment] = useState(false);
+
+  // Calculate total for Apple Pay/Google Pay button
+  const totalAmount = items.reduce((sum, item) => {
+    const price = item.data?.price || 0;
+    return sum + (price * (item.quantity || 1));
+  }, 0);
+
+  // Initialize Apple Pay / Google Pay
+  useEffect(() => {
+    if (!stripe || totalAmount <= 0) return;
+
+    const pr = stripe.paymentRequest({
+      country: 'US',
+      currency: 'usd',
+      total: {
+        label: 'Wolf Mother Wellness',
+        amount: totalAmount,
+      },
+      requestPayerName: true,
+      requestPayerEmail: true,
+    });
+
+    // Check if the browser supports Apple Pay or Google Pay
+    pr.canMakePayment().then((result) => {
+      if (result) {
+        setPaymentRequest(pr);
+        setCanMakePayment(true);
+      } else {
+        setPaymentRequest(null);
+        setCanMakePayment(false);
+      }
+    });
+
+    // Handle the payment when user approves
+    const handlePaymentMethod = async (ev: any) => {
+      setIsProcessing(true);
+      let paymentCompleted = false;
+      try {
+        // Create payment intent on server
+        const res = await apiRequest("POST", "/api/stripe/create-payment-intent", {
+          items: items.map(item => ({
+            type: item.type,
+            quantity: item.quantity || 1,
+            data: item.data
+          })),
+          promoCode: promoCode || undefined
+        });
+        
+        if (!res.ok) {
+          const error = await res.json();
+          ev.complete('fail');
+          paymentCompleted = true;
+          throw new Error(error.message || "Failed to create payment");
+        }
+        
+        const { clientSecret, paymentIntentId, subscriptionId, type, invoiceId } = await res.json();
+
+        // Confirm the payment with the payment method from Apple Pay/Google Pay
+        const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+          clientSecret,
+          { payment_method: ev.paymentMethod.id },
+          { handleActions: false }
+        );
+
+        if (confirmError) {
+          ev.complete('fail');
+          paymentCompleted = true;
+          throw new Error(confirmError.message);
+        }
+
+        // Mark as success before handling additional actions
+        ev.complete('success');
+        paymentCompleted = true;
+
+        if (paymentIntent?.status === 'requires_action') {
+          // Handle additional authentication if needed (SCA)
+          try {
+            const { error: actionError } = await stripe.confirmCardPayment(clientSecret);
+            if (actionError) {
+              throw new Error(actionError.message);
+            }
+          } catch (scaError: any) {
+            throw new Error(scaError.message || "Authentication failed");
+          }
+        }
+
+        // Finalize the order
+        const finalizeRes = await apiRequest("POST", "/api/stripe/finalize-order", {
+          paymentIntentId,
+          subscriptionId,
+          type,
+          invoiceId,
+          items: items.map(item => ({
+            type: item.type,
+            quantity: item.quantity || 1,
+            data: item.data
+          })),
+          promoCode: promoCode || undefined
+        });
+
+        if (!finalizeRes.ok) {
+          const error = await finalizeRes.json();
+          throw new Error(error.message || "Failed to finalize order");
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+        onSuccess(paymentIntentId);
+      } catch (error: any) {
+        // Make sure we complete the payment request if not already done
+        if (!paymentCompleted) {
+          ev.complete('fail');
+        }
+        toast({
+          title: "Payment Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
+    pr.on('paymentmethod', handlePaymentMethod);
+
+    // Cleanup: remove listener when dependencies change
+    return () => {
+      pr.off('paymentmethod', handlePaymentMethod);
+    };
+  }, [stripe, totalAmount, items, promoCode, onSuccess, toast]);
 
   const createPaymentIntentMutation = useMutation({
     mutationFn: async () => {
@@ -246,6 +380,40 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel, bil
         </CardDescription>
       </CardHeader>
       <CardContent className="px-4 sm:px-6">
+        {/* Apple Pay / Google Pay Button */}
+        {canMakePayment && paymentRequest && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 text-base font-medium text-gray-900 mb-3">
+              <Smartphone className="h-5 w-5 text-primary" />
+              Express Checkout
+            </div>
+            {isProcessing ? (
+              <div className="flex items-center justify-center py-4 bg-gray-100 rounded-lg">
+                <Loader2 className="h-5 w-5 animate-spin mr-2 text-primary" />
+                <span className="text-gray-700">Processing payment...</span>
+              </div>
+            ) : (
+              <PaymentRequestButtonElement
+                options={{
+                  paymentRequest,
+                  style: {
+                    paymentRequestButton: {
+                      type: 'default',
+                      theme: 'dark',
+                      height: '48px',
+                    },
+                  },
+                }}
+              />
+            )}
+            <div className="flex items-center gap-4 my-6">
+              <Separator className="flex-1" />
+              <span className="text-sm text-muted-foreground">or pay with card</span>
+              <Separator className="flex-1" />
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">

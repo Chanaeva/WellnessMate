@@ -1526,7 +1526,24 @@ export default function KioskMemberCreation({
           ? packageData.monthlyPrice
           : packageData.totalPrice,
     });
-    setStep("agreement");
+    
+    // Skip waiver for returning members - they already signed when they first joined
+    if (existingMember) {
+      // Set default agreement data for returning members (waiver already on file)
+      setAgreementData({
+        dateOfBirth: "", // Already on file from original signup
+        emergencyContact: "", // Already on file from original signup
+        emergencyPhone: "", // Already on file from original signup
+        healthConfirmation: true,
+        riskAcknowledgment: true,
+        liabilityWaiver: true,
+        rulesAcceptance: true,
+        ageConfirmation: true,
+      });
+      setStep("payment");
+    } else {
+      setStep("agreement");
+    }
   };
 
   const handleAgreementComplete = (data: AgreementFormData) => {

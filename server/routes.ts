@@ -5442,20 +5442,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, customerId, isSubscription, stripePriceId } = req.body;
       console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, isSubscription });
       
-      // Validate agreement data
-      const agreementSchema = z.object({
-        dateOfBirth: z.string().min(1, "Date of birth is required"),
-        emergencyContact: z.string().min(1, "Emergency contact is required"),
-        emergencyPhone: z.string().min(1, "Emergency phone is required"),
-        healthConfirmation: z.boolean().refine(val => val === true, "Health confirmation required"),
-        riskAcknowledgment: z.boolean().refine(val => val === true, "Risk acknowledgment required"),
-        liabilityWaiver: z.boolean().refine(val => val === true, "Liability waiver required"),
-        rulesAcceptance: z.boolean().refine(val => val === true, "Rules acceptance required"),
-        ageConfirmation: z.boolean().refine(val => val === true, "Age confirmation required"),
-      });
-      
-      const validatedAgreement = agreementSchema.parse(agreementData);
-      console.log('✅ Validated agreement data:', validatedAgreement);
+      // Validate agreement data only for new members (returning members already have waiver on file)
+      let validatedAgreement = agreementData;
+      if (!existingMemberId) {
+        const agreementSchema = z.object({
+          dateOfBirth: z.string().min(1, "Date of birth is required"),
+          emergencyContact: z.string().min(1, "Emergency contact is required"),
+          emergencyPhone: z.string().min(1, "Emergency phone is required"),
+          healthConfirmation: z.boolean().refine(val => val === true, "Health confirmation required"),
+          riskAcknowledgment: z.boolean().refine(val => val === true, "Risk acknowledgment required"),
+          liabilityWaiver: z.boolean().refine(val => val === true, "Liability waiver required"),
+          rulesAcceptance: z.boolean().refine(val => val === true, "Rules acceptance required"),
+          ageConfirmation: z.boolean().refine(val => val === true, "Age confirmation required"),
+        });
+        
+        validatedAgreement = agreementSchema.parse(agreementData);
+        console.log('✅ Validated agreement data:', validatedAgreement);
+      } else {
+        console.log('⏭️ Skipping agreement validation for returning member:', existingMemberId);
+      }
       
       // Verify payment was successful
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);

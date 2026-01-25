@@ -51,3 +51,26 @@ Wolf Mother Wellness is a full-stack web application designed for managing a the
 - **SMS**: Twilio (for SMS messaging, previously used for password reset)
 - **UI Components**: Radix UI primitives
 - **Apple Wallet**: `passkit-generator` library (for generating Apple Wallet passes)
+
+## Important Notes & Debugging
+
+### Development vs Production Databases
+**CRITICAL**: Development and Production use SEPARATE PostgreSQL databases. This is how Replit's infrastructure works:
+- When running in development mode (`npm run dev`), you're connected to the **development database**
+- When deployed/published, the app connects to the **production database**
+- Data created in development (members, check-ins, settings) does NOT appear in production
+- Data created in production does NOT appear in development
+
+**Common Issue**: If check-ins or member data "resets" after deployment, you may be:
+1. Looking at production data while testing was done in development
+2. Need to configure settings (hours, packages, etc.) separately in production via admin dashboard
+
+**To verify which database you're using**:
+- Check the URL - development uses the Replit preview URL, production uses the deployed `.replit.app` domain
+- Production admin setup is separate - use the one-time admin setup flow at first production launch
+
+### Kiosk M2 Card Reader Connection
+- The M2 reader connects via Bluetooth - ensure Bluetooth is enabled on the kiosk device
+- New readers must be registered in Stripe Dashboard (dashboard.stripe.com/terminal/readers) before use
+- The kiosk shows connection status: Initializing → Searching → Connecting → Connected
+- Troubleshooting tips are displayed if connection fails

@@ -53,6 +53,10 @@ import {
   Wifi,
   WifiOff,
   Loader2,
+  Bluetooth,
+  RefreshCw,
+  HelpCircle,
+  Radio,
 } from "lucide-react";
 
 // Stripe setup - fetch the public key from the server to support test/live key switching
@@ -575,12 +579,15 @@ function PaymentForm({
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('reader');
-  const [readerStatus, setReaderStatus] = useState<'connecting' | 'connected' | 'waiting' | 'processing' | 'error' | 'idle'>('idle');
+  const [readerStatus, setReaderStatus] = useState<'initializing' | 'searching' | 'found' | 'connecting' | 'connected' | 'waiting' | 'processing' | 'error' | 'idle'>('idle');
   const [readerMessage, setReaderMessage] = useState<string>('');
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [connectedReader, setConnectedReader] = useState<any>(null);
+  const [discoveredReaders, setDiscoveredReaders] = useState<any[]>([]);
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   const [billingZip, setBillingZip] = useState('');
   const [cardError, setCardError] = useState<string | null>(null);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   
   // Card element styling to match checkout form
   const elementOptions = {
@@ -623,117 +630,194 @@ function PaymentForm({
 
   // Track terminal instance in ref for cleanup
   const terminalRef = useRef<Terminal | null>(null);
+  // Track mounted state to prevent state updates after unmount
+  const mountedRef = useRef(true);
+  // Track payment method to ensure we don't update state when switching to manual
+  const paymentMethodRef = useRef(paymentMethod);
   
-  // Initialize Stripe Terminal when reader mode is selected
+  // Keep paymentMethodRef in sync
   useEffect(() => {
-    let mounted = true;
+    paymentMethodRef.current = paymentMethod;
+  }, [paymentMethod]);
+  
+  // Function to connect to a specific reader
+  const connectToReader = async (reader: any) => {
+    if (!terminalRef.current) return;
+    if (paymentMethodRef.current !== 'reader') return;
     
-    const initTerminal = async () => {
-      // Clean up existing terminal connection before reinitializing
-      if (terminalRef.current) {
-        try {
-          await terminalRef.current.disconnectReader();
-        } catch (e) {
-          console.log('Disconnect error (ok if no reader connected):', e);
+    setReaderStatus('connecting');
+    setReaderMessage(`Connecting to ${reader.label || 'M2 Reader'}...`);
+    
+    try {
+      const connectResult = await terminalRef.current.connectReader(reader);
+      
+      // Check if still mounted and in reader mode before updating state
+      if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+      
+      if ('error' in connectResult) {
+        setReaderStatus('error');
+        setReaderMessage(`Failed to connect: ${connectResult.error.message || 'Unknown error'}`);
+      } else {
+        setConnectedReader(connectResult.reader);
+        setReaderStatus('connected');
+        setReaderMessage(`Connected to ${reader.label || 'M2 Card Reader'}`);
+        setDiscoveredReaders([]);
+      }
+    } catch (error: any) {
+      if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+      setReaderStatus('error');
+      setReaderMessage(error.message || 'Failed to connect to reader');
+    }
+  };
+  
+  // Function to retry discovery
+  const retryDiscovery = async () => {
+    // Only retry if still in reader mode
+    if (paymentMethodRef.current !== 'reader') return;
+    
+    setConnectionAttempts(prev => prev + 1);
+    setConnectedReader(null);
+    setDiscoveredReaders([]);
+    setShowTroubleshooting(false);
+    await initializeTerminal();
+  };
+  
+  // Initialize Stripe Terminal
+  const initializeTerminal = async () => {
+    // Don't initialize if not in reader mode
+    if (paymentMethodRef.current !== 'reader') return;
+    
+    // Clean up existing terminal connection before reinitializing
+    if (terminalRef.current) {
+      try {
+        await terminalRef.current.disconnectReader();
+      } catch (e) {
+        console.log('Disconnect error (ok if no reader connected):', e);
+      }
+    }
+    
+    try {
+      if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+      
+      setReaderStatus('initializing');
+      setReaderMessage('Initializing Stripe Terminal...');
+      setDiscoveredReaders([]);
+      
+      const stripeTerminal = await loadStripeTerminal();
+      if (!stripeTerminal) {
+        if (mountedRef.current && paymentMethodRef.current === 'reader') {
+          setReaderStatus('error');
+          setReaderMessage('Failed to load Stripe Terminal SDK');
         }
+        return;
       }
       
-      try {
-        setReaderStatus('connecting');
-        setReaderMessage('Initializing card reader...');
-        
-        const stripeTerminal = await loadStripeTerminal();
-        if (!stripeTerminal || !mounted) return;
-        
-        const term = stripeTerminal.create({
-          onFetchConnectionToken: async () => {
-            const response = await fetch('/api/stripe/terminal/connection-token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-            });
-            const data = await response.json();
-            return data.secret;
-          },
-          onUnexpectedReaderDisconnect: () => {
-            console.log('Reader disconnected unexpectedly');
+      if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+      
+      const term = stripeTerminal.create({
+        onFetchConnectionToken: async () => {
+          const response = await fetch('/api/stripe/terminal/connection-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const data = await response.json();
+          return data.secret;
+        },
+        onUnexpectedReaderDisconnect: () => {
+          console.log('Reader disconnected unexpectedly');
+          if (mountedRef.current && paymentMethodRef.current === 'reader') {
             setReaderStatus('error');
-            setReaderMessage('Card reader disconnected. Please reconnect or use manual entry.');
+            setReaderMessage('Card reader disconnected. Tap "Retry" to reconnect.');
             setConnectedReader(null);
-          },
-        });
-        
-        if (!mounted) return;
-        setTerminal(term);
-        terminalRef.current = term;
-        
-        // Try to discover and connect to a reader
-        const discoverResult = await term.discoverReaders({
-          simulated: false, // Set to true for testing without a real reader
-        });
-        
-        if (!mounted) return;
-        
-        if ('error' in discoverResult) {
-          console.log('No physical readers found, trying simulated:', discoverResult.error);
-          // Try simulated reader for testing
-          const simulatedResult = await term.discoverReaders({ simulated: true });
-          if ('error' in simulatedResult || simulatedResult.discoveredReaders.length === 0) {
-            setReaderStatus('error');
-            setReaderMessage('No card reader found. Using manual card entry.');
-            setPaymentMethod('manual');
-            return;
           }
+        },
+      });
+      
+      setTerminal(term);
+      terminalRef.current = term;
+      
+      if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+      
+      // Start searching for readers
+      setReaderStatus('searching');
+      setReaderMessage('Searching for nearby M2 card readers via Bluetooth...');
+      
+      // Try to discover physical readers first
+      const discoverResult = await term.discoverReaders({
+        simulated: false,
+      });
+      
+      if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+      
+      if ('error' in discoverResult) {
+        console.log('Discovery error:', discoverResult.error);
+        // Try simulated reader for testing/development
+        const simulatedResult = await term.discoverReaders({ simulated: true });
+        
+        if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+        
+        if (!('error' in simulatedResult) && simulatedResult.discoveredReaders.length > 0) {
+          const readers = simulatedResult.discoveredReaders;
+          setDiscoveredReaders(readers);
           
-          const reader = simulatedResult.discoveredReaders[0];
-          const connectResult = await term.connectReader(reader);
-          if ('error' in connectResult) {
-            setReaderStatus('error');
-            setReaderMessage('Could not connect to reader. Using manual entry.');
-            setPaymentMethod('manual');
+          if (readers.length === 1) {
+            await connectToReader(readers[0]);
           } else {
-            setConnectedReader(connectResult.reader);
-            setReaderStatus('connected');
-            setReaderMessage('Card reader connected (simulated)');
-          }
-        } else if (discoverResult.discoveredReaders.length > 0) {
-          const reader = discoverResult.discoveredReaders[0];
-          const connectResult = await term.connectReader(reader);
-          if ('error' in connectResult) {
-            setReaderStatus('error');
-            setReaderMessage('Could not connect to reader. Using manual entry.');
-            setPaymentMethod('manual');
-          } else {
-            setConnectedReader(connectResult.reader);
-            setReaderStatus('connected');
-            setReaderMessage(`Connected to ${reader.label || 'card reader'}`);
+            setReaderStatus('found');
+            setReaderMessage(`Found ${readers.length} readers. Select one to connect.`);
           }
         } else {
           setReaderStatus('error');
-          setReaderMessage('No card reader found. Using manual card entry.');
-          setPaymentMethod('manual');
+          setReaderMessage('No M2 card readers found nearby.');
+          setShowTroubleshooting(true);
         }
-      } catch (error: any) {
-        console.error('Terminal initialization error:', error);
-        if (mounted) {
-          setReaderStatus('error');
-          setReaderMessage('Card reader unavailable. Using manual entry.');
-          setPaymentMethod('manual');
+      } else if (discoverResult.discoveredReaders.length > 0) {
+        const readers = discoverResult.discoveredReaders;
+        setDiscoveredReaders(readers);
+        
+        if (readers.length === 1) {
+          // Auto-connect if only one reader found
+          await connectToReader(readers[0]);
+        } else {
+          // Let user select which reader to use
+          setReaderStatus('found');
+          setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
         }
+      } else {
+        setReaderStatus('error');
+        setReaderMessage('No M2 card readers found nearby.');
+        setShowTroubleshooting(true);
       }
-    };
-    
+    } catch (error: any) {
+      console.error('Terminal initialization error:', error);
+      if (mountedRef.current && paymentMethodRef.current === 'reader') {
+        setReaderStatus('error');
+        setReaderMessage(error.message || 'Card reader unavailable.');
+        setShowTroubleshooting(true);
+      }
+    }
+  };
+  
+  // Initialize Stripe Terminal when reader mode is selected
+  useEffect(() => {
     if (paymentMethod === 'reader' && !connectedReader) {
-      initTerminal();
+      initializeTerminal();
     } else if (paymentMethod === 'manual') {
       // Reset reader state when switching to manual
       setReaderStatus('idle');
       setReaderMessage('');
+      setDiscoveredReaders([]);
+      setShowTroubleshooting(false);
     }
-    
-    return () => {
-      mounted = false;
-    };
   }, [paymentMethod]);
+  
+  // Track mounted state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   
   // Cleanup terminal on unmount
   useEffect(() => {
@@ -1071,18 +1155,31 @@ function PaymentForm({
       {paymentMethod === 'reader' ? (
         <div className="space-y-6">
           {/* Card Reader Status */}
-          <div className={`p-6 border-2 rounded-lg text-center ${
+          <div className={`p-6 border-2 rounded-lg ${
             readerStatus === 'connected' ? 'border-green-500 bg-green-50' :
             readerStatus === 'processing' ? 'border-blue-500 bg-blue-50' :
             readerStatus === 'error' ? 'border-red-500 bg-red-50' :
+            readerStatus === 'found' ? 'border-amber-500 bg-amber-50' :
             'border-gray-300 bg-gray-50'
           }`}>
             <div className="flex justify-center mb-4">
-              {readerStatus === 'connecting' && (
+              {(readerStatus === 'initializing' || readerStatus === 'connecting') && (
                 <Loader2 className="h-12 w-12 text-gray-500 animate-spin" />
               )}
+              {readerStatus === 'searching' && (
+                <div className="relative">
+                  <Bluetooth className="h-12 w-12 text-blue-600" />
+                  <Radio className="h-6 w-6 text-blue-400 absolute -top-1 -right-1 animate-pulse" />
+                </div>
+              )}
+              {readerStatus === 'found' && (
+                <Bluetooth className="h-12 w-12 text-amber-600" />
+              )}
               {readerStatus === 'connected' && (
-                <Wifi className="h-12 w-12 text-green-600" />
+                <div className="relative">
+                  <Bluetooth className="h-12 w-12 text-green-600" />
+                  <CheckCircle className="h-5 w-5 text-green-600 absolute -bottom-1 -right-1 bg-green-50 rounded-full" />
+                </div>
               )}
               {readerStatus === 'processing' && (
                 <CreditCard className="h-12 w-12 text-blue-600 animate-pulse" />
@@ -1091,20 +1188,94 @@ function PaymentForm({
                 <WifiOff className="h-12 w-12 text-red-600" />
               )}
               {readerStatus === 'idle' && (
-                <CreditCard className="h-12 w-12 text-gray-400" />
+                <Bluetooth className="h-12 w-12 text-gray-400" />
               )}
             </div>
-            <p className={`text-lg font-medium ${
+            <p className={`text-lg font-medium text-center ${
               readerStatus === 'connected' ? 'text-green-700' :
               readerStatus === 'processing' ? 'text-blue-700' :
               readerStatus === 'error' ? 'text-red-700' :
+              readerStatus === 'found' ? 'text-amber-700' :
+              readerStatus === 'searching' ? 'text-blue-600' :
               'text-gray-600'
             }`}>
               {readerMessage || 'Initializing...'}
             </p>
             {readerStatus === 'processing' && (
-              <p className="text-sm text-blue-600 mt-2">
+              <p className="text-sm text-blue-600 mt-2 text-center">
                 Please do not remove your card until prompted
+              </p>
+            )}
+            
+            {/* Reader Selection List */}
+            {readerStatus === 'found' && discoveredReaders.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm text-gray-600 text-center mb-3">Tap a reader to connect:</p>
+                {discoveredReaders.map((reader, index) => (
+                  <Button
+                    key={reader.id || index}
+                    variant="outline"
+                    className="w-full justify-start text-left py-4"
+                    onClick={() => connectToReader(reader)}
+                  >
+                    <Bluetooth className="h-5 w-5 mr-3 text-blue-600" />
+                    <div>
+                      <p className="font-medium">{reader.label || `M2 Reader ${index + 1}`}</p>
+                      <p className="text-xs text-gray-500">Serial: {reader.serial_number || 'Unknown'}</p>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            )}
+            
+            {/* Error Actions - Retry and Troubleshooting */}
+            {readerStatus === 'error' && (
+              <div className="mt-4 space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={retryDiscovery}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry Connection
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-gray-600"
+                  onClick={() => setShowTroubleshooting(!showTroubleshooting)}
+                >
+                  <HelpCircle className="h-4 w-4 mr-2" />
+                  {showTroubleshooting ? 'Hide' : 'Show'} Troubleshooting Tips
+                </Button>
+              </div>
+            )}
+            
+            {/* Troubleshooting Tips */}
+            {showTroubleshooting && (
+              <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4 text-left">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <HelpCircle className="h-4 w-4 mr-2 text-blue-600" />
+                  M2 Reader Setup Tips
+                </h4>
+                <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                  <li><strong>Power on the reader:</strong> Press and hold the power button until the LED lights up</li>
+                  <li><strong>Enable Bluetooth:</strong> Ensure Bluetooth is enabled on this device</li>
+                  <li><strong>Stay close:</strong> Keep the M2 reader within 10 feet of the kiosk</li>
+                  <li><strong>Check battery:</strong> The reader needs to be charged (green LED = charged)</li>
+                  <li><strong>Pair via Stripe Dashboard:</strong> New readers must be registered at dashboard.stripe.com/terminal/readers first</li>
+                  <li><strong>One device at a time:</strong> The M2 can only connect to one device - ensure it's not connected elsewhere</li>
+                </ol>
+                <p className="text-xs text-gray-500 mt-3 italic">
+                  If issues persist, try restarting the M2 reader and this browser tab.
+                </p>
+              </div>
+            )}
+            
+            {/* Connection attempts indicator */}
+            {connectionAttempts > 0 && readerStatus === 'error' && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Connection attempts: {connectionAttempts}
               </p>
             )}
           </div>
@@ -1124,6 +1295,20 @@ function PaymentForm({
               `Pay $${(finalPrice / 100).toFixed(2)} with Card Reader`
             )}
           </Button>
+          
+          {/* Quick switch to manual if reader has issues */}
+          {(readerStatus === 'error' || readerStatus === 'searching') && (
+            <p className="text-center text-sm text-gray-500">
+              Having trouble? You can also use{' '}
+              <button
+                type="button"
+                className="text-primary underline hover:text-primary/80"
+                onClick={() => setPaymentMethod('manual')}
+              >
+                Manual Card Entry
+              </button>
+            </p>
+          )}
         </div>
       ) : paymentMethod === 'manual' ? (
         <form onSubmit={handleManualPayment} className="space-y-6">

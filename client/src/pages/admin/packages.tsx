@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Trash2, DollarSign, Crown, Star, Zap, CreditCard, Calendar, RefreshCw, AlertCircle } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, Crown, Star, Zap, CreditCard, Calendar, RefreshCw, AlertCircle, Monitor, ShoppingCart, Tablet } from "lucide-react";
 
 export default function PackagesManagement() {
   const { toast } = useToast();
@@ -37,7 +37,10 @@ export default function PackagesManagement() {
     features: [],
     availableFrom: undefined,
     availableUntil: undefined,
-    expiresAt: undefined
+    expiresAt: undefined,
+    availableOnKiosk: true,
+    availableOnWebsite: true,
+    availableInCart: true
   });
   const [hasExpiration, setHasExpiration] = useState(false);
   const [hasAvailabilityDates, setHasAvailabilityDates] = useState(false);
@@ -55,7 +58,10 @@ export default function PackagesManagement() {
     isActive: true,
     sortOrder: 0,
     availableFrom: undefined,
-    availableUntil: undefined
+    availableUntil: undefined,
+    availableOnKiosk: true,
+    availableOnWebsite: true,
+    availableInCart: true
   });
   const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
   const [templateHasAvailabilityDates, setTemplateHasAvailabilityDates] = useState(false);
@@ -219,7 +225,10 @@ export default function PackagesManagement() {
       features: [],
       availableFrom: undefined,
       availableUntil: undefined,
-      expiresAt: undefined
+      expiresAt: undefined,
+      availableOnKiosk: true,
+      availableOnWebsite: true,
+      availableInCart: true
     });
     setHasExpiration(false);
     setHasAvailabilityDates(false);
@@ -238,7 +247,10 @@ export default function PackagesManagement() {
       isActive: true,
       sortOrder: 0,
       availableFrom: undefined,
-      availableUntil: undefined
+      availableUntil: undefined,
+      availableOnKiosk: true,
+      availableOnWebsite: true,
+      availableInCart: true
     });
     setTemplateHasAvailabilityDates(false);
     setTemplateHasNoEndDate(false);
@@ -256,7 +268,10 @@ export default function PackagesManagement() {
       features: plan.features || [],
       availableFrom: plan.availableFrom || undefined,
       availableUntil: plan.availableUntil || undefined,
-      expiresAt: plan.expiresAt || undefined
+      expiresAt: plan.expiresAt || undefined,
+      availableOnKiosk: plan.availableOnKiosk ?? true,
+      availableOnWebsite: plan.availableOnWebsite ?? true,
+      availableInCart: plan.availableInCart ?? true
     });
     setHasExpiration(!!plan.expiresAt);
     setHasAvailabilityDates(!!(plan.availableFrom || plan.availableUntil));
@@ -275,7 +290,10 @@ export default function PackagesManagement() {
       isActive: template.isActive,
       sortOrder: template.sortOrder,
       availableFrom: template.availableFrom || undefined,
-      availableUntil: template.availableUntil || undefined
+      availableUntil: template.availableUntil || undefined,
+      availableOnKiosk: template.availableOnKiosk ?? true,
+      availableOnWebsite: template.availableOnWebsite ?? true,
+      availableInCart: template.availableInCart ?? true
     });
     setTemplateHasAvailabilityDates(!!(template.availableFrom || template.availableUntil));
     setTemplateHasNoEndDate(!template.availableUntil && !!template.availableFrom);
@@ -722,6 +740,51 @@ export default function PackagesManagement() {
                       </div>
                     </div>
                   </div>
+                  <div className="space-y-3 border-t pt-4">
+                    <Label className="text-sm font-medium">Purchase Channels</Label>
+                    <p className="text-xs text-muted-foreground">Where can members purchase this plan?</p>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="plan-available-kiosk"
+                          checked={planFormData.availableOnKiosk}
+                          onChange={(e) => setPlanFormData(prev => ({...prev, availableOnKiosk: e.target.checked}))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="plan-available-kiosk" className="cursor-pointer flex items-center gap-1.5">
+                          <Tablet className="h-4 w-4" />
+                          Kiosk
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="plan-available-website"
+                          checked={planFormData.availableOnWebsite}
+                          onChange={(e) => setPlanFormData(prev => ({...prev, availableOnWebsite: e.target.checked}))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="plan-available-website" className="cursor-pointer flex items-center gap-1.5">
+                          <Monitor className="h-4 w-4" />
+                          Website
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="plan-available-cart"
+                          checked={planFormData.availableInCart}
+                          onChange={(e) => setPlanFormData(prev => ({...prev, availableInCart: e.target.checked}))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="plan-available-cart" className="cursor-pointer flex items-center gap-1.5">
+                          <ShoppingCart className="h-4 w-4" />
+                          Cart
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button type="submit" disabled={planMutation.isPending}>
                       {planMutation.isPending ? "Saving..." : editingPlan ? "Update Plan" : "Create Plan"}
@@ -972,6 +1035,51 @@ export default function PackagesManagement() {
                         )}
                       </div>
                     )}
+                  </div>
+                  <div className="space-y-3 border-t pt-4">
+                    <Label className="text-sm font-medium">Purchase Channels</Label>
+                    <p className="text-xs text-muted-foreground">Where can members purchase this day pass?</p>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="template-available-kiosk"
+                          checked={templateFormData.availableOnKiosk}
+                          onChange={(e) => setTemplateFormData(prev => ({...prev, availableOnKiosk: e.target.checked}))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="template-available-kiosk" className="cursor-pointer flex items-center gap-1.5">
+                          <Tablet className="h-4 w-4" />
+                          Kiosk
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="template-available-website"
+                          checked={templateFormData.availableOnWebsite}
+                          onChange={(e) => setTemplateFormData(prev => ({...prev, availableOnWebsite: e.target.checked}))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="template-available-website" className="cursor-pointer flex items-center gap-1.5">
+                          <Monitor className="h-4 w-4" />
+                          Website
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="template-available-cart"
+                          checked={templateFormData.availableInCart}
+                          onChange={(e) => setTemplateFormData(prev => ({...prev, availableInCart: e.target.checked}))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <Label htmlFor="template-available-cart" className="cursor-pointer flex items-center gap-1.5">
+                          <ShoppingCart className="h-4 w-4" />
+                          Cart
+                        </Label>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" disabled={templateMutation.isPending}>

@@ -149,6 +149,10 @@ export const membershipPlans = pgTable("membership_plans", {
   stripeProductId: text("stripe_product_id"),
   stripePriceId: text("stripe_price_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Purchase channel availability
+  availableOnKiosk: boolean("available_on_kiosk").notNull().default(true),
+  availableOnWebsite: boolean("available_on_website").notNull().default(true),
+  availableInCart: boolean("available_in_cart").notNull().default(true),
 });
 
 // Punch card templates for admin management
@@ -165,6 +169,10 @@ export const punchCardTemplates = pgTable("punch_card_templates", {
   availableUntil: timestamp("available_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  // Purchase channel availability
+  availableOnKiosk: boolean("available_on_kiosk").notNull().default(true),
+  availableOnWebsite: boolean("available_on_website").notNull().default(true),
+  availableInCart: boolean("available_in_cart").notNull().default(true),
 });
 
 // Punch cards table for day pass packages

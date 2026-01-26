@@ -1819,7 +1819,9 @@ export default function KioskMemberCreation({
                             </FormControl>
                             <SelectContent>
                               {packageType === "membership"
-                                ? membershipPlans.map((plan: any) => (
+                                ? membershipPlans
+                                    .filter((plan: any) => plan.availableOnKiosk !== false)
+                                    .map((plan: any) => (
                                     <SelectItem
                                       key={plan.id}
                                       value={plan.id.toString()}
@@ -1829,7 +1831,9 @@ export default function KioskMemberCreation({
                                       /month
                                     </SelectItem>
                                   ))
-                                : punchCardTemplates.map((template: any) => (
+                                : punchCardTemplates
+                                    .filter((template: any) => template.availableOnKiosk !== false)
+                                    .map((template: any) => (
                                     <SelectItem
                                       key={template.id}
                                       value={template.id.toString()}

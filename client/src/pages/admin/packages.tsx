@@ -505,6 +505,21 @@ export default function PackagesManagement() {
                     </ul>
                   </div>
                   
+                  <div className="flex flex-wrap gap-1 mb-4">
+                    <Badge variant={plan.availableOnKiosk !== false ? "default" : "outline"} className="text-xs">
+                      <Tablet className="h-3 w-3 mr-1" />
+                      Kiosk
+                    </Badge>
+                    <Badge variant={plan.availableOnWebsite !== false ? "default" : "outline"} className="text-xs">
+                      <Monitor className="h-3 w-3 mr-1" />
+                      Website
+                    </Badge>
+                    <Badge variant={plan.availableInCart !== false ? "default" : "outline"} className="text-xs">
+                      <ShoppingCart className="h-3 w-3 mr-1" />
+                      Cart
+                    </Badge>
+                  </div>
+                  
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -841,6 +856,21 @@ export default function PackagesManagement() {
                       <span>Total Price:</span>
                       <span>${(template.totalPrice / 100).toFixed(2)}</span>
                     </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1 mb-4">
+                    <Badge variant={template.availableOnKiosk !== false ? "default" : "outline"} className="text-xs">
+                      <Tablet className="h-3 w-3 mr-1" />
+                      Kiosk
+                    </Badge>
+                    <Badge variant={template.availableOnWebsite !== false ? "default" : "outline"} className="text-xs">
+                      <Monitor className="h-3 w-3 mr-1" />
+                      Website
+                    </Badge>
+                    <Badge variant={template.availableInCart !== false ? "default" : "outline"} className="text-xs">
+                      <ShoppingCart className="h-3 w-3 mr-1" />
+                      Cart
+                    </Badge>
                   </div>
                   
                   <div className="flex gap-2">

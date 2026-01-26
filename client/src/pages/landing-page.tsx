@@ -623,7 +623,7 @@ export default function LandingPage() {
               </div>
 
               <div className="space-y-6">
-                {membershipPlans?.map((plan: MembershipPlan) => (
+                {membershipPlans?.filter((plan: MembershipPlan) => plan.availableOnWebsite !== false).map((plan: MembershipPlan) => (
                   <Card
                     key={plan.id}
                     className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"

@@ -294,7 +294,7 @@ export default function PackagesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {membershipPlans?.map((plan, index) => {
+              {membershipPlans?.filter((plan) => plan.availableOnWebsite !== false).map((plan, index) => {
                 const Icon =
                   planIcons[plan.planType as keyof typeof planIcons] || Shield;
                 const theme =
@@ -463,23 +463,29 @@ export default function PackagesPage() {
                     </CardContent>
 
                     <CardFooter className="pt-0">
-                      <Button
-                        className="w-full wellness-button-primary"
-                        onClick={() => handleAddMembershipToCart(plan)}
-                        disabled={
-                          currentMembership &&
-                          currentMembership.status === "active" &&
-                          currentMembership.planType === plan.planType
-                        }
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        {currentMembership &&
-                        currentMembership.status === "active"
-                          ? currentMembership.planType === plan.planType
-                            ? "Current Plan"
-                            : "Upgrade Plan"
-                          : "Begin Journey"}
-                      </Button>
+                      {plan.availableInCart !== false ? (
+                        <Button
+                          className="w-full wellness-button-primary"
+                          onClick={() => handleAddMembershipToCart(plan)}
+                          disabled={
+                            currentMembership &&
+                            currentMembership.status === "active" &&
+                            currentMembership.planType === plan.planType
+                          }
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          {currentMembership &&
+                          currentMembership.status === "active"
+                            ? currentMembership.planType === plan.planType
+                              ? "Current Plan"
+                              : "Upgrade Plan"
+                            : "Begin Journey"}
+                        </Button>
+                      ) : (
+                        <div className="w-full text-center py-2 text-sm text-muted-foreground">
+                          Available at our location only
+                        </div>
+                      )}
                     </CardFooter>
                   </Card>
                 );
@@ -500,7 +506,7 @@ export default function PackagesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {punchCardTemplates?.map((template) => (
+              {punchCardTemplates?.filter((template) => template.availableOnWebsite !== false).map((template) => (
                 <Card
                   key={template.id}
                   className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-accent/20 bg-gradient-to-br from-card to-accent/5"
@@ -596,13 +602,19 @@ export default function PackagesPage() {
                   </CardContent>
 
                   <CardFooter className="pt-0">
-                    <Button
-                      className="w-full wellness-button-primary"
-                      onClick={() => handleAddPunchCardToCart(template)}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Add to Cart
-                    </Button>
+                    {template.availableInCart !== false ? (
+                      <Button
+                        className="w-full wellness-button-primary"
+                        onClick={() => handleAddPunchCardToCart(template)}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
+                      </Button>
+                    ) : (
+                      <div className="w-full text-center py-2 text-sm text-muted-foreground">
+                        Available at our location only
+                      </div>
+                    )}
                   </CardFooter>
                 </Card>
               ))}

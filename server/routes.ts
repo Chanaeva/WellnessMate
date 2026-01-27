@@ -1777,6 +1777,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel membership and Stripe subscription
+  app.post("/api/admin/memberships/:id/cancel", isAdmin, async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { cancelImmediately = false, reason } = req.body;
+      
+      const membership = await storage.getMembershipById(id);
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found" });
+      }
+      
+      // Cancel Stripe subscription if exists
+      if (membership.stripeSubscriptionId) {
+        try {
+          if (cancelImmediately) {
+            // Cancel immediately - ends subscription now
+            await stripe.subscriptions.cancel(membership.stripeSubscriptionId);
+            console.log(`🔴 Cancelled subscription immediately: ${membership.stripeSubscriptionId}`);
+          } else {
+            // Cancel at period end - lets member keep access until end date
+            await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+              cancel_at_period_end: true,
+              metadata: {
+                cancelReason: reason || 'Admin cancelled',
+                cancelledBy: 'admin',
+                cancelledAt: new Date().toISOString(),
+              }
+            });
+            console.log(`🟡 Subscription set to cancel at period end: ${membership.stripeSubscriptionId}`);
+          }
+        } catch (stripeError: any) {
+          console.error('Failed to cancel Stripe subscription:', stripeError.message);
+          // Continue with local cancellation even if Stripe fails
+        }
+      }
+      
+      // Update membership status locally
+      const newStatus = cancelImmediately ? 'inactive' : 'active'; // Keep active until period end
+      const updatedMembership = await storage.updateMembership(id, {
+        status: newStatus,
+        autoRenew: false,
+        cancelledAt: new Date().toISOString(),
+        cancelReason: reason || 'Admin cancelled',
+      });
+      
+      res.json({
+        success: true,
+        membership: updatedMembership,
+        message: cancelImmediately 
+          ? 'Membership cancelled immediately' 
+          : 'Membership will be cancelled at the end of the billing period'
+      });
+    } catch (error: any) {
+      console.error('Error cancelling membership:', error);
+      res.status(500).json({ message: error.message || "Failed to cancel membership" });
+    }
+  });
+
   // Create a payment record
   app.post("/api/admin/payments", isAdmin, async (req, res) => {
     try {

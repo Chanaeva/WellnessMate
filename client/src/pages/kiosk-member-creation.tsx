@@ -1516,6 +1516,16 @@ export default function KioskMemberCreation({
     email: string;
   }>>([]);
 
+  // Fetch max memberships per purchase setting
+  const { data: maxMembershipsData } = useQuery({
+    queryKey: ["/api/settings/max-memberships"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/settings/max-memberships");
+      return await res.json();
+    },
+  });
+  const maxMemberships = maxMembershipsData?.maxMemberships ?? 4;
+
   // Fetch membership plans
   const { data: membershipPlans = [], isLoading: isPlansLoading } = useQuery({
     queryKey: ["/api/membership-plans"],
@@ -2026,8 +2036,8 @@ export default function KioskMemberCreation({
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => handleQuantityChange(Math.min(4, membershipQuantity + 1))}
-                            disabled={membershipQuantity >= 4}
+                            onClick={() => handleQuantityChange(Math.min(maxMemberships, membershipQuantity + 1))}
+                            disabled={membershipQuantity >= maxMemberships}
                           >
                             +
                           </Button>

@@ -24,6 +24,7 @@ import {
   sessionBookings, type SessionBooking, type InsertSessionBooking,
   dayPassHours, type DayPassHours,
   guestWaivers, type GuestWaiver, type InsertGuestWaiver,
+  siteSettings, type SiteSetting, type InsertSiteSetting,
   treatmentTypeEnum
 } from "@shared/schema";
 import { db, pool } from "./db";
@@ -219,6 +220,11 @@ export interface IStorage {
   getGuestWaiversByEmail(email: string): Promise<GuestWaiver[]>;
   getTodayGuestWaivers(): Promise<GuestWaiver[]>;
   getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }>;
+  
+  // Site settings methods
+  getSiteSetting(key: string): Promise<SiteSetting | undefined>;
+  getAllSiteSettings(): Promise<SiteSetting[]>;
+  upsertSiteSetting(key: string, value: string, description?: string): Promise<SiteSetting>;
   
   // Session store
   sessionStore: any;
@@ -1861,6 +1867,32 @@ export class DatabaseStorage implements IStorage {
       thisWeek: Number(weekResult?.count || 0),
       thisMonth: Number(monthResult?.count || 0),
     };
+  }
+
+  // Site settings methods
+  async getSiteSetting(key: string): Promise<SiteSetting | undefined> {
+    const [setting] = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
+    return setting;
+  }
+
+  async getAllSiteSettings(): Promise<SiteSetting[]> {
+    return await db.select().from(siteSettings);
+  }
+
+  async upsertSiteSetting(key: string, value: string, description?: string): Promise<SiteSetting> {
+    const existing = await this.getSiteSetting(key);
+    if (existing) {
+      const [updated] = await db.update(siteSettings)
+        .set({ value, description, updatedAt: new Date() })
+        .where(eq(siteSettings.key, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(siteSettings)
+        .values({ key, value, description })
+        .returning();
+      return created;
+    }
   }
 }
 

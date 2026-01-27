@@ -773,3 +773,20 @@ export const insertGuestWaiverSchema = createInsertSchema(guestWaivers).omit({
 
 export type GuestWaiver = typeof guestWaivers.$inferSelect;
 export type InsertGuestWaiver = z.infer<typeof insertGuestWaiverSchema>;
+
+// Site settings table - for configurable site-wide settings
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
+export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;

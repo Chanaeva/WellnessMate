@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MembershipPlan, InsertMembershipPlan, PunchCardTemplate, InsertPunchCardTemplate } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,10 +21,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Trash2, DollarSign, Crown, Star, Zap, CreditCard, Calendar, RefreshCw, AlertCircle, Monitor, ShoppingCart, Tablet } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, Crown, Star, Zap, CreditCard, Calendar, RefreshCw, AlertCircle, Monitor, ShoppingCart, Tablet, Settings } from "lucide-react";
 
 export default function PackagesManagement() {
   const { toast } = useToast();
+  
+  // Max memberships per purchase state
+  const [maxMemberships, setMaxMemberships] = useState<number>(4);
+  const [isUpdatingMaxMemberships, setIsUpdatingMaxMemberships] = useState(false);
   
   // Membership plan state
   const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
@@ -66,6 +70,47 @@ export default function PackagesManagement() {
   const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
   const [templateHasAvailabilityDates, setTemplateHasAvailabilityDates] = useState(false);
   const [templateHasNoEndDate, setTemplateHasNoEndDate] = useState(false);
+
+  // Fetch max memberships per purchase setting
+  const { data: maxMembershipsData } = useQuery({
+    queryKey: ["/api/settings/max-memberships"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/settings/max-memberships");
+      return await res.json();
+    },
+  });
+  
+  // Sync local state when data loads
+  useEffect(() => {
+    if (maxMembershipsData?.maxMemberships) {
+      setMaxMemberships(maxMembershipsData.maxMemberships);
+    }
+  }, [maxMembershipsData]);
+  
+  // Save max memberships setting
+  const handleSaveMaxMemberships = async () => {
+    setIsUpdatingMaxMemberships(true);
+    try {
+      await apiRequest("POST", "/api/admin/config-settings", {
+        key: "maxMembershipsPerPurchase",
+        value: String(maxMemberships),
+        description: "Maximum number of memberships allowed per purchase (for family/gift purchases)"
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/max-memberships"] });
+      toast({
+        title: "Success",
+        description: "Maximum memberships per purchase updated",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update setting",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingMaxMemberships(false);
+    }
+  };
 
   // Fetch membership plans
   const { data: plans, isLoading: plansLoading } = useQuery<MembershipPlan[]>({
@@ -436,6 +481,44 @@ export default function PackagesManagement() {
           )}
         </Button>
       </div>
+
+      {/* Multi-Membership Purchase Settings */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Settings className="h-5 w-5" />
+            Multi-Membership Purchase Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <Label htmlFor="max-memberships">Maximum memberships per purchase</Label>
+              <p className="text-sm text-muted-foreground">
+                How many memberships can be purchased at once (for family or gift purchases)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                id="max-memberships"
+                type="number"
+                min={1}
+                max={10}
+                value={maxMemberships}
+                onChange={(e) => setMaxMemberships(parseInt(e.target.value) || 1)}
+                className="w-20"
+              />
+              <Button
+                onClick={handleSaveMaxMemberships}
+                disabled={isUpdatingMaxMemberships || maxMemberships === maxMembershipsData?.maxMemberships}
+                size="sm"
+              >
+                {isUpdatingMaxMemberships ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="memberships" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">

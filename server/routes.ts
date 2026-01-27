@@ -4611,6 +4611,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Site configuration settings (using site_settings table)
+  // Public route to get max memberships per purchase (needed by kiosk before auth)
+  app.get("/api/settings/max-memberships", async (req, res) => {
+    try {
+      const setting = await storage.getSiteSetting('maxMembershipsPerPurchase');
+      const maxMemberships = setting ? parseInt(setting.value) : 4; // Default to 4
+      res.json({ maxMemberships });
+    } catch (error: any) {
+      console.error('Error getting max memberships setting:', error);
+      res.json({ maxMemberships: 4 }); // Default fallback
+    }
+  });
+
+  // Admin route to get all site settings
+  app.get("/api/admin/config-settings", isAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getAllSiteSettings();
+      res.json(settings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin route to update a site setting
+  app.post("/api/admin/config-settings", isAdmin, async (req, res) => {
+    try {
+      const { key, value, description } = req.body;
+      if (!key || value === undefined) {
+        return res.status(400).json({ message: "Key and value are required" });
+      }
+      const setting = await storage.upsertSiteSetting(key, String(value), description);
+      res.json(setting);
+    } catch (error: any) {
+      console.error('Error updating site setting:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin inventory management routes
   app.get("/api/admin/inventory/items", isAdmin, async (req, res) => {
     try {
@@ -5451,12 +5489,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, customerId, isSubscription, stripePriceId, additionalMembers } = req.body;
       console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, isSubscription, additionalMembersCount: additionalMembers?.length || 0 });
       
-      // EARLY VALIDATION: Reject if more than 3 additional members (max 4 total)
+      // EARLY VALIDATION: Reject if additional members exceed configured max
       // This must happen BEFORE any payment verification or membership creation
-      if (additionalMembers && Array.isArray(additionalMembers) && additionalMembers.length > 3) {
-        console.error(`❌ Early rejection: ${additionalMembers.length} additional members exceeds max of 3`);
+      const maxMembershipsSetting = await storage.getSiteSetting('maxMembershipsPerPurchase');
+      const maxMembershipsTotal = maxMembershipsSetting ? parseInt(maxMembershipsSetting.value) : 4;
+      const maxAdditionalMembers = maxMembershipsTotal - 1; // Subtract 1 for primary member
+      
+      if (additionalMembers && Array.isArray(additionalMembers) && additionalMembers.length > maxAdditionalMembers) {
+        console.error(`❌ Early rejection: ${additionalMembers.length} additional members exceeds max of ${maxAdditionalMembers}`);
         return res.status(400).json({ 
-          message: "Maximum of 4 memberships allowed per purchase (1 primary + 3 additional)",
+          message: `Maximum of ${maxMembershipsTotal} memberships allowed per purchase (1 primary + ${maxAdditionalMembers} additional)`,
           error: "MAX_MEMBERSHIPS_EXCEEDED"
         });
       }

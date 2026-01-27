@@ -1497,6 +1497,14 @@ export default function KioskMemberCreation({
   const [step, setStep] = useState<"form" | "agreement" | "payment" | "success">("form");
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [agreementData, setAgreementData] = useState<AgreementFormData | null>(null);
+  
+  // Multi-membership purchase state
+  const [membershipQuantity, setMembershipQuantity] = useState(1);
+  const [additionalMembers, setAdditionalMembers] = useState<Array<{
+    firstName: string;
+    lastName: string;
+    email: string;
+  }>>([]);
 
   // Fetch membership plans
   const { data: membershipPlans = [], isLoading: isPlansLoading } = useQuery({
@@ -1548,6 +1556,58 @@ export default function KioskMemberCreation({
     }
   };
 
+  // Handle quantity change for multi-membership purchases
+  const handleQuantityChange = (newQuantity: number) => {
+    setMembershipQuantity(newQuantity);
+    // Adjust additional members array size
+    const additionalCount = newQuantity - 1;
+    if (additionalCount > additionalMembers.length) {
+      // Add empty entries
+      const newMembers = [...additionalMembers];
+      for (let i = additionalMembers.length; i < additionalCount; i++) {
+        newMembers.push({ firstName: '', lastName: '', email: '' });
+      }
+      setAdditionalMembers(newMembers);
+    } else if (additionalCount < additionalMembers.length) {
+      // Remove extra entries
+      setAdditionalMembers(additionalMembers.slice(0, additionalCount));
+    }
+  };
+
+  // Update additional member info
+  const updateAdditionalMember = (index: number, field: 'firstName' | 'lastName' | 'email', value: string) => {
+    const newMembers = [...additionalMembers];
+    newMembers[index] = { ...newMembers[index], [field]: value };
+    setAdditionalMembers(newMembers);
+  };
+
+  // Validate additional members before proceeding
+  const validateAdditionalMembers = (): boolean => {
+    if (packageType !== 'membership' || membershipQuantity <= 1) return true;
+    
+    for (let i = 0; i < additionalMembers.length; i++) {
+      const member = additionalMembers[i];
+      if (!member.firstName.trim() || !member.lastName.trim() || !member.email.trim()) {
+        toast({
+          title: "Missing Information",
+          description: `Please fill in all fields for additional member ${i + 2}`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      // Basic email validation
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member.email)) {
+        toast({
+          title: "Invalid Email",
+          description: `Please enter a valid email for additional member ${i + 2}`,
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+    return true;
+  };
+
   const onSubmit = (data: MemberFormData) => {
     const packageData = getSelectedPackageData();
     if (!packageData) {
@@ -1559,13 +1619,26 @@ export default function KioskMemberCreation({
       return;
     }
 
+    // Validate additional members for multi-membership purchases
+    if (!validateAdditionalMembers()) {
+      return;
+    }
+
+    const unitPrice = packageType === "membership"
+      ? packageData.monthlyPrice
+      : packageData.totalPrice;
+    
+    // Calculate total price based on quantity (only for memberships)
+    const quantity = packageType === "membership" ? membershipQuantity : 1;
+    const totalPrice = unitPrice * quantity;
+
     setSelectedPackage({
       ...packageData,
       type: packageType,
-      price:
-        packageType === "membership"
-          ? packageData.monthlyPrice
-          : packageData.totalPrice,
+      price: unitPrice,
+      totalPrice: totalPrice,
+      quantity: quantity,
+      additionalMembers: packageType === "membership" ? additionalMembers : [],
     });
     
     // Skip waiver for returning members - they already signed when they first joined
@@ -1921,6 +1994,94 @@ export default function KioskMemberCreation({
                     />
                   )}
 
+                  {/* Quantity selector for memberships */}
+                  {packageType === "membership" && packageId && !existingMember && (
+                    <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-medium">
+                          Number of Memberships
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuantityChange(Math.max(1, membershipQuantity - 1))}
+                            disabled={membershipQuantity <= 1}
+                          >
+                            -
+                          </Button>
+                          <span className="text-xl font-bold w-8 text-center">{membershipQuantity}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuantityChange(Math.min(10, membershipQuantity + 1))}
+                            disabled={membershipQuantity >= 10}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
+                      {membershipQuantity > 1 && (
+                        <p className="text-sm text-blue-700">
+                          Purchasing {membershipQuantity} memberships (for family or as gifts)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Additional member forms */}
+                  {packageType === "membership" && membershipQuantity > 1 && (
+                    <div className="space-y-4">
+                      <Separator />
+                      <h4 className="font-semibold text-lg flex items-center">
+                        <UserPlus className="h-5 w-5 mr-2" />
+                        Additional Members
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        Enter the details for each additional member. They will receive an email to set up their account.
+                      </p>
+                      {additionalMembers.map((member, index) => (
+                        <div key={index} className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                          <h5 className="font-medium text-primary">
+                            Member {index + 2} {index === 0 && membershipQuantity === 2 ? "(Family/Gift)" : ""}
+                          </h5>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label htmlFor={`add-first-${index}`}>First Name</Label>
+                              <Input
+                                id={`add-first-${index}`}
+                                placeholder="First name"
+                                value={member.firstName}
+                                onChange={(e) => updateAdditionalMember(index, 'firstName', e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`add-last-${index}`}>Last Name</Label>
+                              <Input
+                                id={`add-last-${index}`}
+                                placeholder="Last name"
+                                value={member.lastName}
+                                onChange={(e) => updateAdditionalMember(index, 'lastName', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`add-email-${index}`}>Email Address</Label>
+                            <Input
+                              id={`add-email-${index}`}
+                              type="email"
+                              placeholder="email@example.com"
+                              value={member.email}
+                              onChange={(e) => updateAdditionalMember(index, 'email', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full text-lg py-6"
@@ -1962,14 +2123,24 @@ export default function KioskMemberCreation({
                           <div>
                             <h3 className="font-semibold text-lg">
                               {packageData.name}
+                              {packageType === "membership" && membershipQuantity > 1 && (
+                                <span className="text-sm font-normal text-gray-500 ml-2">
+                                  × {membershipQuantity}
+                                </span>
+                              )}
                             </h3>
                             <p className="text-green-600 font-bold text-xl">
                               $
                               {packageType === "membership"
-                                ? (packageData.monthlyPrice / 100).toFixed(2)
+                                ? ((packageData.monthlyPrice * membershipQuantity) / 100).toFixed(2)
                                 : (packageData.totalPrice / 100).toFixed(2)}
                               {packageType === "membership" && "/month"}
                             </p>
+                            {packageType === "membership" && membershipQuantity > 1 && (
+                              <p className="text-sm text-gray-500">
+                                ${(packageData.monthlyPrice / 100).toFixed(2)} each × {membershipQuantity} members
+                              </p>
+                            )}
                           </div>
                         </div>
 

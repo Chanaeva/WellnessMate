@@ -696,7 +696,7 @@ export default function LandingPage() {
               </div>
 
               <div className="space-y-6">
-                {dayPasses?.map((dayPass: any, index: number) => (
+                {dayPasses?.filter((dayPass: any) => dayPass.availableOnWebsite !== false).map((dayPass: any, index: number) => (
                   <Card
                     key={index}
                     className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"

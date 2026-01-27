@@ -5554,6 +5554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             default_payment_method: savedPaymentMethodId,
             billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
             proration_behavior: 'none',
+            payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
             metadata: {
               source: paymentIntent.metadata?.useTerminal === 'true' ? 'kiosk_terminal' : 'kiosk_online',
               memberEmail: memberData.email,
@@ -5686,6 +5687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   collection_method: 'charge_automatically',
                   billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60),
                   proration_behavior: 'none',
+                  payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
                   metadata: {
                     source: 'kiosk_gift_membership',
                     purchasedBy: memberData.email,
@@ -5753,6 +5755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 collection_method: 'charge_automatically',
                 billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
                 proration_behavior: 'none',
+                payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
                 metadata: {
                   source: 'kiosk_gift_membership',
                   purchasedBy: memberData.email,

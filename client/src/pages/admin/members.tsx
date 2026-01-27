@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +74,8 @@ import {
   Link2,
   Key,
   RotateCcw,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Select,
@@ -125,6 +129,9 @@ export default function AdminMembers() {
   const [isEditMemberOpen, setIsEditMemberOpen] = useState(false);
   const [isViewMemberOpen, setIsViewMemberOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCancelMembershipOpen, setIsCancelMembershipOpen] = useState(false);
+  const [cancelImmediately, setCancelImmediately] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [selectedMember, setSelectedMember] = useState<(User & { membership?: Membership }) | null>(null);
   const itemsPerPage = 10;
 
@@ -377,6 +384,59 @@ export default function AdminMembers() {
       });
     },
   });
+
+  // Cancel membership mutation
+  const cancelMembershipMutation = useMutation({
+    mutationFn: async ({ membershipId, cancelImmediately, reason }: { membershipId: string; cancelImmediately: boolean; reason: string }) => {
+      const response = await apiRequest("POST", `/api/admin/memberships/${membershipId}/cancel`, {
+        cancelImmediately,
+        reason,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Membership Cancelled",
+        description: data.message,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      setIsCancelMembershipOpen(false);
+      setCancelImmediately(false);
+      setCancelReason("");
+      setSelectedMember(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Cancelling Membership",
+        description: error.message || "Failed to cancel membership",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle cancel membership
+  const handleCancelMembership = (member: User & { membership?: Membership }) => {
+    if (!member.membership) {
+      toast({
+        title: "No Membership",
+        description: "This member doesn't have an active membership to cancel.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedMember(member);
+    setIsCancelMembershipOpen(true);
+  };
+
+  const confirmCancelMembership = () => {
+    if (selectedMember?.membership) {
+      cancelMembershipMutation.mutate({
+        membershipId: selectedMember.membership.membershipId,
+        cancelImmediately,
+        reason: cancelReason,
+      });
+    }
+  };
 
   // Filter and search members
   const filteredMembers =
@@ -698,6 +758,12 @@ export default function AdminMembers() {
                     </th>
                     <th
                       scope="col"
+                      className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell"
+                    >
+                      Subscription
+                    </th>
+                    <th
+                      scope="col"
                       className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
                       Actions
@@ -764,6 +830,17 @@ export default function AdminMembers() {
                             )
                           : "N/A"}
                       </td>
+                      <td className="px-3 md:px-6 py-4 whitespace-nowrap hidden xl:table-cell">
+                        {member.membership?.stripeSubscriptionId ? (
+                          <div className="flex items-center gap-1.5">
+                            <Badge className={member.membership.autoRenew ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
+                              {member.membership.autoRenew ? "Active" : "Cancelled"}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">No subscription</span>
+                        )}
+                      </td>
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap">
                         <div className="flex space-x-1 md:space-x-2">
                           <Button
@@ -812,6 +889,18 @@ export default function AdminMembers() {
                             </Button>
                           ) : (
                             <>
+                              {member.membership && member.membership.status === 'active' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                                  title="Cancel Membership"
+                                  onClick={() => handleCancelMembership(member)}
+                                  data-testid={`button-cancel-membership-${member.id}`}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1474,6 +1563,95 @@ export default function AdminMembers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cancel Membership Friction Dialog */}
+      <Dialog open={isCancelMembershipOpen} onOpenChange={(open) => {
+        setIsCancelMembershipOpen(open);
+        if (!open) {
+          setCancelImmediately(false);
+          setCancelReason("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg" data-testid="dialog-cancel-membership">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Cancel Membership
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-4 pt-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                  <p className="font-semibold mb-2">You are about to cancel the membership for:</p>
+                  <p className="text-lg font-bold">{selectedMember?.firstName} {selectedMember?.lastName}</p>
+                  <p className="text-sm text-red-600">{selectedMember?.email}</p>
+                </div>
+
+                {selectedMember?.membership && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800">
+                    <p className="font-semibold mb-2">This member will lose:</p>
+                    <ul className="list-disc list-inside space-y-1 text-sm">
+                      <li>Access to all wellness center facilities</li>
+                      <li>Remaining time until {selectedMember.membership.endDate ? format(new Date(selectedMember.membership.endDate), 'MMMM d, yyyy') : 'end date'}</li>
+                      <li>Auto-renewal of their {selectedMember.membership.planType} plan</li>
+                      {selectedMember.membership.stripeSubscriptionId && (
+                        <li>Their Stripe subscription will be cancelled</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-start space-x-3">
+                    <Checkbox 
+                      id="cancel-immediately"
+                      checked={cancelImmediately}
+                      onCheckedChange={(checked) => setCancelImmediately(checked === true)}
+                      data-testid="checkbox-cancel-immediately"
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="cancel-immediately" className="font-medium text-red-700 cursor-pointer">
+                        Cancel immediately (end access now)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        If unchecked, membership remains active until the end of the current billing period
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cancel-reason">Reason for cancellation (optional)</Label>
+                    <Textarea
+                      id="cancel-reason"
+                      placeholder="e.g., Member requested cancellation, Non-payment, etc."
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      rows={2}
+                      data-testid="input-cancel-reason"
+                    />
+                  </div>
+                </div>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsCancelMembershipOpen(false)}
+              data-testid="button-cancel-cancel"
+            >
+              Keep Membership
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={confirmCancelMembership}
+              disabled={cancelMembershipMutation.isPending}
+              data-testid="button-confirm-cancel"
+            >
+              {cancelMembershipMutation.isPending ? "Cancelling..." : "Cancel Membership"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Reset Password Dialog */}
       <Dialog open={isResetPasswordOpen} onOpenChange={(open) => {

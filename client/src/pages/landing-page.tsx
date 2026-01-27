@@ -103,7 +103,8 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
                       <img
                         src={image.imageUrl}
                         alt={image.altText || image.title}
-                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full transform group-hover:scale-110 transition-transform duration-500"
+                        style={{ objectFit: (image.objectFit || "cover") as any }}
                         onLoad={handleImageLoad}
                       />
                     </div>

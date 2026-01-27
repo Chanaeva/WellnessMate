@@ -49,6 +49,7 @@ export default function AdminGallery() {
     imageUrl: "",
     altText: "",
     aspectRatio: "16:9",
+    objectFit: "cover",
     sortOrder: 0,
     isActive: true,
   });
@@ -179,6 +180,7 @@ export default function AdminGallery() {
       imageUrl: "",
       altText: "",
       aspectRatio: "16:9",
+      objectFit: "cover",
       sortOrder: 0,
       isActive: true,
     });
@@ -198,6 +200,7 @@ export default function AdminGallery() {
       imageUrl: image.imageUrl,
       altText: image.altText || "",
       aspectRatio: image.aspectRatio || "16:9",
+      objectFit: image.objectFit || "cover",
       sortOrder: image.sortOrder,
       isActive: image.isActive,
     });
@@ -431,6 +434,23 @@ export default function AdminGallery() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="objectFit">Cropping Style</Label>
+              <Select
+                value={formData.objectFit}
+                onValueChange={(value) => setFormData({ ...formData, objectFit: value })}
+              >
+                <SelectTrigger id="objectFit">
+                  <SelectValue placeholder="Select cropping style" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cover">Cover (fills area, may crop)</SelectItem>
+                  <SelectItem value="contain">Contain (shows full image)</SelectItem>
+                  <SelectItem value="fill">Stretch (stretches to fit)</SelectItem>
+                  <SelectItem value="none">None (original size)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="sortOrder">Display Order</Label>
               <Input
                 id="sortOrder"
@@ -459,7 +479,8 @@ export default function AdminGallery() {
                   <img
                     src={formData.imageUrl}
                     alt="Preview"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full"
+                    style={{ objectFit: formData.objectFit as any }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=Invalid+URL";
                     }}

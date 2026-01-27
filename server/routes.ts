@@ -1793,7 +1793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           if (cancelImmediately) {
             // Cancel immediately - ends subscription now
-            await stripe.subscriptions.cancel(membership.stripeSubscriptionId);
+            await stripe.subscriptions.del(membership.stripeSubscriptionId);
             console.log(`🔴 Cancelled subscription immediately: ${membership.stripeSubscriptionId}`);
           } else {
             // Cancel at period end - lets member keep access until end date
@@ -1802,7 +1802,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
               metadata: {
                 cancelReason: reason || 'Admin cancelled',
                 cancelledBy: 'admin',
-                cancelledAt: new Date().toISOString(),
               }
             });
             console.log(`🟡 Subscription set to cancel at period end: ${membership.stripeSubscriptionId}`);
@@ -1818,8 +1817,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedMembership = await storage.updateMembership(id, {
         status: newStatus,
         autoRenew: false,
-        cancelledAt: new Date().toISOString(),
-        cancelReason: reason || 'Admin cancelled',
       });
       
       res.json({

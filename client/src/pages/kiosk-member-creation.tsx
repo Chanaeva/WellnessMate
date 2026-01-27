@@ -772,13 +772,15 @@ function PaymentForm({
     }
     
     try {
-      console.log('[M2 Reader] Starting manual reader discovery...');
+      console.log('[M2 Reader] Starting manual reader discovery with bluetooth_proximity...');
       setReaderStatus('searching');
-      setReaderMessage('Searching for nearby M2 card readers via Bluetooth...');
+      setReaderMessage('Searching for nearby M2 card readers via Bluetooth...\n(A Bluetooth device picker should appear)');
       
-      // Try to discover physical readers
+      // Try to discover physical M2 readers using bluetooth_proximity method
+      // This triggers the Web Bluetooth device picker dialog in Chrome
       const discoverResult = await terminalRef.current.discoverReaders({
         simulated: false,
+        location: undefined, // Not required for bluetooth_proximity
       });
       
       console.log('[M2 Reader] Discovery result:', discoverResult);

@@ -5352,42 +5352,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stripePriceId: plan.stripePriceId,
           });
         } else {
-          // Online: Create Subscription directly with incomplete status
-          const subscription = await stripe.subscriptions.create({
+          // Online: Use PaymentIntent-first approach (same as Terminal) for reliability
+          // This creates a PaymentIntent that saves the card, then subscription is created after payment succeeds
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(finalAmount),
+            currency: 'usd',
             customer: customerId,
-            items: [{ price: plan.stripePriceId }],
-            collection_method: 'charge_automatically',
-            payment_behavior: 'default_incomplete',
-            payment_settings: {
-              payment_method_types: ['card'],
-              save_default_payment_method: 'on_subscription',
-            },
-            expand: ['latest_invoice.payment_intent'],
+            automatic_payment_methods: { enabled: true },
+            setup_future_usage: 'off_session', // Save card for subscription
+            description: `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
             metadata: {
-              source: 'kiosk',
               memberFirstName: validatedMemberData.firstName,
               memberLastName: validatedMemberData.lastName,
               memberEmail: validatedMemberData.email,
+              memberPhone: validatedMemberData.phoneNumber || '',
+              packageType: 'membership',
+              packageId: validatedMemberData.packageId,
+              packageName: packageData.name,
               planType: plan.planType,
+              stripePriceId: plan.stripePriceId,
+              customerId: customerId,
+              isSubscription: 'true',
+              useTerminal: 'false',
+              source: 'kiosk',
             },
           });
           
-          const invoice = subscription.latest_invoice as any;
-          const paymentIntent = invoice?.payment_intent;
-          
-          console.log('📋 Created subscription:', { 
-            subscriptionId: subscription.id, 
-            status: subscription.status,
-            invoiceId: invoice?.id,
-            paymentIntentId: paymentIntent?.id 
-          });
+          console.log('💳 Created Online PaymentIntent for subscription:', paymentIntent.id);
           
           res.json({ 
-            clientSecret: paymentIntent?.client_secret,
-            paymentIntentId: paymentIntent?.id,
-            subscriptionId: subscription.id,
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
             customerId: customerId,
             isSubscription: true,
+            stripePriceId: plan.stripePriceId,
           });
         }
         return;
@@ -5469,16 +5467,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Payment not completed" });
       }
       
-      // For Terminal subscription payments, create the subscription now
+      // For kiosk subscription payments (both Terminal and Online), create the subscription now
       let finalSubscriptionId = subscriptionId;
       if (isSubscription && !subscriptionId && paymentIntent.metadata?.isSubscription === 'true') {
-        // Terminal payment - need to create subscription with saved payment method
+        // Kiosk payment - need to create subscription with saved payment method
         const savedPaymentMethodId = paymentIntent.payment_method as string;
         const customerIdFromIntent = paymentIntent.customer as string || customerId;
         const priceId = paymentIntent.metadata?.stripePriceId || stripePriceId;
         
         if (savedPaymentMethodId && customerIdFromIntent && priceId) {
-          console.log('📋 Creating subscription after Terminal payment:', { customerIdFromIntent, priceId, savedPaymentMethodId });
+          console.log('📋 Creating subscription after kiosk payment:', { customerIdFromIntent, priceId, savedPaymentMethodId, useTerminal: paymentIntent.metadata?.useTerminal });
           
           // Set the payment method as default for the customer
           await stripe.customers.update(customerIdFromIntent, {
@@ -5494,14 +5492,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
             proration_behavior: 'none',
             metadata: {
-              source: 'kiosk_terminal',
+              source: paymentIntent.metadata?.useTerminal === 'true' ? 'kiosk_terminal' : 'kiosk_online',
               memberEmail: memberData.email,
               firstPaymentIntentId: paymentIntentId,
             },
           });
           
           finalSubscriptionId = subscription.id;
-          console.log('✅ Created subscription after Terminal payment:', finalSubscriptionId);
+          console.log('✅ Created subscription after kiosk payment:', finalSubscriptionId);
         }
       }
       

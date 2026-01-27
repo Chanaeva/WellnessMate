@@ -1036,6 +1036,12 @@ function PaymentForm({
       );
       const paymentData = await response.json();
       const { clientSecret, subscriptionId, customerId, isSubscription, stripePriceId } = paymentData;
+      
+      // Validate clientSecret before proceeding
+      if (!clientSecret) {
+        console.error('Payment creation failed - no clientSecret received:', paymentData);
+        throw new Error(paymentData.message || 'Failed to create payment. Please try again.');
+      }
 
       const { error, paymentIntent } = await stripe.confirmCardPayment(
         clientSecret,

@@ -363,7 +363,8 @@ function DiscountForm({
   const [discountValue, setDiscountValue] = useState<string>('');
   const [discountReason, setDiscountReason] = useState<string>('');
   
-  const originalPrice = packageData.price; // in cents
+  // Use totalPrice for multi-membership purchases, otherwise use unit price
+  const originalPrice = packageData.totalPrice || packageData.price; // in cents
   const discountValueNum = parseFloat(discountValue) || 0;
   
   // Calculate discount amount in cents
@@ -614,7 +615,8 @@ function PaymentForm({
   };
   
   // Calculate final price with discount
-  const originalPrice = packageData.price; // in cents
+  // Use totalPrice for multi-membership purchases, otherwise use unit price
+  const originalPrice = packageData.totalPrice || packageData.price; // in cents
   let discountAmountCents = 0;
   
   if (discountData && discountData.value > 0) {
@@ -952,13 +954,17 @@ function PaymentForm({
               amountCents: discountAmountCents,
             } : null,
             existingMemberId,
+            additionalMembers: packageData.additionalMembers || [],
           },
         );
 
         if (confirmResponse.ok) {
+          const additionalCount = packageData.additionalMembers?.length || 0;
           toast({
             title: "Payment Successful",
-            description: `Welcome, ${memberData.firstName}! Your account has been created.`,
+            description: additionalCount > 0 
+              ? `Welcome! ${additionalCount + 1} memberships have been created successfully.`
+              : `Welcome, ${memberData.firstName}! Your account has been created.`,
           });
           onSuccess();
         } else {
@@ -1090,13 +1096,17 @@ function PaymentForm({
               amountCents: discountAmountCents,
             } : null,
             existingMemberId,
+            additionalMembers: packageData.additionalMembers || [],
           },
         );
 
         if (confirmResponse.ok) {
+          const additionalCount = packageData.additionalMembers?.length || 0;
           toast({
             title: "Payment Successful",
-            description: `Welcome, ${memberData.firstName}! Your account has been created.`,
+            description: additionalCount > 0 
+              ? `Welcome! ${additionalCount + 1} memberships have been created successfully.`
+              : `Welcome, ${memberData.firstName}! Your account has been created.`,
           });
           onSuccess();
         } else {

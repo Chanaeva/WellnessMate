@@ -5437,8 +5437,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Handles both subscription (membership) and one-time (day pass) payments
   app.post("/api/kiosk/confirm-member-creation", async (req, res) => {
     try {
-      const { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, customerId, isSubscription, stripePriceId } = req.body;
-      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, isSubscription });
+      const { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, customerId, isSubscription, stripePriceId, additionalMembers } = req.body;
+      console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, isSubscription, additionalMembersCount: additionalMembers?.length || 0 });
       
       // Validate agreement data only for new members (returning members already have waiver on file)
       let validatedAgreement = agreementData;
@@ -5545,6 +5545,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use targetUser instead of newUser for remainder of function
       const newUser = targetUser;
       
+      // Track additional members created (for multi-membership purchases)
+      let additionalMembersCreated: Array<{email: string, firstName: string, lastName: string, status: 'created' | 'existing' | 'failed', message?: string}> = [];
+      
       // Create membership or punch card based on package type
       if (memberData.packageType === 'membership') {
         const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
@@ -5570,6 +5573,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log('✅ Membership created with subscription:', { membershipId, subscriptionId: finalSubscriptionId });
+        
+        // Handle additional members for multi-membership purchases
+        if (additionalMembers && Array.isArray(additionalMembers) && additionalMembers.length > 0) {
+          console.log(`📦 Creating ${additionalMembers.length} additional memberships`);
+          
+          // Validate additional members schema
+          const additionalMemberSchema = z.object({
+            firstName: z.string().min(1, "First name is required"),
+            lastName: z.string().min(1, "Last name is required"),
+            email: z.string().email("Valid email is required"),
+          });
+          
+          for (const additionalMember of additionalMembers) {
+            try {
+              // Validate additional member data
+              const validatedMember = additionalMemberSchema.parse(additionalMember);
+              
+              // Check if additional member already exists
+              const existingAdditionalMember = await storage.getUserByEmail(validatedMember.email);
+              if (existingAdditionalMember) {
+                console.log(`⚠️ Additional member ${validatedMember.email} already exists, adding membership to existing account`);
+                
+                // Add membership to existing user instead of skipping
+                // First, create or get Stripe customer
+                let existingStripeCustomerId = existingAdditionalMember.stripeCustomerId;
+                if (!existingStripeCustomerId) {
+                  const newStripeCustomer = await stripe.customers.create({
+                    email: validatedMember.email,
+                    name: `${existingAdditionalMember.firstName} ${existingAdditionalMember.lastName}`,
+                    metadata: {
+                      userId: existingAdditionalMember.id.toString(),
+                      source: 'kiosk_gift_membership',
+                      purchasedBy: memberData.email,
+                    },
+                  });
+                  existingStripeCustomerId = newStripeCustomer.id;
+                  await storage.updateUserStripeCustomerId(existingAdditionalMember.id, newStripeCustomer.id);
+                }
+                
+                // Create subscription for existing member
+                const existingMemberSubscription = await stripe.subscriptions.create({
+                  customer: existingStripeCustomerId,
+                  items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
+                  collection_method: 'charge_automatically',
+                  billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60),
+                  proration_behavior: 'none',
+                  metadata: {
+                    source: 'kiosk_gift_membership',
+                    purchasedBy: memberData.email,
+                    memberEmail: validatedMember.email,
+                  },
+                });
+                
+                // Create new membership for existing user
+                const existingMemberMembershipId = `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+                await storage.createMembership({
+                  membershipId: existingMemberMembershipId,
+                  userId: existingAdditionalMember.id,
+                  planType: packageData.planType || 'basic',
+                  status: 'active',
+                  startDate: new Date().toISOString().split('T')[0],
+                  endDate: endDate.toISOString().split('T')[0],
+                  autoRenew: true,
+                  stripeSubscriptionId: existingMemberSubscription.id,
+                });
+                
+                additionalMembersCreated.push({
+                  email: validatedMember.email,
+                  firstName: existingAdditionalMember.firstName,
+                  lastName: existingAdditionalMember.lastName,
+                  status: 'existing',
+                  message: 'Membership added to existing account'
+                });
+                console.log(`✅ Membership added to existing account for ${validatedMember.email}`);
+                continue;
+              }
+              
+              // Create user account for additional member (needs account claim)
+              const salt = randomBytes(16).toString('hex');
+              const tempPassword = Math.random().toString(36).slice(-12);
+              const key = await scryptAsync(tempPassword, salt, 64) as Buffer;
+              
+              const additionalUser = await storage.createUser({
+                username: validatedMember.email,
+                email: validatedMember.email,
+                password: `${key.toString('hex')}:${salt}`,
+                firstName: validatedMember.firstName,
+                lastName: validatedMember.lastName,
+                role: 'member',
+                membershipAgreementCompleted: false, // Additional members need to complete agreement
+              });
+              
+              // Create Stripe customer for additional member
+              const additionalStripeCustomer = await stripe.customers.create({
+                email: validatedMember.email,
+                name: `${validatedMember.firstName} ${validatedMember.lastName}`,
+                metadata: {
+                  userId: additionalUser.id.toString(),
+                  source: 'kiosk_gift_membership',
+                  purchasedBy: memberData.email,
+                },
+              });
+              
+              await storage.updateUserStripeCustomerId(additionalUser.id, additionalStripeCustomer.id);
+              
+              // Create a subscription for the additional member (no initial charge - already paid)
+              const additionalSubscription = await stripe.subscriptions.create({
+                customer: additionalStripeCustomer.id,
+                items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
+                collection_method: 'charge_automatically',
+                billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
+                proration_behavior: 'none',
+                metadata: {
+                  source: 'kiosk_gift_membership',
+                  purchasedBy: memberData.email,
+                  memberEmail: validatedMember.email,
+                },
+              });
+              
+              // Create membership for additional member
+              const additionalMembershipId = `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
+              await storage.createMembership({
+                membershipId: additionalMembershipId,
+                userId: additionalUser.id,
+                planType: packageData.planType || 'basic',
+                status: 'active',
+                startDate: new Date().toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0],
+                autoRenew: true,
+                stripeSubscriptionId: additionalSubscription.id,
+              });
+              
+              additionalMembersCreated.push({
+                email: validatedMember.email,
+                firstName: validatedMember.firstName,
+                lastName: validatedMember.lastName,
+                status: 'created',
+              });
+              console.log(`✅ Additional membership created for ${validatedMember.firstName} ${validatedMember.lastName}`);
+              
+              // TODO: Send welcome email to additional member for account claim
+              
+            } catch (additionalError: any) {
+              console.error(`❌ Failed to create additional member ${additionalMember.email}:`, additionalError.message);
+              additionalMembersCreated.push({
+                email: additionalMember.email || 'unknown',
+                firstName: additionalMember.firstName || 'unknown',
+                lastName: additionalMember.lastName || 'unknown',
+                status: 'failed',
+                message: additionalError.message,
+              });
+              // Continue with other additional members even if one fails
+            }
+          }
+        }
+        
       } else if (memberData.packageType === 'daypass') {
         const totalPunches = Math.max(packageData.totalPunches || 5, 1); // Ensure at least 1 punch
         const punchCard = await storage.createPunchCard({
@@ -5618,13 +5777,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Successfully created member: ${memberData.firstName} ${memberData.lastName}`);
       
+      // Check for any failed additional members
+      const failedMembers = additionalMembersCreated?.filter(m => m.status === 'failed') || [];
+      const successfulMembers = additionalMembersCreated?.filter(m => m.status !== 'failed') || [];
+      
+      const responseMessage = failedMembers.length > 0
+        ? `Member created with ${failedMembers.length} additional member(s) failed`
+        : additionalMembersCreated?.length > 0
+        ? `Successfully created ${1 + successfulMembers.length} membership(s)`
+        : "Member created successfully";
+      
       res.json({ 
-        message: "Member created successfully",
+        message: responseMessage,
         user: {
           id: newUser.id,
           firstName: newUser.firstName,
           lastName: newUser.lastName,
           email: newUser.email
+        },
+        additionalMembers: additionalMembersCreated || [],
+        summary: {
+          primaryMember: true,
+          additionalMembersAttempted: additionalMembers?.length || 0,
+          additionalMembersSuccessful: successfulMembers.length,
+          additionalMembersFailed: failedMembers.length,
         }
       });
     } catch (error: any) {

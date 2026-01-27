@@ -227,6 +227,7 @@ export const galleryImages = pgTable("gallery_images", {
   description: text("description"),
   imageUrl: text("image_url").notNull(),
   altText: text("alt_text"),
+  aspectRatio: text("aspect_ratio").notNull().default("16:9"), // 16:9, 4:3, 1:1, 3:2, 21:9
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),

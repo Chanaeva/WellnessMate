@@ -11,6 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -41,6 +48,7 @@ export default function AdminGallery() {
     description: "",
     imageUrl: "",
     altText: "",
+    aspectRatio: "16:9",
     sortOrder: 0,
     isActive: true,
   });
@@ -170,6 +178,7 @@ export default function AdminGallery() {
       description: "",
       imageUrl: "",
       altText: "",
+      aspectRatio: "16:9",
       sortOrder: 0,
       isActive: true,
     });
@@ -188,6 +197,7 @@ export default function AdminGallery() {
       description: image.description || "",
       imageUrl: image.imageUrl,
       altText: image.altText || "",
+      aspectRatio: image.aspectRatio || "16:9",
       sortOrder: image.sortOrder,
       isActive: image.isActive,
     });
@@ -403,6 +413,24 @@ export default function AdminGallery() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="aspectRatio">Aspect Ratio</Label>
+              <Select
+                value={formData.aspectRatio}
+                onValueChange={(value) => setFormData({ ...formData, aspectRatio: value })}
+              >
+                <SelectTrigger id="aspectRatio">
+                  <SelectValue placeholder="Select aspect ratio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="16:9">16:9 (Widescreen)</SelectItem>
+                  <SelectItem value="4:3">4:3 (Standard)</SelectItem>
+                  <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                  <SelectItem value="3:2">3:2 (Photo)</SelectItem>
+                  <SelectItem value="21:9">21:9 (Ultra-wide)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="sortOrder">Display Order</Label>
               <Input
                 id="sortOrder"
@@ -422,7 +450,12 @@ export default function AdminGallery() {
             {formData.imageUrl && (
               <div className="space-y-2">
                 <Label>Preview</Label>
-                <div className="aspect-video relative rounded-lg overflow-hidden bg-muted">
+                <div 
+                  className="relative rounded-lg overflow-hidden bg-muted"
+                  style={{
+                    aspectRatio: formData.aspectRatio.replace(':', '/'),
+                  }}
+                >
                   <img
                     src={formData.imageUrl}
                     alt="Preview"

@@ -96,7 +96,10 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
                   className="flex-[0_0_100%] min-w-0 md:flex-[0_0_50%] lg:flex-[0_0_33.333%] px-2"
                 >
                   <div className="group relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300">
-                    <div className="aspect-[4/3] overflow-hidden">
+                    <div 
+                      className="overflow-hidden"
+                      style={{ aspectRatio: (image.aspectRatio || "4:3").replace(':', '/') }}
+                    >
                       <img
                         src={image.imageUrl}
                         alt={image.altText || image.title}

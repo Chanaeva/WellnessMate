@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -539,6 +540,29 @@ export default function MemberDashboard() {
       <Header />
 
       <main className="flex-grow wellness-container py-8">
+        {/* Payment Method Warning Alert */}
+        {membership?.status === "active" && !hasPaymentMethod && (
+          <Alert variant="destructive" className="mb-6">
+            <CreditCard className="h-4 w-4" />
+            <AlertTitle>Payment Method Required</AlertTitle>
+            <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <span>
+                Your membership is active but you don't have a saved payment method. 
+                Add one to ensure uninterrupted service and automatic renewals.
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowAddPaymentMethod(true)}
+                className="shrink-0 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Add Payment Method
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex flex-col md:flex-row gap-6">
           {/* Left Column (2/3) */}
           <div className="md:w-2/3 space-y-6">

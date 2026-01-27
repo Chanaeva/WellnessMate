@@ -73,6 +73,7 @@ export const memberships = pgTable("memberships", {
   endDate: date("end_date").notNull(),
   autoRenew: boolean("auto_renew").notNull().default(true),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  managedByUserId: integer("managed_by_user_id").references(() => users.id), // For family/gift memberships - the purchaser can manage these
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -139,6 +139,12 @@ export default function MemberDashboard() {
     refetchOnMount: true, // Always refetch on mount
   });
 
+  // Fetch family/gift memberships managed by this user
+  const { data: managedMemberships } = useQuery<(Membership & { user: { firstName: string; lastName: string; email: string } })[]>({
+    queryKey: ["/api/membership/managed"],
+    enabled: !!user,
+  });
+
   // Fetch punch card options
   const { data: punchCardOptions } = useQuery<
     {
@@ -1007,6 +1013,56 @@ export default function MemberDashboard() {
                 </Link>
               </CardFooter>
             </Card>
+
+            {/* Family Memberships (managed by this user) */}
+            {managedMemberships && managedMemberships.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Family Memberships
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Memberships you've purchased for family members or as gifts
+                  </p>
+                  <div className="space-y-3">
+                    {managedMemberships.map((membership) => (
+                      <div
+                        key={membership.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">
+                            {membership.user?.firstName} {membership.user?.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {membership.user?.email}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {membership.planType.charAt(0).toUpperCase() + membership.planType.slice(1)} Plan • 
+                            Expires: {format(new Date(membership.endDate), "MMM d, yyyy")}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <Badge
+                            variant={
+                              membership.status === "active" ? "default" : "secondary"
+                            }
+                          >
+                            {membership.status}
+                          </Badge>
+                          {membership.autoRenew && (
+                            <p className="text-xs text-green-600 mt-1">Auto-renews</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Recent Transactions */}
             <Card>

@@ -2026,8 +2026,8 @@ export default function KioskMemberCreation({
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => handleQuantityChange(Math.min(10, membershipQuantity + 1))}
-                            disabled={membershipQuantity >= 10}
+                            onClick={() => handleQuantityChange(Math.min(4, membershipQuantity + 1))}
+                            disabled={membershipQuantity >= 4}
                           >
                             +
                           </Button>

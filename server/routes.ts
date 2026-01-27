@@ -508,6 +508,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get family/gift memberships managed by current user
+  app.get("/api/membership/managed", isAuthenticated, async (req, res) => {
+    try {
+      const managedMemberships = await storage.getManagedMemberships(req.user!.id);
+      res.json(managedMemberships);
+    } catch (error) {
+      console.error('Error getting managed memberships:', error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+  
   // Get subscription billing info from Stripe
   app.get("/api/membership/billing-info", isAuthenticated, async (req, res) => {
     try {
@@ -5440,6 +5451,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, customerId, isSubscription, stripePriceId, additionalMembers } = req.body;
       console.log('🔄 Kiosk confirm-member-creation request:', { paymentIntentId, subscriptionId, memberData, packageData, agreementData, discountData, existingMemberId, isSubscription, additionalMembersCount: additionalMembers?.length || 0 });
       
+      // EARLY VALIDATION: Reject if more than 3 additional members (max 4 total)
+      // This must happen BEFORE any payment verification or membership creation
+      if (additionalMembers && Array.isArray(additionalMembers) && additionalMembers.length > 3) {
+        console.error(`❌ Early rejection: ${additionalMembers.length} additional members exceeds max of 3`);
+        return res.status(400).json({ 
+          message: "Maximum of 4 memberships allowed per purchase (1 primary + 3 additional)",
+          error: "MAX_MEMBERSHIPS_EXCEEDED"
+        });
+      }
+      
       // Validate agreement data only for new members (returning members already have waiver on file)
       let validatedAgreement = agreementData;
       if (!existingMemberId) {
@@ -5575,8 +5596,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('✅ Membership created with subscription:', { membershipId, subscriptionId: finalSubscriptionId });
         
         // Handle additional members for multi-membership purchases
+        // Note: Max 3 additional members validation is done at the start of this endpoint
+        // The purchaser (primary member) is stored for managing additional memberships
+        const purchaserUserId = newUser.id; // newUser is the primary member/purchaser
+        
         if (additionalMembers && Array.isArray(additionalMembers) && additionalMembers.length > 0) {
-          console.log(`📦 Creating ${additionalMembers.length} additional memberships`);
+          console.log(`📦 Creating ${additionalMembers.length} additional memberships (purchaser ID: ${purchaserUserId})`);
           
           // Validate additional members schema
           const additionalMemberSchema = z.object({
@@ -5626,7 +5651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   },
                 });
                 
-                // Create new membership for existing user
+                // Create new membership for existing user (managed by the purchaser)
                 const existingMemberMembershipId = `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
                 await storage.createMembership({
                   membershipId: existingMemberMembershipId,
@@ -5637,6 +5662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   endDate: endDate.toISOString().split('T')[0],
                   autoRenew: true,
                   stripeSubscriptionId: existingMemberSubscription.id,
+                  managedByUserId: purchaserUserId, // The purchaser can manage this membership
                 });
                 
                 additionalMembersCreated.push({
@@ -5692,7 +5718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 },
               });
               
-              // Create membership for additional member
+              // Create membership for additional member (managed by the purchaser)
               const additionalMembershipId = `WM-${Date.now()}-${Math.random().toString(36).slice(-4).toUpperCase()}`;
               await storage.createMembership({
                 membershipId: additionalMembershipId,
@@ -5703,6 +5729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 endDate: endDate.toISOString().split('T')[0],
                 autoRenew: true,
                 stripeSubscriptionId: additionalSubscription.id,
+                managedByUserId: purchaserUserId, // The purchaser can manage this membership
               });
               
               additionalMembersCreated.push({

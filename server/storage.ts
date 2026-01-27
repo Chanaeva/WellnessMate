@@ -70,6 +70,7 @@ export interface IStorage {
   updateMembership(id: string, data: Partial<Membership>): Promise<Membership>;
   getAllMembers(): Promise<(User & {membership?: Membership})[]>;
   getMembershipsWithoutSubscription(): Promise<(Membership & { user: User })[]>;
+  getManagedMemberships(managedByUserId: number): Promise<(Membership & { user: User })[]>;
 
   // Check-in methods
   getCheckInsByUserId(userId: number): Promise<CheckIn[]>;
@@ -475,6 +476,24 @@ export class DatabaseStorage implements IStorage {
     const result: (Membership & { user: User })[] = [];
     
     for (const membership of membershipsWithoutSub) {
+      const user = await this.getUser(membership.userId);
+      if (user) {
+        result.push({ ...membership, user });
+      }
+    }
+    
+    return result;
+  }
+
+  async getManagedMemberships(managedByUserId: number): Promise<(Membership & { user: User })[]> {
+    // Get all memberships managed by a specific user (family/gift memberships)
+    const managedMemberships = await db.select()
+      .from(memberships)
+      .where(eq(memberships.managedByUserId, managedByUserId));
+    
+    const result: (Membership & { user: User })[] = [];
+    
+    for (const membership of managedMemberships) {
       const user = await this.getUser(membership.userId);
       if (user) {
         result.push({ ...membership, user });

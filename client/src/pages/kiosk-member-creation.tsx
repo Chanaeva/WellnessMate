@@ -53,7 +53,6 @@ import {
   Wifi,
   WifiOff,
   Loader2,
-  Bluetooth,
   RefreshCw,
   HelpCircle,
   Radio,
@@ -578,7 +577,7 @@ function PaymentForm({
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('reader');
+  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('manual');
   const [readerStatus, setReaderStatus] = useState<'initializing' | 'searching' | 'found' | 'connecting' | 'connected' | 'waiting' | 'processing' | 'error' | 'idle' | 'ready'>('idle');
   const [readerMessage, setReaderMessage] = useState<string>('');
   const [terminal, setTerminal] = useState<Terminal | null>(null);
@@ -692,24 +691,24 @@ function PaymentForm({
       try {
         await terminalRef.current.disconnectReader();
       } catch (e) {
-        console.log('[M2 Reader] Disconnect error (ok if no reader connected):', e);
+        console.log('[Card Reader] Disconnect error (ok if no reader connected):', e);
       }
     }
     
     try {
       if (!mountedRef.current || paymentMethodRef.current !== 'reader') {
-        console.log('[M2 Reader] Skipping init - component unmounted or payment method changed');
+        console.log('[Card Reader] Skipping init - component unmounted or payment method changed');
         return;
       }
       
-      console.log('[M2 Reader] Starting Terminal initialization...');
+      console.log('[Card Reader] Starting Terminal initialization...');
       setReaderStatus('initializing');
       setReaderMessage('Initializing Stripe Terminal...');
       setDiscoveredReaders([]);
       
       const stripeTerminal = await loadStripeTerminal();
       if (!stripeTerminal) {
-        console.error('[M2 Reader] Failed to load Stripe Terminal SDK');
+        console.error('[Card Reader] Failed to load Stripe Terminal SDK');
         if (mountedRef.current && paymentMethodRef.current === 'reader') {
           setReaderStatus('error');
           setReaderMessage('Failed to load Stripe Terminal SDK');
@@ -717,23 +716,23 @@ function PaymentForm({
         return;
       }
       
-      console.log('[M2 Reader] Stripe Terminal SDK loaded successfully');
+      console.log('[Card Reader] Stripe Terminal SDK loaded successfully');
       
       if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
       
       const term = stripeTerminal.create({
         onFetchConnectionToken: async () => {
-          console.log('[M2 Reader] Fetching connection token...');
+          console.log('[Card Reader] Fetching connection token...');
           const response = await fetch('/api/stripe/terminal/connection-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
           const data = await response.json();
-          console.log('[M2 Reader] Connection token received');
+          console.log('[Card Reader] Connection token received');
           return data.secret;
         },
         onUnexpectedReaderDisconnect: () => {
-          console.log('[M2 Reader] Reader disconnected unexpectedly');
+          console.log('[Card Reader] Reader disconnected unexpectedly');
           if (mountedRef.current && paymentMethodRef.current === 'reader') {
             setReaderStatus('error');
             setReaderMessage('Card reader disconnected. Tap "Retry" to reconnect.');
@@ -742,7 +741,7 @@ function PaymentForm({
         },
       });
       
-      console.log('[M2 Reader] Terminal instance created');
+      console.log('[Card Reader] Terminal instance created');
       setTerminal(term);
       terminalRef.current = term;
       
@@ -750,11 +749,11 @@ function PaymentForm({
       
       // Don't auto-discover, show ready state with manual scan button
       setReaderStatus('ready');
-      setReaderMessage('Terminal ready. Tap "Scan for Readers" to find your M2 reader.');
-      console.log('[M2 Reader] Ready for manual scan');
+      setReaderMessage('Terminal ready. Tap "Scan for Readers" to find your card reader.');
+      console.log('[Card Reader] Ready for manual scan');
       
     } catch (error: any) {
-      console.error('[M2 Reader] Terminal initialization error:', error);
+      console.error('[Card Reader] Terminal initialization error:', error);
       if (mountedRef.current && paymentMethodRef.current === 'reader') {
         setReaderStatus('error');
         setReaderMessage(error.message || 'Card reader unavailable.');
@@ -763,32 +762,31 @@ function PaymentForm({
     }
   };
   
-  // Manual scan for readers - triggers Web Bluetooth dialog
+  // Manual scan for readers - discovers internet-connected readers on local network
   const scanForReaders = async () => {
     if (!terminalRef.current) {
-      console.log('[M2 Reader] No terminal instance, initializing first...');
+      console.log('[Card Reader] No terminal instance, initializing first...');
       await initializeTerminal();
       return;
     }
     
     try {
-      console.log('[M2 Reader] Starting manual reader discovery with bluetooth_proximity...');
+      console.log('[Card Reader] Starting discovery for internet-connected readers...');
       setReaderStatus('searching');
-      setReaderMessage('Searching for nearby M2 card readers via Bluetooth...\n(A Bluetooth device picker should appear)');
+      setReaderMessage('Searching for card readers on your network...');
       
-      // Try to discover physical M2 readers using bluetooth_proximity method
-      // This triggers the Web Bluetooth device picker dialog in Chrome
+      // Discover internet-connected readers (WisePOS E, S700) on local network
+      // These readers must be registered in Stripe Dashboard and on the same WiFi network
       const discoverResult = await terminalRef.current.discoverReaders({
         simulated: false,
-        location: undefined, // Not required for bluetooth_proximity
       });
       
-      console.log('[M2 Reader] Discovery result:', discoverResult);
+      console.log('[Card Reader] Discovery result:', discoverResult);
       
       if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
       
       if ('error' in discoverResult) {
-        console.log('[M2 Reader] Discovery error:', discoverResult.error);
+        console.log('[Card Reader] Discovery error:', discoverResult.error);
         // Try simulated reader for testing/development
         const simulatedResult = await terminalRef.current.discoverReaders({ simulated: true });
         
@@ -796,7 +794,7 @@ function PaymentForm({
         
         if (!('error' in simulatedResult) && simulatedResult.discoveredReaders.length > 0) {
           const readers = simulatedResult.discoveredReaders;
-          console.log('[M2 Reader] Found simulated readers:', readers.length);
+          console.log('[Card Reader] Found simulated readers:', readers.length);
           setDiscoveredReaders(readers);
           
           if (readers.length === 1) {
@@ -807,12 +805,12 @@ function PaymentForm({
           }
         } else {
           setReaderStatus('ready');
-          setReaderMessage('No readers found. Make sure your M2 reader is powered on and try again.');
+          setReaderMessage('No card readers found on your network. Ensure your WisePOS E is powered on and connected to the same WiFi.');
           setShowTroubleshooting(true);
         }
       } else if (discoverResult.discoveredReaders.length > 0) {
         const readers = discoverResult.discoveredReaders;
-        console.log('[M2 Reader] Found physical readers:', readers.length);
+        console.log('[Card Reader] Found readers:', readers.length);
         setDiscoveredReaders(readers);
         
         if (readers.length === 1) {
@@ -822,13 +820,13 @@ function PaymentForm({
           setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
         }
       } else {
-        console.log('[M2 Reader] No readers discovered');
+        console.log('[Card Reader] No readers discovered');
         setReaderStatus('ready');
-        setReaderMessage('No readers found. Make sure your M2 reader is powered on and try again.');
+        setReaderMessage('No card readers found. Ensure your WisePOS E is powered on and connected to the same WiFi network.');
         setShowTroubleshooting(true);
       }
     } catch (error: any) {
-      console.error('[M2 Reader] Scan error:', error);
+      console.error('[Card Reader] Scan error:', error);
       if (mountedRef.current && paymentMethodRef.current === 'reader') {
         setReaderStatus('ready');
         setReaderMessage(error.message || 'Scan failed. Try again.');
@@ -1209,16 +1207,16 @@ function PaymentForm({
               )}
               {readerStatus === 'searching' && (
                 <div className="relative">
-                  <Bluetooth className="h-12 w-12 text-blue-600" />
+                  <Wifi className="h-12 w-12 text-blue-600" />
                   <Radio className="h-6 w-6 text-blue-400 absolute -top-1 -right-1 animate-pulse" />
                 </div>
               )}
               {readerStatus === 'found' && (
-                <Bluetooth className="h-12 w-12 text-amber-600" />
+                <Wifi className="h-12 w-12 text-amber-600" />
               )}
               {readerStatus === 'connected' && (
                 <div className="relative">
-                  <Bluetooth className="h-12 w-12 text-green-600" />
+                  <Wifi className="h-12 w-12 text-green-600" />
                   <CheckCircle className="h-5 w-5 text-green-600 absolute -bottom-1 -right-1 bg-green-50 rounded-full" />
                 </div>
               )}
@@ -1229,10 +1227,10 @@ function PaymentForm({
                 <WifiOff className="h-12 w-12 text-red-600" />
               )}
               {readerStatus === 'idle' && (
-                <Bluetooth className="h-12 w-12 text-gray-400" />
+                <Wifi className="h-12 w-12 text-gray-400" />
               )}
               {readerStatus === 'ready' && (
-                <Bluetooth className="h-12 w-12 text-blue-600" />
+                <Wifi className="h-12 w-12 text-blue-600" />
               )}
             </div>
             <p className={`text-lg font-medium text-center ${
@@ -1263,9 +1261,9 @@ function PaymentForm({
                     className="w-full justify-start text-left py-4"
                     onClick={() => connectToReader(reader)}
                   >
-                    <Bluetooth className="h-5 w-5 mr-3 text-blue-600" />
+                    <Wifi className="h-5 w-5 mr-3 text-blue-600" />
                     <div>
-                      <p className="font-medium">{reader.label || `M2 Reader ${index + 1}`}</p>
+                      <p className="font-medium">{reader.label || `Card Reader ${index + 1}`}</p>
                       <p className="text-xs text-gray-500">Serial: {reader.serial_number || 'Unknown'}</p>
                     </div>
                   </Button>
@@ -1281,8 +1279,8 @@ function PaymentForm({
                   className="w-full py-6 text-lg"
                   onClick={scanForReaders}
                 >
-                  <Bluetooth className="h-5 w-5 mr-2" />
-                  Scan for Readers
+                  <Wifi className="h-5 w-5 mr-2" />
+                  Scan Network for Readers
                 </Button>
                 <Button
                   variant="ghost"
@@ -1324,18 +1322,17 @@ function PaymentForm({
               <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4 text-left">
                 <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
                   <HelpCircle className="h-4 w-4 mr-2 text-blue-600" />
-                  M2 Reader Setup Tips
+                  Card Reader Setup Tips
                 </h4>
                 <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
-                  <li><strong>Power on the reader:</strong> Press and hold the power button until the LED lights up</li>
-                  <li><strong>Enable Bluetooth:</strong> Ensure Bluetooth is enabled on this device</li>
-                  <li><strong>Stay close:</strong> Keep the M2 reader within 10 feet of the kiosk</li>
-                  <li><strong>Check battery:</strong> The reader needs to be charged (green LED = charged)</li>
-                  <li><strong>Pair via Stripe Dashboard:</strong> New readers must be registered at dashboard.stripe.com/terminal/readers first</li>
-                  <li><strong>One device at a time:</strong> The M2 can only connect to one device - ensure it's not connected elsewhere</li>
+                  <li><strong>Power on the reader:</strong> Ensure your WisePOS E is powered on and showing the home screen</li>
+                  <li><strong>Same WiFi network:</strong> The reader and this kiosk must be on the same WiFi network</li>
+                  <li><strong>Check WiFi connection:</strong> On the reader, go to Settings → Network to verify WiFi is connected</li>
+                  <li><strong>Register in Stripe Dashboard:</strong> New readers must be registered at dashboard.stripe.com/terminal/readers first</li>
+                  <li><strong>Restart if needed:</strong> Try restarting the reader if it's not appearing</li>
                 </ol>
                 <p className="text-xs text-gray-500 mt-3 italic">
-                  If issues persist, try restarting the M2 reader and this browser tab.
+                  If issues persist, try restarting the card reader and refreshing this page.
                 </p>
               </div>
             )}

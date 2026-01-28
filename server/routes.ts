@@ -1546,11 +1546,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.email = email;
       }
       
-      // If password is provided, hash it
+      // If password is provided, hash it using the same format as hashPassword
       if (password && password.trim()) {
-        const salt = randomBytes(32);
+        const salt = randomBytes(16).toString("hex");
         const hashedPassword = await scryptAsync(password, salt, 64) as Buffer;
-        updateData.password = `${salt.toString('hex')}:${hashedPassword.toString('hex')}`;
+        updateData.password = `${hashedPassword.toString('hex')}.${salt}`;
       }
       
       const updatedUser = await storage.updateUser(memberId, updateData);
@@ -4118,8 +4118,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Reset code has expired" });
       }
 
-      // Update password
-      await storage.updateUserPassword(user.id, newPassword);
+      // Hash and update password
+      const salt = randomBytes(16).toString("hex");
+      const hashedPassword = await scryptAsync(newPassword, salt, 64) as Buffer;
+      const hashedPasswordString = `${hashedPassword.toString('hex')}.${salt}`;
+      await storage.updateUserPassword(user.id, hashedPasswordString);
       
       // Mark token as used
       await storage.markTokenAsUsed(resetToken.id);

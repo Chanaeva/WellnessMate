@@ -627,7 +627,7 @@ export default function LandingPage() {
               </div>
 
               <div className="space-y-6">
-                {membershipPlans?.filter((plan: MembershipPlan) => plan.availableOnWebsite !== false).map((plan: MembershipPlan) => (
+                {membershipPlans?.filter((plan: MembershipPlan) => plan.isActive && plan.availableOnWebsite !== false).map((plan: MembershipPlan) => (
                   <Card
                     key={plan.id}
                     className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
@@ -700,7 +700,7 @@ export default function LandingPage() {
               </div>
 
               <div className="space-y-6">
-                {dayPasses?.filter((dayPass: any) => dayPass.availableOnWebsite !== false).map((dayPass: any, index: number) => (
+                {dayPasses?.filter((dayPass: any) => dayPass.isActive && dayPass.availableOnWebsite !== false).map((dayPass: any, index: number) => (
                   <Card
                     key={index}
                     className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"

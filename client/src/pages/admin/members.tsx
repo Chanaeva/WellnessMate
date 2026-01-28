@@ -9,6 +9,7 @@ import {
   CheckIn,
   Payment,
   PunchCard,
+  PaymentMethod,
 } from "@shared/schema";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
@@ -76,6 +77,8 @@ import {
   RotateCcw,
   XCircle,
   AlertTriangle,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   Select,
@@ -85,6 +88,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
+import { AdminAddPaymentMethod } from "@/components/payment/admin-add-payment-method";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema
@@ -133,6 +137,9 @@ export default function AdminMembers() {
   const [cancelImmediately, setCancelImmediately] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [selectedMember, setSelectedMember] = useState<(User & { membership?: Membership }) | null>(null);
+  const [isAddPaymentMethodOpen, setIsAddPaymentMethodOpen] = useState(false);
+  const [addingPaymentMethod, setAddingPaymentMethod] = useState(false);
+  const [paymentMethodClientSecret, setPaymentMethodClientSecret] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   // Form for adding new member
@@ -172,6 +179,18 @@ export default function AdminMembers() {
   // Fetch member's check-in history
   const { data: memberCheckIns, isLoading: isLoadingCheckIns } = useQuery<CheckIn[]>({
     queryKey: [`/api/admin/members/${selectedMember?.id}/check-ins`],
+    enabled: !!selectedMember,
+  });
+
+  // Fetch member's payment methods
+  const { data: memberPaymentMethods, isLoading: isLoadingPaymentMethods, refetch: refetchPaymentMethods } = useQuery<PaymentMethod[]>({
+    queryKey: ['/api/admin/members', selectedMember?.id, 'payment-methods'],
+    queryFn: async () => {
+      if (!selectedMember?.id) return [];
+      const response = await fetch(`/api/admin/members/${selectedMember.id}/payment-methods`);
+      if (!response.ok) throw new Error('Failed to fetch payment methods');
+      return response.json();
+    },
     enabled: !!selectedMember,
   });
 
@@ -384,6 +403,44 @@ export default function AdminMembers() {
       });
     },
   });
+
+  // Add payment method for member
+  const handleAddPaymentMethod = async () => {
+    if (!selectedMember) return;
+    
+    setAddingPaymentMethod(true);
+    try {
+      // Get setup intent from server
+      const response = await apiRequest("POST", `/api/admin/members/${selectedMember.id}/setup-intent`);
+      const { clientSecret } = await response.json();
+      
+      setPaymentMethodClientSecret(clientSecret);
+      setIsAddPaymentMethodOpen(true);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to initialize payment method setup",
+        variant: "destructive",
+      });
+    } finally {
+      setAddingPaymentMethod(false);
+    }
+  };
+
+  const handlePaymentMethodSuccess = () => {
+    setIsAddPaymentMethodOpen(false);
+    setPaymentMethodClientSecret(null);
+    refetchPaymentMethods();
+    toast({
+      title: "Payment Method Added",
+      description: "The card has been added to this member's account.",
+    });
+  };
+
+  const handlePaymentMethodCancel = () => {
+    setIsAddPaymentMethodOpen(false);
+    setPaymentMethodClientSecret(null);
+  };
 
   // Cancel membership mutation
   const cancelMembershipMutation = useMutation({
@@ -1206,6 +1263,61 @@ export default function AdminMembers() {
 
               <TabsContent value="payments" className="space-y-4" data-testid="tab-content-payments">
                 <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-medium text-gray-700">Payment Methods</h4>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddPaymentMethod}
+                      disabled={addingPaymentMethod}
+                      data-testid="button-add-payment-method"
+                    >
+                      {addingPaymentMethod ? (
+                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Add Card
+                    </Button>
+                  </div>
+                  {isLoadingPaymentMethods ? (
+                    <div className="bg-gray-50 p-4 rounded-lg text-center">
+                      <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                      <p className="text-sm text-gray-600">Loading payment methods...</p>
+                    </div>
+                  ) : memberPaymentMethods && memberPaymentMethods.length > 0 ? (
+                    <div className="space-y-2">
+                      {memberPaymentMethods.map((pm) => (
+                        <div key={pm.id} className="border rounded-lg p-3 hover:bg-gray-50 flex justify-between items-center" data-testid={`payment-method-${pm.id}`}>
+                          <div className="flex items-center gap-3">
+                            <CreditCard className="h-5 w-5 text-gray-500" />
+                            <div>
+                              <p className="text-sm font-medium capitalize">
+                                {pm.cardBrand} •••• {pm.cardLast4}
+                                {pm.isDefault && (
+                                  <Badge className="ml-2 text-xs bg-green-100 text-green-800">Default</Badge>
+                                )}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Expires {pm.cardExpMonth}/{pm.cardExpYear}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-4 rounded-lg text-center">
+                      <CreditCard className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">No payment methods on file</p>
+                      <p className="text-xs text-gray-500 mt-1">Add a card to enable subscription creation</p>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div>
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Payment History</h4>
                   {isLoadingPayments ? (
                     <div className="bg-gray-50 p-8 rounded-lg text-center">
@@ -1712,6 +1824,33 @@ export default function AdminMembers() {
               {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Payment Method Dialog */}
+      <Dialog open={isAddPaymentMethodOpen} onOpenChange={(open) => {
+        if (!open) {
+          handlePaymentMethodCancel();
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-add-payment-method">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Add Payment Method
+            </DialogTitle>
+            <DialogDescription>
+              Add a credit or debit card for {selectedMember?.firstName} {selectedMember?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          {paymentMethodClientSecret && selectedMember && (
+            <AdminAddPaymentMethod
+              clientSecret={paymentMethodClientSecret}
+              memberId={selectedMember.id}
+              onSuccess={handlePaymentMethodSuccess}
+              onCancel={handlePaymentMethodCancel}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

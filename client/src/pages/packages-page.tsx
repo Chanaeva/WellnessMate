@@ -294,7 +294,7 @@ export default function PackagesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {membershipPlans?.filter((plan) => plan.availableOnWebsite !== false).map((plan, index) => {
+              {membershipPlans?.filter((plan) => plan.isActive && plan.availableOnWebsite !== false).map((plan, index) => {
                 const Icon =
                   planIcons[plan.planType as keyof typeof planIcons] || Shield;
                 const theme =
@@ -506,7 +506,7 @@ export default function PackagesPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {punchCardTemplates?.filter((template) => template.availableOnWebsite !== false).map((template) => (
+              {punchCardTemplates?.filter((template) => template.isActive && template.availableOnWebsite !== false).map((template) => (
                 <Card
                   key={template.id}
                   className="wellness-card relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 border-2 border-accent/20 bg-gradient-to-br from-card to-accent/5"

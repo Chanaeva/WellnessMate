@@ -1984,7 +1984,7 @@ export default function KioskMemberCreation({
                             <SelectContent>
                               {packageType === "membership"
                                 ? membershipPlans
-                                    .filter((plan: any) => plan.availableOnKiosk !== false)
+                                    .filter((plan: any) => plan.isActive && plan.availableOnKiosk !== false)
                                     .map((plan: any) => (
                                     <SelectItem
                                       key={plan.id}
@@ -1996,7 +1996,7 @@ export default function KioskMemberCreation({
                                     </SelectItem>
                                   ))
                                 : punchCardTemplates
-                                    .filter((template: any) => template.availableOnKiosk !== false)
+                                    .filter((template: any) => template.isActive && template.availableOnKiosk !== false)
                                     .map((template: any) => (
                                     <SelectItem
                                       key={template.id}

@@ -1612,6 +1612,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get member's payment methods (Admin only)
+  app.get("/api/admin/members/:id/payment-methods", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const paymentMethods = await storage.getPaymentMethodsByUserId(memberId);
+      res.json(paymentMethods);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create setup intent for adding payment method to member (Admin only)
+  app.post("/api/admin/members/:id/setup-intent", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const member = await storage.getUserById(memberId);
+      
+      if (!member) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      const freshStripe = createStripeClient();
+      
+      // Ensure customer exists in Stripe
+      let customerId = member.stripeCustomerId;
+      if (!customerId) {
+        const customer = await freshStripe.customers.create({
+          email: member.email,
+          name: `${member.firstName} ${member.lastName}`,
+          metadata: { userId: member.id.toString() }
+        });
+        customerId = customer.id;
+        await storage.updateUser(member.id, { stripeCustomerId: customerId });
+      }
+
+      // Create a SetupIntent for adding a card
+      const setupIntent = await freshStripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        usage: 'off_session',
+      });
+
+      res.json({
+        clientSecret: setupIntent.client_secret,
+        customerId
+      });
+    } catch (error: any) {
+      console.error('Error creating setup intent for member:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Save payment method after setup intent confirmation (Admin only)
+  app.post("/api/admin/members/:id/save-payment-method", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const { paymentMethodId, setAsDefault } = req.body;
+
+      if (!paymentMethodId) {
+        return res.status(400).json({ message: "Payment method ID is required" });
+      }
+
+      const member = await storage.getUserById(memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      const freshStripe = createStripeClient();
+      
+      // Retrieve the payment method from Stripe
+      const paymentMethod = await freshStripe.paymentMethods.retrieve(paymentMethodId);
+      
+      if (!paymentMethod.card) {
+        return res.status(400).json({ message: "Invalid payment method" });
+      }
+
+      // Validate that the payment method belongs to this member's Stripe customer
+      if (member.stripeCustomerId && paymentMethod.customer !== member.stripeCustomerId) {
+        // If the payment method isn't attached to the customer, attach it
+        if (!paymentMethod.customer) {
+          await freshStripe.paymentMethods.attach(paymentMethodId, {
+            customer: member.stripeCustomerId
+          });
+        } else {
+          return res.status(400).json({ 
+            message: "This payment method is associated with a different customer" 
+          });
+        }
+      }
+
+      // Check if this payment method already exists
+      const existingMethods = await storage.getPaymentMethodsByUserId(memberId);
+      const alreadyExists = existingMethods.some(pm => pm.stripePaymentMethodId === paymentMethodId);
+      
+      if (alreadyExists) {
+        return res.status(400).json({ message: "This payment method is already saved" });
+      }
+
+      // Determine if this should be the default
+      const isDefault = setAsDefault || existingMethods.length === 0;
+
+      // Save the payment method locally
+      const savedPaymentMethod = await storage.createPaymentMethod({
+        userId: memberId,
+        stripePaymentMethodId: paymentMethodId,
+        cardBrand: paymentMethod.card.brand,
+        cardLast4: paymentMethod.card.last4,
+        cardExpMonth: paymentMethod.card.exp_month,
+        cardExpYear: paymentMethod.card.exp_year,
+        isDefault
+      });
+
+      // If setting as default, update in Stripe as well
+      if (isDefault && member.stripeCustomerId) {
+        await freshStripe.customers.update(member.stripeCustomerId, {
+          invoice_settings: { default_payment_method: paymentMethodId }
+        });
+        
+        // Update any other methods to not be default
+        if (existingMethods.length > 0) {
+          await storage.setDefaultPaymentMethod(memberId, paymentMethodId);
+        }
+      }
+
+      res.json(savedPaymentMethod);
+    } catch (error: any) {
+      console.error('Error saving payment method for member:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get member's check-in history (Admin only)
   app.get("/api/admin/members/:id/check-ins", isAdmin, async (req, res) => {
     try {

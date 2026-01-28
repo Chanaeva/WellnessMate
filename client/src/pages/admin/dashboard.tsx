@@ -202,63 +202,8 @@ export default function AdminDashboard() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Members</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{members?.length || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {dashboardSummary.activeMembers || 0} active memberships
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{checkIns.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {dashboardSummary.todayVisits || 0} check-ins today
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Monthly Visits</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{dashboardSummary.monthlyVisits || 0}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {(dashboardSummary.growth?.visits || 0) >= 0 ? '+' : ''}{dashboardSummary.growth?.visits || 0}% from last month
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Peak Hour</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{peakHours.peakHour || '--'}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {peakHours.peakVisits || 0} visits avg
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
             {/* Kiosk Section */}
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">

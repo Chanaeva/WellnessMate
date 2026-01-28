@@ -471,7 +471,10 @@ export function setupAuth(app: Express) {
       // Check if user has a phone number for SMS
       if (!user.phoneNumber) {
         console.log(`Password reset requested for user ${user.id} but no phone number on file`);
-        return res.status(200).json({ message: "If an account with that email or phone exists, a reset code has been sent." });
+        return res.status(200).json({ 
+          message: "We don't have a phone number on file for this account. Please call us to reset your password.",
+          needsPhoneCall: true
+        });
       }
 
       // Generate a 6-digit reset code (easier for SMS)
@@ -529,8 +532,14 @@ export function setupAuth(app: Express) {
 
       // Find and validate token
       const resetToken = await storage.getPasswordResetToken(token);
-      if (!resetToken || resetToken.used || new Date() > new Date(resetToken.expiresAt!)) {
-        return res.status(400).json({ message: "Invalid or expired reset token" });
+      if (!resetToken) {
+        return res.status(400).json({ message: "That code doesn't match our records. Please double-check and try again." });
+      }
+      if (resetToken.used) {
+        return res.status(400).json({ message: "This reset code has already been used. Please request a new one." });
+      }
+      if (new Date() > new Date(resetToken.expiresAt!)) {
+        return res.status(400).json({ message: "This reset code has expired. Please request a new one." });
       }
 
       // Hash new password

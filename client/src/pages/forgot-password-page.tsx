@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Mail, ArrowLeft, CheckCircle, Phone, Lock, KeyRound } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle, Phone, Lock, KeyRound, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,7 @@ type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
 type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState<"email" | "code" | "success">("email");
+  const [step, setStep] = useState<"email" | "code" | "success" | "call">("email");
   const [phoneLastFour, setPhoneLastFour] = useState<string>("");
   const { toast } = useToast();
 
@@ -62,6 +62,8 @@ export default function ForgotPasswordPage() {
           title: "Code Sent",
           description: `A reset code has been sent to your phone ending in ${data.phoneLastFour}.`,
         });
+      } else if (data.needsPhoneCall) {
+        setStep("call");
       } else {
         toast({
           title: "Request Received",
@@ -130,11 +132,13 @@ export default function ForgotPasswordPage() {
               {step === "email" && "Reset Password"}
               {step === "code" && "Enter Reset Code"}
               {step === "success" && "Password Updated"}
+              {step === "call" && "Give Us a Call"}
             </CardTitle>
             <CardDescription className="text-slate-400" data-testid="text-card-description">
               {step === "email" && "Enter your email and we'll text you a reset code"}
               {step === "code" && `Enter the 6-digit code sent to ***-***-${phoneLastFour}`}
               {step === "success" && "Your password has been successfully updated"}
+              {step === "call" && "We need to verify your identity over the phone"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -274,6 +278,43 @@ export default function ForgotPasswordPage() {
                     data-testid="button-go-to-login"
                   >
                     Go to Login
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            {step === "call" && (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto">
+                  <PhoneCall className="h-8 w-8 text-amber-500" />
+                </div>
+                <div className="space-y-3">
+                  <p className="text-slate-300">
+                    We don't have a phone number on file for your account.
+                  </p>
+                  <p className="text-slate-400 text-sm">
+                    To reset your password, please call us and our staff will help verify your identity and reset your password.
+                  </p>
+                  <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                    <p className="text-sm text-slate-400 mb-1">Call us at:</p>
+                    <a 
+                      href="tel:+15551234567" 
+                      className="text-xl font-semibold text-amber-500 hover:text-amber-400 transition-colors"
+                    >
+                      (555) 123-4567
+                    </a>
+                    <p className="text-xs text-slate-500 mt-2">
+                      Available during business hours
+                    </p>
+                  </div>
+                </div>
+                <Link href="/auth">
+                  <Button 
+                    variant="outline"
+                    className="w-full border-slate-600 text-slate-300 hover:bg-slate-700"
+                    data-testid="button-back-to-login-from-call"
+                  >
+                    Back to Login
                   </Button>
                 </Link>
               </div>

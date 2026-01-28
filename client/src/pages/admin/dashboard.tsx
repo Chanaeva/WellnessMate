@@ -107,6 +107,14 @@ export default function AdminDashboard() {
     },
   });
 
+  const { data: upcomingBookings = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/session-bookings", "upcoming"],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await apiRequest("GET", `/api/admin/session-bookings?fromDate=${today}`);
+      return res.json();
+    },
+  });
 
   // Form for adding new member
   const newMemberForm = useForm<NewMemberFormData>({
@@ -250,7 +258,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Kiosk Section */}
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-3">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -315,6 +323,48 @@ export default function AdminDashboard() {
                   ) : (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground">No check-ins today yet.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Session Bookings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Upcoming Session Bookings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {upcomingBookings.length > 0 ? (
+                    <div className="space-y-3">
+                      {upcomingBookings.slice(0, 5).map((booking: any) => (
+                        <div key={booking.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div>
+                            <p className="font-medium">
+                              {booking.user?.firstName && booking.user?.lastName 
+                                ? `${booking.user.firstName} ${booking.user.lastName}`
+                                : booking.user?.email || `Member #${booking.userId}`}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {booking.bookingDate ? format(new Date(booking.bookingDate), "MMM d, yyyy") : "N/A"}
+                            </p>
+                          </div>
+                          <Badge variant={booking.sessionType === 'morning' ? 'default' : 'secondary'}>
+                            {booking.sessionType === 'morning' ? 'Morning' : 'Evening'}
+                          </Badge>
+                        </div>
+                      ))}
+                      {upcomingBookings.length > 5 && (
+                        <p className="text-sm text-muted-foreground text-center pt-2">
+                          +{upcomingBookings.length - 5} more bookings
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No upcoming session bookings.</p>
                     </div>
                   )}
                 </CardContent>

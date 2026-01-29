@@ -47,8 +47,8 @@ Wolf Mother Wellness is a full-stack web application designed for managing a the
 
 - **Database**: Neon PostgreSQL serverless database
 - **Payments**: Stripe (for payment processing and tax calculation via Stripe Tax)
-- **Email**: SendGrid (for transactional emails)
-- **SMS**: Twilio (for SMS messaging, previously used for password reset)
+- **Email**: SendGrid (for transactional emails including password reset)
+- **SMS**: Twilio (for SMS messaging, used for account claim verification)
 - **UI Components**: Radix UI primitives
 - **Apple Wallet**: `passkit-generator` library (for generating Apple Wallet passes)
 

@@ -456,7 +456,7 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Password reset request endpoint
+  // Password reset request endpoint (email-based)
   app.post("/api/password-reset-request", async (req, res, next) => {
     try {
       const { email } = req.body;
@@ -465,22 +465,13 @@ export function setupAuth(app: Express) {
       const user = await storage.getUserByEmail(email);
       if (!user) {
         // Don't reveal if email exists for security
-        return res.status(200).json({ message: "If an account with that email or phone exists, a reset code has been sent." });
+        return res.status(200).json({ message: "If an account with that email exists, a reset code has been sent." });
       }
 
-      // Check if user has a phone number for SMS
-      if (!user.phoneNumber) {
-        console.log(`Password reset requested for user ${user.id} but no phone number on file`);
-        return res.status(200).json({ 
-          message: "We don't have a phone number on file for this account. Please call us to reset your password.",
-          needsPhoneCall: true
-        });
-      }
-
-      // Generate a 6-digit reset code (easier for SMS)
+      // Generate a 6-digit reset code
       const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const token = resetCode; // Use the code as the token
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes for SMS codes
+      const token = resetCode;
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
       // Store reset token
       await storage.createPasswordResetToken({
@@ -490,34 +481,24 @@ export function setupAuth(app: Express) {
         used: false
       });
 
-      // Send SMS via Twilio
-      const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-      const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-
-      if (!twilioAccountSid || !twilioAuthToken || !twilioPhoneNumber) {
-        console.error("Twilio credentials not configured");
-        return res.status(500).json({ message: "SMS service not configured. Please contact support." });
-      }
-
+      // Send email via SendGrid
+      const { sendPasswordResetEmail } = await import("./email");
+      
       try {
-        const twilioClient = Twilio(twilioAccountSid, twilioAuthToken);
+        const emailSent = await sendPasswordResetEmail(email, resetCode, user.firstName || undefined);
         
-        await twilioClient.messages.create({
-          body: `Your Wolf Mother Wellness password reset code is: ${resetCode}. This code expires in 15 minutes.`,
-          from: twilioPhoneNumber,
-          to: user.phoneNumber
-        });
-
-        console.log(`Password reset SMS sent to ${user.phoneNumber} for user ${user.id}`);
-        
-        res.status(200).json({ 
-          message: "A password reset code has been sent to your phone.",
-          // Return partial phone for UI display
-          phoneLastFour: user.phoneNumber.slice(-4)
-        });
-      } catch (smsError: any) {
-        console.error("Failed to send SMS:", smsError.message);
+        if (emailSent) {
+          console.log(`Password reset email sent to ${email} for user ${user.id}`);
+          res.status(200).json({ 
+            message: "A password reset code has been sent to your email.",
+            emailSent: true
+          });
+        } else {
+          console.error("Failed to send password reset email");
+          return res.status(500).json({ message: "Failed to send reset code. Please try again or contact support." });
+        }
+      } catch (emailError: any) {
+        console.error("Failed to send email:", emailError.message);
         return res.status(500).json({ message: "Failed to send reset code. Please try again or contact support." });
       }
     } catch (error) {

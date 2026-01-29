@@ -461,11 +461,22 @@ export function setupAuth(app: Express) {
     try {
       const { email } = req.body;
       
+      // Validate email format
+      if (!email || typeof email !== 'string' || !email.includes('@')) {
+        return res.status(400).json({ message: "Please provide a valid email address." });
+      }
+      
+      // Always return same response to prevent user enumeration
+      const genericResponse = { 
+        message: "If an account with that email exists, a reset code has been sent.",
+        emailSent: true
+      };
+      
       // Find user by email
       const user = await storage.getUserByEmail(email);
       if (!user) {
-        // Don't reveal if email exists for security
-        return res.status(200).json({ message: "If an account with that email exists, a reset code has been sent." });
+        // Don't reveal if email exists - return same response
+        return res.status(200).json(genericResponse);
       }
 
       // Generate a 6-digit reset code
@@ -489,18 +500,15 @@ export function setupAuth(app: Express) {
         
         if (emailSent) {
           console.log(`Password reset email sent to ${email} for user ${user.id}`);
-          res.status(200).json({ 
-            message: "A password reset code has been sent to your email.",
-            emailSent: true
-          });
         } else {
-          console.error("Failed to send password reset email");
-          return res.status(500).json({ message: "Failed to send reset code. Please try again or contact support." });
+          console.error("Failed to send password reset email for user", user.id);
         }
       } catch (emailError: any) {
         console.error("Failed to send email:", emailError.message);
-        return res.status(500).json({ message: "Failed to send reset code. Please try again or contact support." });
       }
+      
+      // Always return same response regardless of email send success
+      res.status(200).json(genericResponse);
     } catch (error) {
       next(error);
     }

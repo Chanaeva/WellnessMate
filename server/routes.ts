@@ -2188,33 +2188,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         invoice_settings: { default_payment_method: defaultPaymentMethod }
       });
       
-      // Calculate billing anchor based on membership end date
+      // Calculate trial period based on membership end date
       const endDate = new Date(membership.endDate);
       const now = new Date();
       
-      // If end date is in the future, use it as billing anchor; otherwise start immediately
-      let billingAnchor: number;
+      // Calculate days until membership ends (for trial period)
+      let trialDays = 0;
+      let trialEnd: number | undefined;
+      
       if (endDate > now) {
-        billingAnchor = Math.floor(endDate.getTime() / 1000);
+        // Membership still active - set trial until end date so first charge is when membership expires
+        const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        trialEnd = Math.floor(endDate.getTime() / 1000);
+        trialDays = daysRemaining;
       } else {
-        // End date is in the past or today, start billing in 30 days
-        billingAnchor = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+        // Membership already expired - charge immediately (no trial)
+        trialEnd = undefined;
+        trialDays = 0;
       }
       
-      // Create subscription
-      const subscription = await freshStripe.subscriptions.create({
+      // Create subscription with trial if membership is still active
+      const subscriptionParams: any = {
         customer: customerId,
         items: [{ price: plan.stripePriceId }],
-        collection_method: 'charge_automatically',
         default_payment_method: defaultPaymentMethod,
-        billing_cycle_anchor: billingAnchor,
-        proration_behavior: 'none',
         metadata: {
           source: 'admin_migration',
           membershipId: membership.membershipId,
           userId: user.id.toString(),
         },
-      });
+      };
+      
+      // Add trial_end if membership hasn't expired yet
+      if (trialEnd) {
+        subscriptionParams.trial_end = trialEnd;
+      }
+      
+      const subscription = await freshStripe.subscriptions.create(subscriptionParams);
       
       // Update membership with subscription ID
       await storage.updateMembership(membership.membershipId, {
@@ -2223,10 +2233,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`✅ Created subscription for membership ${membershipId}:`, subscription.id);
       
+      // Calculate next billing date
+      const nextBillingDate = trialEnd 
+        ? new Date(trialEnd * 1000).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      
       res.json({ 
         message: "Subscription created successfully",
         subscriptionId: subscription.id,
-        nextBillingDate: new Date(billingAnchor * 1000).toISOString().split('T')[0],
+        nextBillingDate,
       });
     } catch (error: any) {
       console.error('Failed to create subscription:', error);

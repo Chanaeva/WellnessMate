@@ -1102,9 +1102,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const enabledSessionsForCheckin = allSessionConfigs.filter(s => s.isEnabled);
         
         if (enabledSessionsForCheckin.length > 0) {
-          const today = new Date().toISOString().split('T')[0];
-          const nowTime = new Date();
-          const currentTimeMin = nowTime.getHours() * 60 + nowTime.getMinutes();
+          // Use business timezone for time comparison
+          const { DateTime } = await import('luxon');
+          const BUSINESS_TIMEZONE = 'America/Chicago'; // Central Time - adjust as needed
+          
+          const nowInBusinessTz = DateTime.now().setZone(BUSINESS_TIMEZONE);
+          const today = nowInBusinessTz.toISODate(); // YYYY-MM-DD in business timezone
+          const currentTimeMin = nowInBusinessTz.hour * 60 + nowInBusinessTz.minute;
           
           for (const session of enabledSessionsForCheckin) {
             const sessionStartMinutes = parseTimeToMinutes(session.startTime);
@@ -1112,7 +1116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (currentTimeMin >= sessionStartMinutes && currentTimeMin < sessionEndMinutes) {
               // Mark this session booking as checked in
-              await storage.markSessionBookingCheckedIn(user.id, today, session.sessionType as 'morning' | 'evening');
+              await storage.markSessionBookingCheckedIn(user.id, today!, session.sessionType as 'morning' | 'evening');
               break;
             }
           }
@@ -4477,12 +4481,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This session is not available" });
       }
       
-      // Validate booking date is not in the past
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      bookingDateObj.setHours(0, 0, 0, 0);
+      // Use business timezone for all date/time comparisons
+      const { DateTime } = await import('luxon');
+      const BUSINESS_TIMEZONE = 'America/Chicago'; // Central Time - adjust as needed
       
-      if (bookingDateObj < today) {
+      const nowInBusinessTz = DateTime.now().setZone(BUSINESS_TIMEZONE);
+      const todayInBusinessTz = nowInBusinessTz.startOf('day');
+      const bookingDateInBusinessTz = DateTime.fromISO(bookingDate, { zone: BUSINESS_TIMEZONE }).startOf('day');
+      
+      // Validate booking date is not in the past
+      if (bookingDateInBusinessTz < todayInBusinessTz) {
         return res.status(400).json({ message: "Cannot book sessions for past dates" });
       }
       
@@ -4513,9 +4521,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // For same-day bookings, check if the session time window is still open for booking
-      if (bookingDateObj.getTime() === today.getTime()) {
-        const now = new Date();
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      if (bookingDateInBusinessTz.equals(todayInBusinessTz)) {
+        const currentMinutes = nowInBusinessTz.hour * 60 + nowInBusinessTz.minute;
         const sessionStartMinutes = parseTimeToMinutes(config.startTime);
         const sessionEndMinutes = parseTimeToMinutes(config.endTime);
         

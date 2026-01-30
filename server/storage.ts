@@ -69,6 +69,7 @@ export interface IStorage {
   getMembershipById(id: string): Promise<Membership | undefined>;
   createMembership(membership: InsertMembership): Promise<Membership>;
   updateMembership(id: string, data: Partial<Membership>): Promise<Membership>;
+  deleteMembership(id: string): Promise<void>;
   getAllMembers(): Promise<(User & {membership?: Membership})[]>;
   getMembershipsWithoutSubscription(): Promise<(Membership & { user: User })[]>;
   getManagedMemberships(managedByUserId: number): Promise<(Membership & { user: User })[]>;
@@ -451,6 +452,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(memberships.membershipId, id))
       .returning();
     return membership;
+  }
+
+  async deleteMembership(id: string): Promise<void> {
+    await db.delete(memberships).where(eq(memberships.membershipId, id));
   }
 
   async getAllMembers(): Promise<(User & {membership?: Membership})[]> {

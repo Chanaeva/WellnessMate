@@ -2249,6 +2249,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Create membership for a member with subscription
+  app.post("/api/admin/members/:userId/membership", isAdmin, async (req, res) => {
+    try {
+      const userId = Number(req.params.userId);
+      
+      // Validate request body
+      const bodySchema = z.object({
+        planType: z.enum(['basic', 'premium', 'vip']),
+      });
+      
+      const parseResult = bodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid plan type. Must be basic, premium, or vip." });
+      }
+      
+      const { planType } = parseResult.data;
+      
+      // Get the user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check if user already has a membership
+      const existingMembership = await storage.getMembershipByUserId(userId);
+      if (existingMembership) {
+        return res.status(400).json({ message: "User already has a membership. Please update or remove the existing one first." });
+      }
+      
+      // Get the plan details
+      const allPlans = await storage.getAllMembershipPlans();
+      const plan = allPlans.find(p => p.planType === planType && p.isActive);
+      if (!plan) {
+        return res.status(404).json({ message: "Active membership plan not found for this type" });
+      }
+      
+      if (!plan.stripePriceId) {
+        return res.status(400).json({ message: "This plan doesn't have Stripe pricing configured" });
+      }
+      
+      // Check if user has a Stripe customer ID
+      if (!user.stripeCustomerId) {
+        return res.status(400).json({ message: "User doesn't have a Stripe customer ID. Please add a payment method first." });
+      }
+      
+      // Check if user has a payment method
+      const freshStripe = createStripeClient();
+      const paymentMethods = await freshStripe.paymentMethods.list({
+        customer: user.stripeCustomerId,
+        type: 'card',
+      });
+      
+      if (paymentMethods.data.length === 0) {
+        return res.status(400).json({ message: "User doesn't have a saved payment method. Please add one first." });
+      }
+      
+      // Set default payment method
+      const defaultPaymentMethod = paymentMethods.data[0].id;
+      await freshStripe.customers.update(user.stripeCustomerId, {
+        invoice_settings: { default_payment_method: defaultPaymentMethod }
+      });
+      
+      // Create membership - starts today, ends in 30 days
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 30);
+      
+      const membershipId = `WMW-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      
+      // Create subscription - charges immediately for first month, then recurring
+      // This matches the subscription behavior used elsewhere in the system
+      const subscription = await freshStripe.subscriptions.create({
+        customer: user.stripeCustomerId,
+        items: [{ price: plan.stripePriceId }],
+        default_payment_method: defaultPaymentMethod,
+        metadata: {
+          source: 'admin_portal',
+          userId: userId.toString(),
+          membershipId,
+        },
+      });
+      
+      // Create the membership
+      const membership = await storage.createMembership({
+        membershipId,
+        planType,
+        userId,
+        status: 'active',
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        autoRenew: true,
+        stripeSubscriptionId: subscription.id,
+      });
+      
+      console.log(`✅ Admin created membership for user ${userId}:`, membershipId);
+      
+      res.json({
+        message: "Membership created successfully",
+        membershipId,
+        subscriptionId: subscription.id,
+        nextBillingDate: new Date(subscription.current_period_end * 1000).toISOString().split('T')[0],
+      });
+    } catch (error: any) {
+      console.error('Failed to create membership:', error);
+      res.status(500).json({ message: "Failed to create membership: " + error.message });
+    }
+  });
+
+  // Admin: Remove/delete membership
+  app.delete("/api/admin/memberships/:membershipId", isAdmin, async (req, res) => {
+    try {
+      const { membershipId } = req.params;
+      
+      // Get the membership
+      const membership = await storage.getMembershipById(membershipId);
+      if (!membership) {
+        return res.status(404).json({ message: "Membership not found" });
+      }
+      
+      // If there's a Stripe subscription, cancel it
+      if (membership.stripeSubscriptionId) {
+        const freshStripe = createStripeClient();
+        try {
+          await freshStripe.subscriptions.del(membership.stripeSubscriptionId);
+          console.log(`Cancelled Stripe subscription: ${membership.stripeSubscriptionId}`);
+        } catch (stripeError: any) {
+          console.error('Failed to cancel Stripe subscription:', stripeError);
+          // Continue even if Stripe cancel fails (subscription might already be cancelled)
+        }
+      }
+      
+      // Delete the membership
+      await storage.deleteMembership(membershipId);
+      
+      console.log(`✅ Admin deleted membership: ${membershipId}`);
+      
+      res.json({ message: "Membership removed successfully" });
+    } catch (error: any) {
+      console.error('Failed to remove membership:', error);
+      res.status(500).json({ message: "Failed to remove membership: " + error.message });
+    }
+  });
+
   // Admin: Get all active punch cards with user info
   app.get("/api/admin/active-punch-cards", isAdmin, async (req, res) => {
     try {

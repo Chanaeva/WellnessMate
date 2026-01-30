@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   User,
   Membership,
+  MembershipPlan,
   insertUserSchema,
   insertMembershipSchema,
   CheckIn,
@@ -140,6 +141,8 @@ export default function AdminMembers() {
   const [isAddPaymentMethodOpen, setIsAddPaymentMethodOpen] = useState(false);
   const [addingPaymentMethod, setAddingPaymentMethod] = useState(false);
   const [paymentMethodClientSecret, setPaymentMethodClientSecret] = useState<string | null>(null);
+  const [isCreateMembershipOpen, setIsCreateMembershipOpen] = useState(false);
+  const [selectedPlanType, setSelectedPlanType] = useState<string>("");
   const itemsPerPage = 10;
 
   // Form for adding new member
@@ -192,6 +195,59 @@ export default function AdminMembers() {
       return response.json();
     },
     enabled: !!selectedMember,
+  });
+
+  // Fetch membership plans for creating memberships
+  const { data: membershipPlans = [] } = useQuery<MembershipPlan[]>({
+    queryKey: ["/api/membership-plans"],
+  });
+
+  // Create membership mutation
+  const createMembershipMutation = useMutation({
+    mutationFn: async ({ userId, planType }: { userId: number; planType: string }) => {
+      const response = await apiRequest("POST", `/api/admin/members/${userId}/membership`, { planType });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Membership Created",
+        description: data.subscriptionId 
+          ? `Membership created with subscription. Next billing: ${data.nextBillingDate}`
+          : "Membership created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      setIsCreateMembershipOpen(false);
+      setSelectedPlanType("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Creating Membership",
+        description: error.message || "Failed to create membership",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Remove membership mutation
+  const removeMembershipMutation = useMutation({
+    mutationFn: async (membershipId: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/memberships/${membershipId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Membership Removed",
+        description: "Membership has been removed from this member.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error Removing Membership",
+        description: error.message || "Failed to remove membership",
+        variant: "destructive",
+      });
+    },
   });
 
   // Add new member mutation
@@ -1211,11 +1267,52 @@ export default function AdminMembers() {
                           </div>
                         )}
                       </div>
+                      <div className="col-span-2 pt-2 border-t mt-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="w-full"
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to remove ${selectedMember.firstName}'s membership? This will also cancel any active subscription.`)) {
+                              removeMembershipMutation.mutate(selectedMember.membership!.membershipId);
+                            }
+                          }}
+                          disabled={removeMembershipMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {removeMembershipMutation.isPending ? "Removing..." : "Remove Membership"}
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="bg-gray-50 p-4 rounded-lg text-center">
                       <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">No active membership</p>
+                      <p className="text-sm text-gray-600 mb-3">No active membership</p>
+                      {memberPaymentMethods && memberPaymentMethods.length > 0 ? (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPlanType("");
+                            setIsCreateMembershipOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Membership
+                        </Button>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-500">Add a payment method first to create a membership</p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleAddPaymentMethod}
+                            disabled={addingPaymentMethod}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            {addingPaymentMethod ? "Setting up..." : "Add Payment Method"}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1851,6 +1948,74 @@ export default function AdminMembers() {
               onCancel={handlePaymentMethodCancel}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Membership Dialog */}
+      <Dialog open={isCreateMembershipOpen} onOpenChange={setIsCreateMembershipOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-create-membership">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Create Membership
+            </DialogTitle>
+            <DialogDescription>
+              Create a new membership for {selectedMember?.firstName} {selectedMember?.lastName}. 
+              This will also set up recurring billing using their saved payment method.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="plan-type">Membership Plan</Label>
+              <Select value={selectedPlanType} onValueChange={setSelectedPlanType}>
+                <SelectTrigger id="plan-type" data-testid="select-plan-type">
+                  <SelectValue placeholder="Select a plan..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {membershipPlans
+                    .filter(plan => plan.isActive && plan.planType !== 'daily')
+                    .map(plan => (
+                      <SelectItem key={plan.id} value={plan.planType}>
+                        {plan.name} - ${plan.monthlyPrice}/month
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedPlanType && (
+              <div className="bg-blue-50 p-3 rounded-lg text-sm">
+                <p className="font-medium text-blue-800">What will happen:</p>
+                <ul className="list-disc list-inside text-blue-700 mt-1 space-y-1">
+                  <li>Membership starts today for 30 days</li>
+                  <li>Card charged immediately for first month</li>
+                  <li>Subscription set up for monthly recurring billing</li>
+                </ul>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateMembershipOpen(false)}
+              data-testid="button-cancel-create-membership"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedMember && selectedPlanType) {
+                  createMembershipMutation.mutate({
+                    userId: selectedMember.id,
+                    planType: selectedPlanType,
+                  });
+                }
+              }}
+              disabled={!selectedPlanType || createMembershipMutation.isPending}
+              data-testid="button-confirm-create-membership"
+            >
+              {createMembershipMutation.isPending ? "Creating..." : "Create Membership"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

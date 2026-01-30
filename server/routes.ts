@@ -5742,13 +5742,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             invoice_settings: { default_payment_method: savedPaymentMethodId }
           });
           
-          // Create subscription starting from next billing cycle (first month already paid)
+          // Create subscription with 30-day trial (first month already paid via PaymentIntent)
           const subscription = await stripe.subscriptions.create({
             customer: customerIdFromIntent,
             items: [{ price: priceId }],
             collection_method: 'charge_automatically',
             default_payment_method: savedPaymentMethodId,
-            billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
+            trial_end: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // First charge in 30 days
             proration_behavior: 'none',
             payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
             metadata: {
@@ -5876,12 +5876,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   await storage.updateUserStripeCustomerId(existingAdditionalMember.id, newStripeCustomer.id);
                 }
                 
-                // Create subscription for existing member
+                // Create subscription for existing member with 30-day trial (first month already paid)
                 const existingMemberSubscription = await stripe.subscriptions.create({
                   customer: existingStripeCustomerId,
                   items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
                   collection_method: 'charge_automatically',
-                  billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60),
+                  trial_end: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // First charge in 30 days
                   proration_behavior: 'none',
                   payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
                   metadata: {
@@ -5944,12 +5944,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               await storage.updateUserStripeCustomerId(additionalUser.id, additionalStripeCustomer.id);
               
-              // Create a subscription for the additional member (no initial charge - already paid)
+              // Create a subscription for the additional member with 30-day trial (first month already paid)
               const additionalSubscription = await stripe.subscriptions.create({
                 customer: additionalStripeCustomer.id,
                 items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
                 collection_method: 'charge_automatically',
-                billing_cycle_anchor: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // Start billing in 30 days
+                trial_end: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // First charge in 30 days
                 proration_behavior: 'none',
                 payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
                 metadata: {

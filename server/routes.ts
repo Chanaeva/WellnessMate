@@ -5743,14 +5743,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           // Create subscription with 30-day trial (first month already paid via PaymentIntent)
+          // Note: We don't set default_payment_method here - it's already saved on the customer
           const subscription = await stripe.subscriptions.create({
             customer: customerIdFromIntent,
             items: [{ price: priceId }],
-            collection_method: 'charge_automatically',
-            default_payment_method: savedPaymentMethodId,
-            trial_end: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // First charge in 30 days
-            proration_behavior: 'none',
-            payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
+            trial_period_days: 30, // Subscription starts in trialing status, no charge until trial ends
             metadata: {
               source: paymentIntent.metadata?.useTerminal === 'true' ? 'kiosk_terminal' : 'kiosk_online',
               memberEmail: memberData.email,
@@ -5880,10 +5877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const existingMemberSubscription = await stripe.subscriptions.create({
                   customer: existingStripeCustomerId,
                   items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
-                  collection_method: 'charge_automatically',
-                  trial_end: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // First charge in 30 days
-                  proration_behavior: 'none',
-                  payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
+                  trial_period_days: 30, // Subscription starts in trialing status, no charge until trial ends
                   metadata: {
                     source: 'kiosk_gift_membership',
                     purchasedBy: memberData.email,
@@ -5948,10 +5942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const additionalSubscription = await stripe.subscriptions.create({
                 customer: additionalStripeCustomer.id,
                 items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
-                collection_method: 'charge_automatically',
-                trial_end: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // First charge in 30 days
-                proration_behavior: 'none',
-                payment_behavior: 'allow_incomplete', // Allow subscription creation without immediate invoice payment
+                trial_period_days: 30, // Subscription starts in trialing status, no charge until trial ends
                 metadata: {
                   source: 'kiosk_gift_membership',
                   purchasedBy: memberData.email,

@@ -597,15 +597,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If there's a Stripe subscription, cancel it first
       if (membership.stripeSubscriptionId) {
         try {
-          await stripe.subscriptions.del(membership.stripeSubscriptionId);
-          console.log(`Cancelled Stripe subscription: ${membership.stripeSubscriptionId}`);
-        } catch (stripeError: any) {
-          // Log but don't fail if Stripe cancellation fails (subscription might already be cancelled)
-          console.error("Stripe subscription cancellation error:", stripeError.message);
-          // Only fail if it's not a "subscription not found" error
-          if (stripeError.code !== 'resource_missing') {
-            throw stripeError;
+          // First check if the subscription exists and its current status
+          const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+          
+          if (subscription.status !== 'canceled') {
+            // Cancel the subscription immediately
+            await stripe.subscriptions.del(membership.stripeSubscriptionId);
+            console.log(`Cancelled Stripe subscription: ${membership.stripeSubscriptionId}`);
+          } else {
+            console.log(`Subscription already cancelled: ${membership.stripeSubscriptionId}`);
           }
+        } catch (stripeError: any) {
+          // Log but don't fail if Stripe cancellation fails (subscription might already be cancelled or not exist)
+          console.error("Stripe subscription cancellation error:", stripeError.message, stripeError.code);
+          // Continue with local cancellation even if Stripe fails - the subscription might not exist in Stripe
+          // This allows users to cancel their membership even if there's a Stripe sync issue
         }
       }
 

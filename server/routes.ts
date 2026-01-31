@@ -4684,17 +4684,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessionStartMinutes = parseTimeToMinutes(config.startTime);
         const sessionEndMinutes = parseTimeToMinutes(config.endTime);
         
-        // Block if the session has already started (can't book a session in progress)
-        if (currentMinutes >= sessionStartMinutes) {
-          return res.status(400).json({ 
-            message: `The ${sessionType} session has already started. Please book a future session.` 
-          });
-        }
+        // Allow booking up to 1 hour after session start time OR until session ends (whichever is later)
+        const bookingGraceMinutes = 60;
+        const bookingCutoffMinutes = Math.max(sessionStartMinutes + bookingGraceMinutes, sessionEndMinutes);
         
-        // Also block if the session has ended (shouldn't happen given the above, but safety check)
-        if (currentMinutes >= sessionEndMinutes) {
+        if (currentMinutes >= bookingCutoffMinutes) {
           return res.status(400).json({ 
-            message: `The ${sessionType} session has already ended. Please book a future session.` 
+            message: `The ${sessionType} session booking window has closed. Please book a future session.` 
           });
         }
       }

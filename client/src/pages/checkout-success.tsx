@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { CheckCircle, Receipt, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,11 @@ export default function CheckoutSuccess() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
+
+    // Invalidate membership-related queries to ensure dashboard shows updated data
+    queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/membership/billing-info"] });
 
     if (sessionId) {
       // Retrieve session details from Stripe

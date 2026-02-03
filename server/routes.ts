@@ -14,6 +14,7 @@ import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
+import { sendSessionBookingNotification } from "./email";
 
 const scryptAsync = promisify(scrypt);
 
@@ -4719,6 +4720,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookingDate,
         status: 'confirmed'
       });
+      
+      // Send email notification to info@wolfmothertulsa.com
+      const user = req.user!;
+      const memberName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+      sendSessionBookingNotification(memberName, user.email, sessionType, bookingDate)
+        .catch(err => console.error('Failed to send session booking notification:', err));
       
       res.status(201).json(booking);
     } catch (error: any) {

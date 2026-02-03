@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PriceInput } from "@/components/ui/price-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -331,18 +332,12 @@ export default function AdminInventory() {
                         name="priceInCents"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Price ($)</FormLabel>
+                            <FormLabel>Price</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="number" 
-                                min="0"
-                                step="0.01"
+                              <PriceInput 
+                                value={field.value || 0}
+                                onChange={field.onChange}
                                 placeholder="0.00"
-                                value={field.value ? (field.value / 100).toFixed(2) : ""}
-                                onChange={e => {
-                                  const dollars = parseFloat(e.target.value) || 0;
-                                  field.onChange(Math.round(dollars * 100));
-                                }}
                                 data-testid="input-create-price"
                               />
                             </FormControl>
@@ -595,18 +590,12 @@ export default function AdminInventory() {
                 name="priceInCents"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price ($)</FormLabel>
+                    <FormLabel>Price</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0"
-                        step="0.01"
+                      <PriceInput 
+                        value={field.value || 0}
+                        onChange={field.onChange}
                         placeholder="0.00"
-                        value={field.value ? (field.value / 100).toFixed(2) : ""}
-                        onChange={e => {
-                          const dollars = parseFloat(e.target.value) || 0;
-                          field.onChange(Math.round(dollars * 100));
-                        }}
                         data-testid="input-edit-price"
                       />
                     </FormControl>

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PriceInput } from "@/components/ui/price-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -649,15 +650,12 @@ export default function PackagesManagement() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="monthly-price">Monthly Price ($) *</Label>
-                      <Input
+                      <Label htmlFor="monthly-price">Monthly Price *</Label>
+                      <PriceInput
                         id="monthly-price"
-                        type="number"
-                        step="0.01"
-                        value={((planFormData.monthlyPrice || 0) / 100).toFixed(2)}
-                        onChange={(e) => setPlanFormData(prev => ({...prev, monthlyPrice: Math.round(parseFloat(e.target.value || "0") * 100)}))}
+                        value={planFormData.monthlyPrice || 0}
+                        onChange={(cents) => setPlanFormData(prev => ({...prev, monthlyPrice: cents}))}
                         placeholder="159.00"
-                        required
                       />
                     </div>
                   </div>
@@ -989,32 +987,26 @@ export default function PackagesManagement() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="price-per-punch">Price Per Visit ($) *</Label>
-                      <Input
+                      <Label htmlFor="price-per-punch">Price Per Visit *</Label>
+                      <PriceInput
                         id="price-per-punch"
-                        type="number"
-                        step="0.01"
-                        value={((templateFormData.pricePerPunch || 0) / 100).toFixed(2)}
-                        onChange={(e) => {
-                          const price = Math.round(parseFloat(e.target.value || "0") * 100);
+                        value={templateFormData.pricePerPunch || 0}
+                        onChange={(cents) => {
                           setTemplateFormData(prev => ({
                             ...prev, 
-                            pricePerPunch: price,
-                            totalPrice: (prev.totalPunches || 0) * price
+                            pricePerPunch: cents,
+                            totalPrice: (prev.totalPunches || 0) * cents
                           }));
                         }}
                         placeholder="25.00"
-                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="total-price">Total Price ($)</Label>
-                      <Input
+                      <Label htmlFor="total-price">Total Price</Label>
+                      <PriceInput
                         id="total-price"
-                        type="number"
-                        step="0.01"
-                        value={((templateFormData.totalPrice || 0) / 100).toFixed(2)}
-                        onChange={(e) => setTemplateFormData(prev => ({...prev, totalPrice: Math.round(parseFloat(e.target.value || "0") * 100)}))}
+                        value={templateFormData.totalPrice || 0}
+                        onChange={(cents) => setTemplateFormData(prev => ({...prev, totalPrice: cents}))}
                         placeholder="Auto-calculated"
                       />
                     </div>

@@ -71,3 +71,64 @@ export async function sendPasswordResetEmail(toEmail: string, resetCode: string,
     return false;
   }
 }
+
+export async function sendSessionBookingNotification(
+  memberName: string,
+  memberEmail: string,
+  sessionType: string,
+  bookingDate: string
+): Promise<boolean> {
+  try {
+    const { client, fromEmail } = await getUncachableSendGridClient();
+    
+    const formattedDate = new Date(bookingDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const sessionLabel = sessionType === 'morning' ? 'Morning Session' : 'Evening Session';
+    
+    const msg = {
+      to: 'info@wolfmothertulsa.com',
+      from: fromEmail,
+      subject: `Session Booking: ${memberName} - ${sessionLabel} on ${formattedDate}`,
+      text: `New Session Booking\n\nMember: ${memberName}\nEmail: ${memberEmail}\nSession: ${sessionLabel}\nDate: ${formattedDate}\n\nThis is an automated notification from Wolf Mother Wellness.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4a5d4a;">Wolf Mother Wellness - New Session Booking</h2>
+          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #ddd; font-weight: bold; width: 120px;">Member:</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #ddd;">${memberName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #ddd; font-weight: bold;">Email:</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #ddd;"><a href="mailto:${memberEmail}">${memberEmail}</a></td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #ddd; font-weight: bold;">Session:</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #ddd;">${sessionLabel}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0; font-weight: bold;">Date:</td>
+                <td style="padding: 10px 0;">${formattedDate}</td>
+              </tr>
+            </table>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #999; font-size: 12px;">This is an automated notification from Wolf Mother Wellness.</p>
+        </div>
+      `
+    };
+
+    await client.send(msg);
+    console.log(`Session booking notification sent for ${memberName} - ${sessionLabel} on ${formattedDate}`);
+    return true;
+  } catch (error) {
+    console.error('SendGrid session booking notification error:', error);
+    return false;
+  }
+}

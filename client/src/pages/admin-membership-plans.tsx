@@ -8,6 +8,7 @@ import Footer from "@/components/layout/footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PriceInput } from "@/components/ui/price-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -130,7 +131,7 @@ export default function AdminMembershipPlans() {
   const handleSubmit = (data: any) => {
     const formattedData = {
       ...data,
-      monthlyPrice: Math.round(data.monthlyPrice * 100), // Convert to cents
+      monthlyPrice: data.monthlyPrice, // Already in cents from PriceInput
       features: data.features ? data.features.split('\n').filter((f: string) => f.trim()) : [],
     };
 
@@ -147,7 +148,7 @@ export default function AdminMembershipPlans() {
       name: plan.name,
       description: plan.description,
       planType: plan.planType,
-      monthlyPrice: plan.monthlyPrice / 100, // Convert from cents
+      monthlyPrice: plan.monthlyPrice, // Already in cents
       features: plan.features.join('\n'),
       isActive: plan.isActive,
     });
@@ -266,14 +267,12 @@ export default function AdminMembershipPlans() {
                     name="monthlyPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Monthly Price (USD)</FormLabel>
+                        <FormLabel>Monthly Price</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01" 
-                            placeholder="99.00" 
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          <PriceInput 
+                            value={field.value || 0}
+                            onChange={field.onChange}
+                            placeholder="99.00"
                           />
                         </FormControl>
                         <FormMessage />

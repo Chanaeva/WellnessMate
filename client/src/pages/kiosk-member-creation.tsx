@@ -585,6 +585,8 @@ function PaymentForm({
   const [connectedReader, setConnectedReader] = useState<any>(null);
   const [discoveredReaders, setDiscoveredReaders] = useState<any[]>([]);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+  const [selectedServerReader, setSelectedServerReader] = useState<any>(null); // For server-driven flow
+  const [useServerDriven, setUseServerDriven] = useState(true); // Default to server-driven for WisePOS E
   const [billingZip, setBillingZip] = useState('');
   const [cardError, setCardError] = useState<string | null>(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
@@ -780,21 +782,17 @@ function PaymentForm({
     }
   };
   
-  // Manual scan for readers - uses server-driven discovery (more reliable for WisePOS E)
+  // Manual scan for readers - uses server-driven discovery (bypasses local network DNS issues)
   const scanForReaders = async () => {
-    if (!terminalRef.current) {
-      console.log('[Card Reader] No terminal instance, initializing first...');
-      await initializeTerminal();
-      return;
-    }
-    
     try {
       console.log('[Card Reader] Starting server-driven discovery for WisePOS E...');
       setReaderStatus('searching');
       setReaderMessage('Searching for card readers...');
+      setDiscoveredReaders([]);
+      setSelectedServerReader(null);
       
-      // Try server-driven discovery first (more reliable for WisePOS E)
-      // This queries Stripe API directly instead of relying on local network discovery
+      // Use server-driven discovery - this queries Stripe API directly
+      // and doesn't require local network connectivity to the reader
       const serverDiscovery = await fetch('/api/stripe/terminal/discover-readers');
       const serverResult = await serverDiscovery.json();
       
@@ -804,89 +802,30 @@ function PaymentForm({
       
       if (serverResult.readers && serverResult.readers.length > 0) {
         console.log('[Card Reader] Found readers via server:', serverResult.readers.length);
-        // Server-driven discovery returns readers, but we still need to connect via Terminal SDK
-        // Store location ID for later connection
+        
         if (serverResult.locationId) {
           setTerminalLocationId(serverResult.locationId);
         }
         
-        // Now use Terminal SDK to discover and connect (it should find the same readers)
-        const discoverResult = await terminalRef.current.discoverReaders({
-          simulated: false,
-          location: serverResult.locationId || terminalLocationId,
-        });
+        // Store discovered readers for selection
+        setDiscoveredReaders(serverResult.readers);
         
-        if ('error' in discoverResult) {
-          console.log('[Card Reader] SDK discovery error after server success:', discoverResult.error);
-          // Show what the server found even if SDK can't connect
-          setReaderStatus('ready');
-          setReaderMessage(`Found ${serverResult.readers.length} reader(s) registered in Stripe, but unable to connect via network. Check that the reader is on the same WiFi network as this device.`);
-          setShowTroubleshooting(true);
-        } else if (discoverResult.discoveredReaders.length > 0) {
-          const readers = discoverResult.discoveredReaders;
-          console.log('[Card Reader] Found readers via SDK:', readers.length);
-          setDiscoveredReaders(readers);
-          
-          if (readers.length === 1) {
-            await connectToReader(readers[0]);
-          } else {
-            setReaderStatus('found');
-            setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
-          }
+        if (serverResult.readers.length === 1) {
+          // Auto-select the only reader and mark as connected
+          const reader = serverResult.readers[0];
+          console.log('[Card Reader] Auto-selecting single reader:', reader.label);
+          setSelectedServerReader(reader);
+          setReaderStatus('connected');
+          setReaderMessage(`Connected to ${reader.label} (server-driven)`);
         } else {
-          setReaderStatus('ready');
-          setReaderMessage(`Found ${serverResult.readers.length} reader(s) registered in Stripe, but they appear offline or not on this network.`);
-          setShowTroubleshooting(true);
+          setReaderStatus('found');
+          setReaderMessage(`Found ${serverResult.readers.length} card readers. Select one to connect.`);
         }
       } else {
-        // No readers found in Stripe - try SDK discovery anyway
-        console.log('[Card Reader] No readers from server, trying SDK discovery...');
-        
-        const discoverResult = await terminalRef.current.discoverReaders({
-          simulated: false,
-          ...(terminalLocationId ? { location: terminalLocationId } : {}),
-        });
-        
-        if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
-        
-        if ('error' in discoverResult) {
-          console.log('[Card Reader] SDK discovery error:', discoverResult.error);
-          // Try simulated reader for testing/development
-          const simulatedResult = await terminalRef.current.discoverReaders({ simulated: true });
-          
-          if (!('error' in simulatedResult) && simulatedResult.discoveredReaders.length > 0) {
-            const readers = simulatedResult.discoveredReaders;
-            console.log('[Card Reader] Found simulated readers:', readers.length);
-            setDiscoveredReaders(readers);
-            
-            if (readers.length === 1) {
-              await connectToReader(readers[0]);
-            } else {
-              setReaderStatus('found');
-              setReaderMessage(`Found ${readers.length} readers. Select one to connect.`);
-            }
-          } else {
-            setReaderStatus('ready');
-            setReaderMessage('No card readers found. Make sure your WisePOS E is registered in the Stripe Dashboard and powered on.');
-            setShowTroubleshooting(true);
-          }
-        } else if (discoverResult.discoveredReaders.length > 0) {
-          const readers = discoverResult.discoveredReaders;
-          console.log('[Card Reader] Found readers:', readers.length);
-          setDiscoveredReaders(readers);
-          
-          if (readers.length === 1) {
-            await connectToReader(readers[0]);
-          } else {
-            setReaderStatus('found');
-            setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
-          }
-        } else {
-          console.log('[Card Reader] No readers discovered');
-          setReaderStatus('ready');
-          setReaderMessage('No card readers registered in Stripe. Please register your WisePOS E in the Stripe Dashboard first.');
-          setShowTroubleshooting(true);
-        }
+        console.log('[Card Reader] No readers found on server');
+        setReaderStatus('ready');
+        setReaderMessage('No card readers found. Make sure your WisePOS E is registered in the Stripe Dashboard and powered on.');
+        setShowTroubleshooting(true);
       }
     } catch (error: any) {
       console.error('[Card Reader] Scan error:', error);
@@ -898,16 +837,26 @@ function PaymentForm({
     }
   };
   
-  // Initialize Stripe Terminal when reader mode is selected
+  // Select a reader from the discovered list (server-driven)
+  const selectServerReader = (reader: any) => {
+    console.log('[Card Reader] Selecting reader:', reader.label);
+    setSelectedServerReader(reader);
+    setReaderStatus('connected');
+    setReaderMessage(`Connected to ${reader.label} (server-driven)`);
+  };
+  
+  // Initialize card reader when reader mode is selected
   useEffect(() => {
-    if (paymentMethod === 'reader' && !connectedReader) {
-      initializeTerminal();
+    if (paymentMethod === 'reader' && !selectedServerReader) {
+      // Use server-driven discovery (bypasses local network DNS issues with WisePOS E)
+      scanForReaders();
     } else if (paymentMethod === 'manual') {
       // Reset reader state when switching to manual
       setReaderStatus('idle');
       setReaderMessage('');
       setDiscoveredReaders([]);
       setShowTroubleshooting(false);
+      setSelectedServerReader(null);
     }
   }, [paymentMethod]);
   
@@ -928,9 +877,9 @@ function PaymentForm({
     };
   }, []);
 
-  // Handle card reader payment
+  // Handle card reader payment - Server-driven approach (bypasses local network DNS issues)
   const handleReaderPayment = async () => {
-    if (!terminal || !connectedReader) {
+    if (!selectedServerReader) {
       toast({
         title: "Reader Not Connected",
         description: "Please wait for the reader to connect or use manual entry.",
@@ -941,10 +890,13 @@ function PaymentForm({
 
     setIsProcessing(true);
     setReaderStatus('processing');
-    setReaderMessage('Please tap, insert, or swipe your card...');
+    setReaderMessage('Creating payment...');
+
+    let paymentIntentId: string | null = null;
 
     try {
-      // Create payment intent using existing kiosk endpoint with Terminal mode
+      // Step 1: Create payment intent using existing kiosk endpoint with Terminal mode
+      console.log('[Card Reader] Creating payment intent for server-driven flow...');
       const piResponse = await apiRequest(
         "POST",
         "/api/kiosk/create-member-payment",
@@ -963,87 +915,142 @@ function PaymentForm({
             amountCents: discountAmountCents,
           } : null,
           useTerminal: true, // Use Terminal (card_present) payment method
-          existingMemberId, // Pass existing member ID if purchasing for existing member
+          existingMemberId,
         },
       );
       
       const paymentData = await piResponse.json();
-      const { clientSecret, paymentIntentId, subscriptionId, customerId, isSubscription, stripePriceId } = paymentData;
+      const { paymentIntentId: piId, subscriptionId, customerId, isSubscription, stripePriceId } = paymentData;
+      paymentIntentId = piId;
       
-      if (!clientSecret) {
+      if (!paymentIntentId) {
         throw new Error('Failed to create payment intent');
       }
 
-      // Collect payment method from the reader
-      const collectResult = await terminal.collectPaymentMethod(clientSecret);
+      console.log('[Card Reader] Payment intent created:', paymentIntentId);
+
+      // Step 2: Send payment to the reader via server API (server-driven)
+      setReaderMessage('Please tap, insert, or swipe your card on the reader...');
       
-      if ('error' in collectResult) {
-        throw new Error(collectResult.error.message || 'Failed to collect payment');
+      console.log('[Card Reader] Sending payment to reader:', selectedServerReader.id);
+      const processResponse = await fetch('/api/stripe/terminal/process-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          readerId: selectedServerReader.id,
+          paymentIntentId,
+        }),
+      });
+      
+      const processResult = await processResponse.json();
+      
+      if (!processResponse.ok) {
+        throw new Error(processResult.message || 'Failed to send payment to reader');
       }
 
-      setReaderMessage('Processing payment...');
+      console.log('[Card Reader] Payment sent to reader, starting polling...');
 
-      // Process the payment
-      const processResult = await terminal.processPayment(collectResult.paymentIntent);
+      // Step 3: Poll for payment completion
+      const maxPolls = 120; // 2 minutes (1 poll per second)
+      let pollCount = 0;
+      let paymentSucceeded = false;
       
-      if ('error' in processResult) {
-        throw new Error(processResult.error.message || 'Payment processing failed');
-      }
-
-      if (processResult.paymentIntent.status === 'succeeded') {
-        // Payment succeeded, create member account
-        const confirmResponse = await apiRequest(
-          "POST",
-          "/api/kiosk/confirm-member-creation",
-          {
-            paymentIntentId: processResult.paymentIntent.id,
-            subscriptionId,
-            customerId,
-            isSubscription,
-            stripePriceId,
-            memberData,
-            packageData: {
-              ...packageData,
-              finalPrice,
-              originalPrice,
-            },
-            agreementData,
-            discountData: discountData ? {
-              type: discountData.type,
-              value: discountData.value,
-              reason: discountData.reason,
-              amountCents: discountAmountCents,
-            } : null,
-            existingMemberId,
-            additionalMembers: packageData.additionalMembers || [],
-          },
-        );
-
-        if (confirmResponse.ok) {
-          const additionalCount = packageData.additionalMembers?.length || 0;
-          toast({
-            title: "Payment Successful",
-            description: additionalCount > 0 
-              ? `Welcome! ${additionalCount + 1} memberships have been created successfully.`
-              : `Welcome, ${memberData.firstName}! Your account has been created.`,
-          });
-          onSuccess();
+      while (pollCount < maxPolls && !paymentSucceeded) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        
+        const statusResponse = await fetch(`/api/stripe/terminal/reader-status/${selectedServerReader.id}`);
+        const statusResult = await statusResponse.json();
+        
+        console.log('[Card Reader] Poll', pollCount, 'status:', statusResult.action?.status);
+        
+        if (statusResult.action) {
+          if (statusResult.action.status === 'succeeded') {
+            paymentSucceeded = true;
+            console.log('[Card Reader] Payment succeeded!');
+          } else if (statusResult.action.status === 'failed') {
+            throw new Error(statusResult.action.failure_message || 'Payment failed on reader');
+          } else if (statusResult.action.status === 'in_progress') {
+            // Still waiting for card
+            if (pollCount % 10 === 0) {
+              console.log('[Card Reader] Still waiting for card...');
+            }
+          }
         } else {
-          const errorData = await confirmResponse.json();
-          throw new Error(errorData.message || 'Failed to create member account');
+          // No action means it completed or was cleared
+          // Check payment intent status directly
+          const piStatusResponse = await fetch(`/api/stripe/payment-intent-status/${paymentIntentId}`);
+          if (piStatusResponse.ok) {
+            const piStatus = await piStatusResponse.json();
+            if (piStatus.status === 'succeeded' || piStatus.status === 'requires_capture') {
+              paymentSucceeded = true;
+              console.log('[Card Reader] Payment intent succeeded!');
+            }
+          }
         }
+        
+        pollCount++;
+      }
+
+      if (!paymentSucceeded) {
+        throw new Error('Payment timed out. Please try again.');
+      }
+
+      // Step 4: Confirm member creation
+      setReaderMessage('Payment successful! Creating your account...');
+      
+      const confirmResponse = await apiRequest(
+        "POST",
+        "/api/kiosk/confirm-member-creation",
+        {
+          paymentIntentId,
+          subscriptionId,
+          customerId,
+          isSubscription,
+          stripePriceId,
+          memberData,
+          packageData: {
+            ...packageData,
+            finalPrice,
+            originalPrice,
+          },
+          agreementData,
+          discountData: discountData ? {
+            type: discountData.type,
+            value: discountData.value,
+            reason: discountData.reason,
+            amountCents: discountAmountCents,
+          } : null,
+          existingMemberId,
+          additionalMembers: packageData.additionalMembers || [],
+        },
+      );
+
+      if (confirmResponse.ok) {
+        const additionalCount = packageData.additionalMembers?.length || 0;
+        toast({
+          title: "Payment Successful",
+          description: additionalCount > 0 
+            ? `Welcome! ${additionalCount + 1} memberships have been created successfully.`
+            : `Welcome, ${memberData.firstName}! Your account has been created.`,
+        });
+        onSuccess();
       } else {
-        throw new Error('Payment was not successful');
+        const errorData = await confirmResponse.json();
+        throw new Error(errorData.message || 'Failed to create member account');
       }
     } catch (error: any) {
-      console.error('Reader payment error:', error);
+      console.error('[Card Reader] Server-driven payment error:', error);
       
-      // Cancel any pending reader action to prevent lockup
-      if (terminal) {
+      // Try to cancel any pending reader action
+      if (selectedServerReader) {
         try {
-          await terminal.cancelCollectPaymentMethod();
+          await fetch('/api/stripe/terminal/cancel-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ readerId: selectedServerReader.id }),
+          });
         } catch (cancelError) {
-          console.log('Cancel action (ok if nothing to cancel):', cancelError);
+          console.log('[Card Reader] Cancel action (ok if nothing to cancel):', cancelError);
         }
       }
       
@@ -1058,9 +1065,9 @@ function PaymentForm({
       setIsProcessing(false);
       // Reset to connected status after a short delay for error recovery
       setTimeout(() => {
-        if (connectedReader) {
+        if (selectedServerReader) {
           setReaderStatus('connected');
-          setReaderMessage('Ready for payment');
+          setReaderMessage(`Connected to ${selectedServerReader.label}`);
         }
       }, 2000);
     }
@@ -1336,7 +1343,7 @@ function PaymentForm({
                     key={reader.id || index}
                     variant="outline"
                     className="w-full justify-start text-left py-4"
-                    onClick={() => connectToReader(reader)}
+                    onClick={() => selectServerReader(reader)}
                   >
                     <Wifi className="h-5 w-5 mr-3 text-blue-600" />
                     <div>

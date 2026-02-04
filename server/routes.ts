@@ -254,6 +254,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // SERVER-DRIVEN TERMINAL PAYMENT (for WisePOS E)
+  // This bypasses local network DNS issues by having
+  // Stripe's servers communicate with the reader directly
+  // ============================================
+
+  // Process a payment intent on a specific reader (server-driven)
+  // The reader will display the payment and wait for card tap/insert
+  app.post("/api/stripe/terminal/process-payment", async (req, res) => {
+    try {
+      const { readerId, paymentIntentId } = req.body;
+      
+      if (!readerId || !paymentIntentId) {
+        return res.status(400).json({ message: "readerId and paymentIntentId are required" });
+      }
+      
+      console.log(`[Terminal] Processing payment ${paymentIntentId} on reader ${readerId}`);
+      
+      // Send the payment intent to the reader for collection
+      const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
+        payment_intent: paymentIntentId,
+      });
+      
+      console.log(`[Terminal] Reader action started:`, reader.action?.type, reader.action?.status);
+      
+      res.json({ 
+        success: true,
+        reader: {
+          id: reader.id,
+          label: reader.label,
+          status: reader.status,
+          action: reader.action,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Terminal] Failed to process payment on reader:", error);
+      res.status(500).json({ message: error.message, code: error.code });
+    }
+  });
+
+  // Check the status of a reader (poll for payment completion)
+  app.get("/api/stripe/terminal/reader-status/:readerId", async (req, res) => {
+    try {
+      const { readerId } = req.params;
+      
+      const reader = await stripe.terminal.readers.retrieve(readerId);
+      
+      // Check if reader is deleted
+      if ('deleted' in reader && reader.deleted) {
+        return res.status(404).json({ message: "Reader not found or deleted" });
+      }
+      
+      res.json({
+        id: reader.id,
+        label: (reader as any).label,
+        status: (reader as any).status,
+        action: (reader as any).action,
+      });
+    } catch (error: any) {
+      console.error("[Terminal] Failed to get reader status:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get payment intent status (for server-driven polling)
+  app.get("/api/stripe/payment-intent-status/:paymentIntentId", async (req, res) => {
+    try {
+      const { paymentIntentId } = req.params;
+      
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      res.json({
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        amount: paymentIntent.amount,
+      });
+    } catch (error: any) {
+      console.error("[Terminal] Failed to get payment intent status:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Cancel the current action on a reader
+  app.post("/api/stripe/terminal/cancel-action", async (req, res) => {
+    try {
+      const { readerId } = req.body;
+      
+      if (!readerId) {
+        return res.status(400).json({ message: "readerId is required" });
+      }
+      
+      console.log(`[Terminal] Canceling action on reader ${readerId}`);
+      
+      const reader = await stripe.terminal.readers.cancelAction(readerId);
+      
+      res.json({ 
+        success: true,
+        reader: {
+          id: reader.id,
+          label: reader.label,
+          status: reader.status,
+          action: reader.action,
+        }
+      });
+    } catch (error: any) {
+      console.error("[Terminal] Failed to cancel reader action:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================
   // ONE-TIME ADMIN SETUP ROUTES (for production)
   // ============================================
   

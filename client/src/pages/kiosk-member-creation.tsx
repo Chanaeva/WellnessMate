@@ -780,7 +780,7 @@ function PaymentForm({
     }
   };
   
-  // Manual scan for readers - discovers internet-connected readers on local network
+  // Manual scan for readers - uses server-driven discovery (more reliable for WisePOS E)
   const scanForReaders = async () => {
     if (!terminalRef.current) {
       console.log('[Card Reader] No terminal instance, initializing first...');
@@ -789,61 +789,104 @@ function PaymentForm({
     }
     
     try {
-      console.log('[Card Reader] Starting discovery for internet-connected readers...');
+      console.log('[Card Reader] Starting server-driven discovery for WisePOS E...');
       setReaderStatus('searching');
-      setReaderMessage('Searching for card readers on your network...');
+      setReaderMessage('Searching for card readers...');
       
-      // Discover internet-connected readers (WisePOS E, S700) on local network
-      // These readers must be registered in Stripe Dashboard and on the same WiFi network
-      // WisePOS E requires a location ID for discovery
-      const discoverResult = await terminalRef.current.discoverReaders({
-        simulated: false,
-        ...(terminalLocationId ? { location: terminalLocationId } : {}),
-      });
+      // Try server-driven discovery first (more reliable for WisePOS E)
+      // This queries Stripe API directly instead of relying on local network discovery
+      const serverDiscovery = await fetch('/api/stripe/terminal/discover-readers');
+      const serverResult = await serverDiscovery.json();
       
-      console.log('[Card Reader] Discovery result:', discoverResult);
+      console.log('[Card Reader] Server discovery result:', serverResult);
       
       if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
       
-      if ('error' in discoverResult) {
-        console.log('[Card Reader] Discovery error:', discoverResult.error);
-        // Try simulated reader for testing/development
-        const simulatedResult = await terminalRef.current.discoverReaders({ simulated: true });
+      if (serverResult.readers && serverResult.readers.length > 0) {
+        console.log('[Card Reader] Found readers via server:', serverResult.readers.length);
+        // Server-driven discovery returns readers, but we still need to connect via Terminal SDK
+        // Store location ID for later connection
+        if (serverResult.locationId) {
+          setTerminalLocationId(serverResult.locationId);
+        }
         
-        if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+        // Now use Terminal SDK to discover and connect (it should find the same readers)
+        const discoverResult = await terminalRef.current.discoverReaders({
+          simulated: false,
+          location: serverResult.locationId || terminalLocationId,
+        });
         
-        if (!('error' in simulatedResult) && simulatedResult.discoveredReaders.length > 0) {
-          const readers = simulatedResult.discoveredReaders;
-          console.log('[Card Reader] Found simulated readers:', readers.length);
+        if ('error' in discoverResult) {
+          console.log('[Card Reader] SDK discovery error after server success:', discoverResult.error);
+          // Show what the server found even if SDK can't connect
+          setReaderStatus('ready');
+          setReaderMessage(`Found ${serverResult.readers.length} reader(s) registered in Stripe, but unable to connect via network. Check that the reader is on the same WiFi network as this device.`);
+          setShowTroubleshooting(true);
+        } else if (discoverResult.discoveredReaders.length > 0) {
+          const readers = discoverResult.discoveredReaders;
+          console.log('[Card Reader] Found readers via SDK:', readers.length);
           setDiscoveredReaders(readers);
           
           if (readers.length === 1) {
             await connectToReader(readers[0]);
           } else {
             setReaderStatus('found');
-            setReaderMessage(`Found ${readers.length} readers. Select one to connect.`);
+            setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
           }
         } else {
           setReaderStatus('ready');
-          setReaderMessage('No card readers found on your network. Ensure your WisePOS E is powered on and connected to the same WiFi.');
+          setReaderMessage(`Found ${serverResult.readers.length} reader(s) registered in Stripe, but they appear offline or not on this network.`);
           setShowTroubleshooting(true);
         }
-      } else if (discoverResult.discoveredReaders.length > 0) {
-        const readers = discoverResult.discoveredReaders;
-        console.log('[Card Reader] Found readers:', readers.length);
-        setDiscoveredReaders(readers);
-        
-        if (readers.length === 1) {
-          await connectToReader(readers[0]);
-        } else {
-          setReaderStatus('found');
-          setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
-        }
       } else {
-        console.log('[Card Reader] No readers discovered');
-        setReaderStatus('ready');
-        setReaderMessage('No card readers found. Ensure your WisePOS E is powered on and connected to the same WiFi network.');
-        setShowTroubleshooting(true);
+        // No readers found in Stripe - try SDK discovery anyway
+        console.log('[Card Reader] No readers from server, trying SDK discovery...');
+        
+        const discoverResult = await terminalRef.current.discoverReaders({
+          simulated: false,
+          ...(terminalLocationId ? { location: terminalLocationId } : {}),
+        });
+        
+        if (!mountedRef.current || paymentMethodRef.current !== 'reader') return;
+        
+        if ('error' in discoverResult) {
+          console.log('[Card Reader] SDK discovery error:', discoverResult.error);
+          // Try simulated reader for testing/development
+          const simulatedResult = await terminalRef.current.discoverReaders({ simulated: true });
+          
+          if (!('error' in simulatedResult) && simulatedResult.discoveredReaders.length > 0) {
+            const readers = simulatedResult.discoveredReaders;
+            console.log('[Card Reader] Found simulated readers:', readers.length);
+            setDiscoveredReaders(readers);
+            
+            if (readers.length === 1) {
+              await connectToReader(readers[0]);
+            } else {
+              setReaderStatus('found');
+              setReaderMessage(`Found ${readers.length} readers. Select one to connect.`);
+            }
+          } else {
+            setReaderStatus('ready');
+            setReaderMessage('No card readers found. Make sure your WisePOS E is registered in the Stripe Dashboard and powered on.');
+            setShowTroubleshooting(true);
+          }
+        } else if (discoverResult.discoveredReaders.length > 0) {
+          const readers = discoverResult.discoveredReaders;
+          console.log('[Card Reader] Found readers:', readers.length);
+          setDiscoveredReaders(readers);
+          
+          if (readers.length === 1) {
+            await connectToReader(readers[0]);
+          } else {
+            setReaderStatus('found');
+            setReaderMessage(`Found ${readers.length} card readers. Select one to connect.`);
+          }
+        } else {
+          console.log('[Card Reader] No readers discovered');
+          setReaderStatus('ready');
+          setReaderMessage('No card readers registered in Stripe. Please register your WisePOS E in the Stripe Dashboard first.');
+          setShowTroubleshooting(true);
+        }
       }
     } catch (error: any) {
       console.error('[Card Reader] Scan error:', error);

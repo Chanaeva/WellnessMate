@@ -170,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin-only: List registered card readers
+  // Admin/Staff: List registered card readers
   app.get("/api/stripe/terminal/readers", async (req, res) => {
     if (!req.isAuthenticated() || !['admin', 'staff'].includes(req.user?.role || '')) {
       return res.sendStatus(403);
@@ -184,11 +184,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin-only: Get or create Terminal location
-  app.get("/api/stripe/terminal/location", async (req, res) => {
-    if (!req.isAuthenticated() || req.user?.role !== 'admin') {
-      return res.sendStatus(403);
+  // Server-driven reader discovery for kiosk (no auth for kiosk access)
+  // This is more reliable for WisePOS E than client-side discovery
+  app.get("/api/stripe/terminal/discover-readers", async (req, res) => {
+    try {
+      // Get the location ID if provided, otherwise get the first location
+      let locationId = req.query.location as string | undefined;
+      
+      if (!locationId) {
+        const locations = await stripe.terminal.locations.list({ limit: 1 });
+        if (locations.data.length > 0) {
+          locationId = locations.data[0].id;
+        }
+      }
+      
+      // List readers, optionally filtered by location
+      const listParams: any = { limit: 20 };
+      if (locationId) {
+        listParams.location = locationId;
+      }
+      
+      const readers = await stripe.terminal.readers.list(listParams);
+      
+      // Filter to only online readers and map to a simpler format
+      const onlineReaders = readers.data.filter(r => r.status === 'online').map(r => ({
+        id: r.id,
+        object: 'terminal.reader',
+        device_type: r.device_type,
+        label: r.label || r.serial_number,
+        serial_number: r.serial_number,
+        ip_address: r.ip_address,
+        location: r.location,
+        status: r.status,
+      }));
+      
+      console.log(`[Terminal] Server-driven discovery found ${onlineReaders.length} online readers`);
+      res.json({ readers: onlineReaders, locationId });
+    } catch (error: any) {
+      console.error("Failed to discover readers:", error);
+      res.status(500).json({ message: error.message });
     }
+  });
+
+  // Get Terminal location (for kiosk reader discovery - no auth required)
+  // This endpoint returns the location ID needed for WisePOS E discovery
+  app.get("/api/stripe/terminal/location", async (req, res) => {
     try {
       const locations = await stripe.terminal.locations.list({ limit: 1 });
       

@@ -719,12 +719,12 @@ export default function MemberDashboard() {
                   )}
 
                   {/* Upcoming Bookings */}
-                  {mySessionBookings.filter(b => b.status !== 'cancelled' && new Date(b.bookingDate) >= new Date(format(new Date(), 'yyyy-MM-dd'))).length > 0 && (
+                  {mySessionBookings.filter(b => b.status !== 'cancelled' && b.bookingDate >= format(new Date(), 'yyyy-MM-dd')).length > 0 && (
                     <div className="pt-4 border-t">
                       <h4 className="font-medium mb-2">Your Upcoming Bookings</h4>
                       <div className="space-y-2">
                         {mySessionBookings
-                          .filter(b => b.status !== 'cancelled' && new Date(b.bookingDate) >= new Date(format(new Date(), 'yyyy-MM-dd')))
+                          .filter(b => b.status !== 'cancelled' && b.bookingDate >= format(new Date(), 'yyyy-MM-dd'))
                           .sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime())
                           .slice(0, 5)
                           .map((booking) => {

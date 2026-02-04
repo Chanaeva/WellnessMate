@@ -868,7 +868,7 @@ export default function MemberDashboard() {
                         Finnish Saunas
                       </h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Open 24/7 • Traditional dry heat therapy
+                        Traditional dry heat therapy
                       </p>
                       <Badge className="thermal-badge-primary mt-2">
                         Available

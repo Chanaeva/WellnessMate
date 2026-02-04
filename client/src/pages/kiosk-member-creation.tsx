@@ -807,20 +807,15 @@ function PaymentForm({
           setTerminalLocationId(serverResult.locationId);
         }
         
-        // Store discovered readers for selection
+        // Store discovered readers
         setDiscoveredReaders(serverResult.readers);
         
-        if (serverResult.readers.length === 1) {
-          // Auto-select the only reader and mark as connected
-          const reader = serverResult.readers[0];
-          console.log('[Card Reader] Auto-selecting single reader:', reader.label);
-          setSelectedServerReader(reader);
-          setReaderStatus('connected');
-          setReaderMessage(`Connected to ${reader.label} (server-driven)`);
-        } else {
-          setReaderStatus('found');
-          setReaderMessage(`Found ${serverResult.readers.length} card readers. Select one to connect.`);
-        }
+        // Auto-connect to the first reader
+        const reader = serverResult.readers[0];
+        console.log('[Card Reader] Auto-connecting to reader:', reader.label);
+        setSelectedServerReader(reader);
+        setReaderStatus('connected');
+        setReaderMessage(`Connected to ${reader.label}`);
       } else {
         console.log('[Card Reader] No readers found on server');
         setReaderStatus('ready');

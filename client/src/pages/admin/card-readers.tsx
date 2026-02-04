@@ -13,10 +13,22 @@ export default function AdminCardReaders() {
   const [discoveredReaders, setDiscoveredReaders] = useState<Reader[]>([]);
   const [connectedReader, setConnectedReader] = useState<Reader | null>(null);
   const [terminalStatus, setTerminalStatus] = useState<'initializing' | 'ready' | 'error'>('initializing');
+  const [terminalLocationId, setTerminalLocationId] = useState<string | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
 
   useEffect(() => {
     initializeTerminal();
+    // Fetch Terminal location for WisePOS E reader discovery
+    fetch('/api/stripe/terminal/location')
+      .then(res => res.json())
+      .then(data => {
+        if (data.location?.id) {
+          console.log('[Card Reader] Terminal location fetched:', data.location.id);
+          setTerminalLocationId(data.location.id);
+        }
+      })
+      .catch(err => console.error('[Card Reader] Failed to fetch terminal location:', err));
+    
     return () => {
       if (terminalRef.current && connectedReader) {
         terminalRef.current.disconnectReader();
@@ -69,8 +81,10 @@ export default function AdminCardReaders() {
     setDiscoveredReaders([]);
 
     try {
+      // WisePOS E requires a location ID for discovery
       const result = await terminalRef.current.discoverReaders({
         simulated: false,
+        ...(terminalLocationId ? { location: terminalLocationId } : {}),
       });
 
       if ('error' in result) {

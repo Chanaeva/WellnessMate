@@ -588,6 +588,7 @@ function PaymentForm({
   const [billingZip, setBillingZip] = useState('');
   const [cardError, setCardError] = useState<string | null>(null);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [terminalLocationId, setTerminalLocationId] = useState<string | null>(null);
   
   // Card element styling to match checkout form
   const elementOptions = {
@@ -640,6 +641,21 @@ function PaymentForm({
   useEffect(() => {
     paymentMethodRef.current = paymentMethod;
   }, [paymentMethod]);
+  
+  // Fetch Terminal location for WisePOS E reader discovery
+  useEffect(() => {
+    if (paymentMethod === 'reader' && !terminalLocationId) {
+      fetch('/api/stripe/terminal/location')
+        .then(res => res.json())
+        .then(data => {
+          if (data.location?.id) {
+            console.log('[Card Reader] Terminal location fetched:', data.location.id);
+            setTerminalLocationId(data.location.id);
+          }
+        })
+        .catch(err => console.error('[Card Reader] Failed to fetch terminal location:', err));
+    }
+  }, [paymentMethod, terminalLocationId]);
   
   // Function to connect to a specific reader
   const connectToReader = async (reader: any) => {
@@ -779,8 +795,10 @@ function PaymentForm({
       
       // Discover internet-connected readers (WisePOS E, S700) on local network
       // These readers must be registered in Stripe Dashboard and on the same WiFi network
+      // WisePOS E requires a location ID for discovery
       const discoverResult = await terminalRef.current.discoverReaders({
         simulated: false,
+        ...(terminalLocationId ? { location: terminalLocationId } : {}),
       });
       
       console.log('[Card Reader] Discovery result:', discoverResult);

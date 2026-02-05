@@ -565,6 +565,7 @@ function PaymentForm({
   onSuccess,
   onBack,
   existingMemberId,
+  useDayPassToday,
 }: {
   memberData: MemberFormData;
   packageData: any;
@@ -573,6 +574,7 @@ function PaymentForm({
   onSuccess: () => void;
   onBack: () => void;
   existingMemberId?: number;
+  useDayPassToday: boolean;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -1002,7 +1004,10 @@ function PaymentForm({
           customerId,
           isSubscription,
           stripePriceId,
-          memberData,
+          memberData: {
+            ...memberData,
+            useDayPassToday: memberData.packageType === 'daypass' ? useDayPassToday : undefined,
+          },
           packageData: {
             ...packageData,
             finalPrice,
@@ -1145,7 +1150,10 @@ function PaymentForm({
             customerId,
             isSubscription,
             stripePriceId,
-            memberData,
+            memberData: {
+              ...memberData,
+              useDayPassToday: memberData.packageType === 'daypass' ? useDayPassToday : undefined,
+            },
             packageData: {
               ...packageData,
               finalPrice,
@@ -1571,6 +1579,9 @@ export default function KioskMemberCreation({
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [agreementData, setAgreementData] = useState<AgreementFormData | null>(null);
   
+  // Day pass usage option - whether to use day pass today or save for later
+  const [useDayPassToday, setUseDayPassToday] = useState(true);
+  
   // Multi-membership purchase state
   const [membershipQuantity, setMembershipQuantity] = useState(1);
   const [additionalMembers, setAdditionalMembers] = useState<Array<{
@@ -1847,6 +1858,7 @@ export default function KioskMemberCreation({
                   onSuccess={handlePaymentSuccess}
                   onBack={() => setStep("agreement")}
                   existingMemberId={existingMember?.id}
+                  useDayPassToday={useDayPassToday}
                 />
               </Elements>
             </CardContent>
@@ -2250,18 +2262,47 @@ export default function KioskMemberCreation({
                             )}
 
                           {packageType === "daypass" && (
-                            <div className="mt-4">
-                              <p className="text-sm font-medium">
-                                {packageData.totalPunches} visits included
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                $
-                                {(
-                                  packageData.totalPrice /
-                                  packageData.totalPunches
-                                ).toFixed(2)}{" "}
-                                per visit
-                              </p>
+                            <div className="mt-4 space-y-4">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {packageData.totalPunches} visits included
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  $
+                                  {(
+                                    packageData.totalPrice /
+                                    packageData.totalPunches
+                                  ).toFixed(2)}{" "}
+                                  per visit
+                                </p>
+                              </div>
+                              
+                              <div className="border-t pt-4">
+                                <p className="text-sm font-medium mb-3">Would you like to use a visit today?</p>
+                                <div className="flex gap-3">
+                                  <Button
+                                    type="button"
+                                    variant={useDayPassToday ? "default" : "outline"}
+                                    className="flex-1"
+                                    onClick={() => setUseDayPassToday(true)}
+                                  >
+                                    Yes, check me in
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant={!useDayPassToday ? "default" : "outline"}
+                                    className="flex-1"
+                                    onClick={() => setUseDayPassToday(false)}
+                                  >
+                                    No, save for later
+                                  </Button>
+                                </div>
+                                {!useDayPassToday && (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Your {packageData.totalPunches} visits will be saved for future use.
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>

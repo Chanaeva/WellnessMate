@@ -6318,15 +6318,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'active',
         });
         
-        // Automatically check in the day pass user and use one punch
-        await storage.usePunchCardEntry(punchCard.id);
-        await storage.createCheckIn({
-          userId: newUser.id,
-          membershipId: `day-pass-${punchCard.id}`,
-          location: 'Kiosk Registration',
-          method: 'manual',
-        });
-        console.log(`✅ Day pass user ${newUser.firstName} ${newUser.lastName} automatically checked in`);
+        // Only check in and use a punch if member wants to use day pass today
+        if (memberData.useDayPassToday !== false) {
+          await storage.usePunchCardEntry(punchCard.id);
+          await storage.createCheckIn({
+            userId: newUser.id,
+            membershipId: `day-pass-${punchCard.id}`,
+            location: 'Kiosk Registration',
+            method: 'manual',
+          });
+          console.log(`✅ Day pass user ${newUser.firstName} ${newUser.lastName} automatically checked in`);
+        } else {
+          console.log(`📋 Day pass purchased for ${newUser.firstName} ${newUser.lastName} - saved for later use`);
+        }
       }
       
       // Calculate final amount and discount info

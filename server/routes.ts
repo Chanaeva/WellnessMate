@@ -2560,6 +2560,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Add days/punches to an existing day pass
+  app.post("/api/admin/punch-cards/:id/add-punches", isAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { punchesToAdd } = req.body;
+      
+      if (!punchesToAdd || punchesToAdd < 1) {
+        return res.status(400).json({ message: "Must add at least 1 day" });
+      }
+      
+      const updatedCard = await storage.addPunchesToCard(id, punchesToAdd);
+      console.log(`✅ Admin added ${punchesToAdd} days to punch card ${id}`);
+      res.json(updatedCard);
+    } catch (error: any) {
+      console.error("Error adding punches to card:", error);
+      res.status(500).json({ message: error.message || "Server error" });
+    }
+  });
+
   // Admin punch card template management
   app.get("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
     try {

@@ -110,6 +110,7 @@ export interface IStorage {
   getPunchCardById(id: number): Promise<PunchCard | undefined>;
   createPunchCard(punchCard: InsertPunchCard): Promise<PunchCard>;
   usePunchCardEntry(id: number): Promise<PunchCard>;
+  addPunchesToCard(id: number, punchesToAdd: number): Promise<PunchCard>;
   getAvailablePunchCardOptions(): Promise<PunchCardTemplate[]>;
   getActiveDayPassHolders(): Promise<(PunchCard & { user?: User })[]>;
 
@@ -830,6 +831,31 @@ export class DatabaseStorage implements IStorage {
       .update(punchCards)
       .set({ 
         remainingPunches: newRemaining,
+        status: newStatus
+      })
+      .where(eq(punchCards.id, id))
+      .returning();
+
+    return updatedCard;
+  }
+
+  async addPunchesToCard(id: number, punchesToAdd: number): Promise<PunchCard> {
+    const card = await this.getPunchCardById(id);
+    if (!card) {
+      throw new Error("Punch card not found");
+    }
+
+    const newRemaining = card.remainingPunches + punchesToAdd;
+    const newTotal = card.totalPunches + punchesToAdd;
+    
+    // Reactivate if it was exhausted
+    const newStatus = card.status === 'exhausted' ? 'active' : card.status;
+
+    const [updatedCard] = await db
+      .update(punchCards)
+      .set({ 
+        remainingPunches: newRemaining,
+        totalPunches: newTotal,
         status: newStatus
       })
       .where(eq(punchCards.id, id))

@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Clock, Users, Ticket, Search, RefreshCw, Calendar, AlertCircle } from "lucide-react";
+import { Clock, Users, Ticket, Search, RefreshCw, Calendar, AlertCircle, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 
 type PunchCardWithUser = PunchCard & { user?: User };
@@ -22,6 +23,11 @@ export default function AdminDayPasses() {
     startTime: "",
     endTime: ""
   });
+  const [addDaysDialog, setAddDaysDialog] = useState<{ open: boolean; card: PunchCardWithUser | null }>({
+    open: false,
+    card: null
+  });
+  const [daysToAdd, setDaysToAdd] = useState(1);
 
   const { data: activePunchCards = [], isLoading: cardsLoading, refetch: refetchCards } = useQuery<PunchCardWithUser[]>({
     queryKey: ["/api/admin/active-punch-cards"],
@@ -78,12 +84,33 @@ export default function AdminDayPasses() {
     );
   });
 
+  const addPunchesMutation = useMutation({
+    mutationFn: async ({ cardId, punchesToAdd }: { cardId: number; punchesToAdd: number }) => {
+      const res = await apiRequest("POST", `/api/admin/punch-cards/${cardId}/add-punches`, { punchesToAdd });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+      toast({ title: "Success", description: `Added ${daysToAdd} day(s) to the day pass` });
+      setAddDaysDialog({ open: false, card: null });
+      setDaysToAdd(1);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleUpdateHours = () => {
     if (!hoursForm.startTime || !hoursForm.endTime) {
       toast({ title: "Error", description: "Please enter both start and end times", variant: "destructive" });
       return;
     }
     updateHoursMutation.mutate(hoursForm);
+  };
+
+  const handleAddDays = () => {
+    if (!addDaysDialog.card) return;
+    addPunchesMutation.mutate({ cardId: addDaysDialog.card.id, punchesToAdd: daysToAdd });
   };
 
   return (
@@ -180,6 +207,7 @@ export default function AdminDayPasses() {
                         <TableHead className="text-center">Used</TableHead>
                         <TableHead>Purchased</TableHead>
                         <TableHead>Expires</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -211,6 +239,19 @@ export default function AdminDayPasses() {
                             ) : (
                               <span className="text-muted-foreground">Never</span>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setAddDaysDialog({ open: true, card });
+                                setDaysToAdd(1);
+                              }}
+                            >
+                              <PlusCircle className="h-4 w-4 mr-1" />
+                              Add Days
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -261,6 +302,38 @@ export default function AdminDayPasses() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={addDaysDialog.open} onOpenChange={(open) => setAddDaysDialog({ open, card: open ? addDaysDialog.card : null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Days to Day Pass</DialogTitle>
+            <DialogDescription>
+              Add additional days to {addDaysDialog.card?.user?.firstName} {addDaysDialog.card?.user?.lastName}'s day pass.
+              Current remaining: {addDaysDialog.card?.remainingPunches} days
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="daysToAdd">Days to Add</Label>
+            <Input
+              id="daysToAdd"
+              type="number"
+              min={1}
+              max={100}
+              value={daysToAdd}
+              onChange={(e) => setDaysToAdd(Math.max(1, parseInt(e.target.value) || 1))}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDaysDialog({ open: false, card: null })}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddDays} disabled={addPunchesMutation.isPending}>
+              {addPunchesMutation.isPending ? "Adding..." : `Add ${daysToAdd} Day${daysToAdd > 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

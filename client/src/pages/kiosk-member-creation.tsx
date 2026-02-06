@@ -947,49 +947,74 @@ function PaymentForm({
 
       console.log('[Card Reader] Payment sent to reader, starting polling...');
 
-      // Step 3: Poll for payment completion
+      // Step 3: Poll reader for card collection completion
       const maxPolls = 120; // 2 minutes (1 poll per second)
       let pollCount = 0;
-      let paymentSucceeded = false;
+      let readerActionDone = false;
       
-      while (pollCount < maxPolls && !paymentSucceeded) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      while (pollCount < maxPolls && !readerActionDone) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         const statusResponse = await fetch(`/api/stripe/terminal/reader-status/${selectedServerReader.id}`);
         const statusResult = await statusResponse.json();
         
-        console.log('[Card Reader] Poll', pollCount, 'status:', statusResult.action?.status);
+        console.log('[Card Reader] Poll', pollCount, 'reader action:', statusResult.action?.status);
         
         if (statusResult.action) {
           if (statusResult.action.status === 'succeeded') {
-            paymentSucceeded = true;
-            console.log('[Card Reader] Payment succeeded!');
+            readerActionDone = true;
+            console.log('[Card Reader] Reader action succeeded (card collected)');
           } else if (statusResult.action.status === 'failed') {
             throw new Error(statusResult.action.failure_message || 'Payment failed on reader');
           } else if (statusResult.action.status === 'in_progress') {
-            // Still waiting for card
             if (pollCount % 10 === 0) {
               console.log('[Card Reader] Still waiting for card...');
             }
           }
         } else {
-          // No action means it completed or was cleared
-          // Check payment intent status directly
-          const piStatusResponse = await fetch(`/api/stripe/payment-intent-status/${paymentIntentId}`);
-          if (piStatusResponse.ok) {
-            const piStatus = await piStatusResponse.json();
-            if (piStatus.status === 'succeeded' || piStatus.status === 'requires_capture') {
-              paymentSucceeded = true;
-              console.log('[Card Reader] Payment intent succeeded!');
-            }
-          }
+          // No action means reader cleared it - card was already collected
+          readerActionDone = true;
+          console.log('[Card Reader] Reader action cleared (card already collected)');
         }
         
         pollCount++;
       }
 
+      if (!readerActionDone) {
+        throw new Error('Card reader timed out. Please try again.');
+      }
+
+      // Step 3b: Poll PaymentIntent status until it confirms succeeded
+      // The reader action succeeding means the card was read, but the PaymentIntent
+      // may still be processing. We need to wait for the actual payment to complete.
+      setReaderMessage('Card accepted! Processing payment...');
+      
+      let paymentSucceeded = false;
+      const maxPiPolls = 30; // 30 seconds max for PI to process
+      let piPollCount = 0;
+      
+      while (piPollCount < maxPiPolls && !paymentSucceeded) {
+        const piStatusResponse = await fetch(`/api/stripe/payment-intent-status/${paymentIntentId}`);
+        if (piStatusResponse.ok) {
+          const piStatus = await piStatusResponse.json();
+          console.log('[Card Reader] PI poll', piPollCount, 'status:', piStatus.status);
+          
+          if (piStatus.status === 'succeeded') {
+            paymentSucceeded = true;
+            console.log('[Card Reader] PaymentIntent confirmed succeeded!');
+          } else if (piStatus.status === 'canceled' || piStatus.status === 'requires_payment_method') {
+            throw new Error('Payment was declined. Please try a different card.');
+          }
+        }
+        
+        if (!paymentSucceeded) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          piPollCount++;
+        }
+      }
+
       if (!paymentSucceeded) {
-        throw new Error('Payment timed out. Please try again.');
+        throw new Error('Payment processing timed out. The charge may still complete — please check before retrying.');
       }
 
       // Step 4: Confirm member creation

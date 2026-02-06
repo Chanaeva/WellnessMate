@@ -6059,7 +6059,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       console.log('💳 Payment Intent status:', paymentIntent.status);
       if (paymentIntent.status !== 'succeeded') {
-        return res.status(400).json({ message: "Payment not completed" });
+        console.error(`❌ Payment not completed. PI ${paymentIntentId} status: ${paymentIntent.status}`);
+        return res.status(400).json({ 
+          message: `Payment not completed (status: ${paymentIntent.status}). Please wait a moment and try again.`,
+          paymentStatus: paymentIntent.status,
+        });
       }
       
       // For kiosk subscription payments (both Terminal and Online), create the subscription now

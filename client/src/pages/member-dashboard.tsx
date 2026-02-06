@@ -100,6 +100,17 @@ export default function MemberDashboard() {
     format(new Date(), "yyyy-MM-dd")
   );
 
+  const { data: businessDateData } = useQuery<{ today: string; timezone: string }>({
+    queryKey: ["/api/business-date"],
+  });
+  const businessToday = businessDateData?.today || format(new Date(), "yyyy-MM-dd");
+
+  useEffect(() => {
+    if (businessDateData?.today) {
+      setSelectedBookingDate(businessDateData.today);
+    }
+  }, [businessDateData?.today]);
+
   // Check if we should auto-open add payment form from URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -625,7 +636,7 @@ export default function MemberDashboard() {
                       type="date"
                       value={selectedBookingDate}
                       onChange={(e) => setSelectedBookingDate(e.target.value)}
-                      min={format(new Date(), "yyyy-MM-dd")}
+                      min={businessToday}
                       className="border rounded-md px-3 py-2 text-sm bg-background"
                     />
                   </div>
@@ -719,12 +730,12 @@ export default function MemberDashboard() {
                   )}
 
                   {/* Upcoming Bookings */}
-                  {mySessionBookings.filter(b => b.status !== 'cancelled' && b.bookingDate >= format(new Date(), 'yyyy-MM-dd')).length > 0 && (
+                  {mySessionBookings.filter(b => b.status !== 'cancelled' && b.bookingDate >= businessToday).length > 0 && (
                     <div className="pt-4 border-t">
                       <h4 className="font-medium mb-2">Your Upcoming Bookings</h4>
                       <div className="space-y-2">
                         {mySessionBookings
-                          .filter(b => b.status !== 'cancelled' && b.bookingDate >= format(new Date(), 'yyyy-MM-dd'))
+                          .filter(b => b.status !== 'cancelled' && b.bookingDate >= businessToday)
                           .sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime())
                           .slice(0, 5)
                           .map((booking) => {

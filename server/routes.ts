@@ -4787,6 +4787,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/business-date", async (_req, res) => {
+    try {
+      const { DateTime } = await import('luxon');
+      const BUSINESS_TIMEZONE = 'America/Chicago';
+      const now = DateTime.now().setZone(BUSINESS_TIMEZONE);
+      res.json({ today: now.toISODate(), timezone: BUSINESS_TIMEZONE });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Member: Book a session
   app.post("/api/session-bookings", async (req, res) => {
     if (!req.isAuthenticated()) {

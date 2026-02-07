@@ -1,51 +1,29 @@
-import sgMail from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 
-let connectionSettings: any;
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 
-async function getCredentials() {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+function createTransporter() {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    throw new Error('Gmail credentials not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD environment variables.');
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=sendgrid',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
-    throw new Error('SendGrid not connected');
-  }
-  return { apiKey: connectionSettings.settings.api_key, email: connectionSettings.settings.from_email };
-}
-
-async function getUncachableSendGridClient() {
-  const { apiKey, email } = await getCredentials();
-  sgMail.setApiKey(apiKey);
-  return {
-    client: sgMail,
-    fromEmail: email
-  };
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_APP_PASSWORD,
+    },
+  });
 }
 
 export async function sendPasswordResetEmail(toEmail: string, resetCode: string, firstName?: string): Promise<boolean> {
   try {
-    const { client, fromEmail } = await getUncachableSendGridClient();
-    
+    const transporter = createTransporter();
+
     const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
       to: toEmail,
-      from: fromEmail,
       subject: 'Wolf Mother Wellness - Password Reset Code',
       text: `Hi ${firstName || 'there'},\n\nYour password reset code is: ${resetCode}\n\nThis code will expire in 15 minutes.\n\nIf you did not request a password reset, please ignore this email.\n\nBest regards,\nWolf Mother Wellness Team`,
       html: `
@@ -64,10 +42,11 @@ export async function sendPasswordResetEmail(toEmail: string, resetCode: string,
       `
     };
 
-    await client.send(msg);
+    await transporter.sendMail(msg);
+    console.log(`Password reset email sent to ${toEmail}`);
     return true;
   } catch (error) {
-    console.error('SendGrid email error:', error);
+    console.error('Gmail email error:', error);
     return false;
   }
 }
@@ -79,20 +58,20 @@ export async function sendSessionBookingNotification(
   bookingDate: string
 ): Promise<boolean> {
   try {
-    const { client, fromEmail } = await getUncachableSendGridClient();
-    
+    const transporter = createTransporter();
+
     const formattedDate = new Date(bookingDate).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-    
+
     const sessionLabel = sessionType === 'morning' ? 'Morning Session' : 'Evening Session';
-    
+
     const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
       to: 'info@wolfmothertulsa.com',
-      from: fromEmail,
       subject: `Session Booking: ${memberName} - ${sessionLabel} on ${formattedDate}`,
       text: `New Session Booking\n\nMember: ${memberName}\nEmail: ${memberEmail}\nSession: ${sessionLabel}\nDate: ${formattedDate}\n\nThis is an automated notification from Wolf Mother Wellness.`,
       html: `
@@ -124,11 +103,11 @@ export async function sendSessionBookingNotification(
       `
     };
 
-    await client.send(msg);
+    await transporter.sendMail(msg);
     console.log(`Session booking notification sent for ${memberName} - ${sessionLabel} on ${formattedDate}`);
     return true;
   } catch (error) {
-    console.error('SendGrid session booking notification error:', error);
+    console.error('Gmail session booking notification error:', error);
     return false;
   }
 }

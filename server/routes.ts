@@ -364,6 +364,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // STRIPE TERMINAL SPLASH SCREEN ROUTES
+  // ============================================
+
+  // Get current splash screen configuration
+  app.get("/api/stripe/terminal/splash-screen", async (req, res) => {
+    if (!req.isAuthenticated() || !['admin'].includes(req.user?.role || '')) {
+      return res.sendStatus(403);
+    }
+    try {
+      const configs = await stripe.terminal.configurations.list({ limit: 10 });
+      
+      let splashConfig = configs.data.find(c => 
+        (c as any).bbpos_wisepos_e?.splashscreen
+      );
+      
+      if (!splashConfig) {
+        splashConfig = configs.data.find(c => (c as any).is_account_default);
+      }
+      
+      if (splashConfig && (splashConfig as any).bbpos_wisepos_e?.splashscreen) {
+        const fileId = (splashConfig as any).bbpos_wisepos_e.splashscreen;
+        let fileUrl = null;
+        try {
+          const file = await stripe.files.retrieve(fileId);
+          fileUrl = file.url;
+        } catch (e) {}
+        
+        res.json({
+          configurationId: splashConfig.id,
+          fileId,
+          fileUrl,
+          isAccountDefault: (splashConfig as any).is_account_default || false,
+        });
+      } else {
+        res.json({ configurationId: null, fileId: null, fileUrl: null });
+      }
+    } catch (error: any) {
+      console.error("Failed to get splash screen config:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Upload and set splash screen for WisePOS E reader
+  app.post("/api/stripe/terminal/splash-screen", galleryUpload.single('image'), async (req, res) => {
+    if (!req.isAuthenticated() || !['admin'].includes(req.user?.role || '')) {
+      return res.sendStatus(403);
+    }
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "Image file is required" });
+      }
+
+      console.log(`[Terminal] Uploading splash screen: ${req.file.originalname} (${req.file.size} bytes)`);
+
+      const file = await stripe.files.create({
+        purpose: 'terminal_reader_splashscreen' as any,
+        file: {
+          data: req.file.buffer,
+          name: req.file.originalname,
+          type: req.file.mimetype,
+        },
+      });
+
+      console.log(`[Terminal] File uploaded to Stripe: ${file.id}`);
+
+      const configs = await stripe.terminal.configurations.list({ limit: 10 });
+      let existingConfig = configs.data.find(c => 
+        (c as any).bbpos_wisepos_e?.splashscreen
+      );
+
+      let configuration;
+      if (existingConfig) {
+        configuration = await stripe.terminal.configurations.update(existingConfig.id, {
+          bbpos_wisepos_e: {
+            splashscreen: file.id,
+          },
+        });
+        console.log(`[Terminal] Updated existing configuration: ${configuration.id}`);
+      } else {
+        configuration = await stripe.terminal.configurations.create({
+          bbpos_wisepos_e: {
+            splashscreen: file.id,
+          },
+        });
+        console.log(`[Terminal] Created new configuration: ${configuration.id}`);
+      }
+
+      const locations = await stripe.terminal.locations.list({ limit: 1 });
+      if (locations.data.length > 0) {
+        const locationId = locations.data[0].id;
+        await stripe.terminal.locations.update(locationId, {
+          configuration_overrides: configuration.id,
+        });
+        console.log(`[Terminal] Applied configuration to location: ${locationId}`);
+      }
+
+      res.json({
+        success: true,
+        configurationId: configuration.id,
+        fileId: file.id,
+        fileUrl: file.url,
+        message: "Splash screen uploaded and applied. It will appear on your reader within 10 minutes.",
+      });
+    } catch (error: any) {
+      console.error("[Terminal] Failed to set splash screen:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove splash screen from reader
+  app.delete("/api/stripe/terminal/splash-screen", async (req, res) => {
+    if (!req.isAuthenticated() || !['admin'].includes(req.user?.role || '')) {
+      return res.sendStatus(403);
+    }
+    try {
+      const configs = await stripe.terminal.configurations.list({ limit: 10 });
+      const splashConfig = configs.data.find(c => 
+        (c as any).bbpos_wisepos_e?.splashscreen
+      );
+
+      if (splashConfig) {
+        await stripe.terminal.configurations.update(splashConfig.id, {
+          bbpos_wisepos_e: {
+            splashscreen: '',
+          },
+        });
+        console.log(`[Terminal] Removed splash screen from configuration: ${splashConfig.id}`);
+      }
+
+      res.json({ success: true, message: "Splash screen removed. Reader will return to default display within 10 minutes." });
+    } catch (error: any) {
+      console.error("[Terminal] Failed to remove splash screen:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================
   // ONE-TIME ADMIN SETUP ROUTES (for production)
   // ============================================
   

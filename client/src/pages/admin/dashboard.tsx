@@ -47,8 +47,7 @@ import AdminSessionBookings from "./session-bookings";
 import StaffItems from "@/pages/staff-items";
 import AdminDayPasses from "./day-passes";
 import AdminCheckIns from "./check-ins";
-// Hidden for now - Card Readers requires WiFi reader hardware
-// import AdminCardReaders from "./card-readers";
+import AdminCardReaderSplash from "./card-reader-splash";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -198,6 +197,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="landing-page" className="flex-shrink-0">Landing Page</TabsTrigger>
             <TabsTrigger value="notifications" className="flex-shrink-0">Notifications</TabsTrigger>
             <TabsTrigger value="analytics" className="flex-shrink-0">Analytics</TabsTrigger>
+            <TabsTrigger value="card-reader" className="flex-shrink-0">Card Reader</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -436,6 +436,11 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Card Reader Tab */}
+          <TabsContent value="card-reader" className="space-y-6">
+            <AdminCardReaderSplash />
           </TabsContent>
 
         </Tabs>

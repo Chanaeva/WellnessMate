@@ -14,7 +14,7 @@ import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
-import { sendSessionBookingNotification } from "./email";
+import { sendSessionBookingNotification, sendPasswordResetEmail } from "./email";
 
 const scryptAsync = promisify(scrypt);
 
@@ -4599,6 +4599,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Password reset successfully" });
     } catch (error: any) {
       console.error("SMS reset verification error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Email Password Reset - Request code
+  app.post("/api/password-reset-request", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.json({ emailSent: true, message: "If an account exists with this email, a reset code will be sent." });
+      }
+
+      const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        token: resetCode,
+        method: 'email',
+        expiresAt,
+        used: false
+      });
+
+      const emailSent = await sendPasswordResetEmail(email, resetCode, user.firstName || undefined);
+
+      if (emailSent) {
+        res.json({ emailSent: true, message: "Reset code sent to your email." });
+      } else {
+        res.status(500).json({ message: "Failed to send reset email. Please try again later." });
+      }
+    } catch (error: any) {
+      console.error("Email password reset request error:", error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  // Email Password Reset - Verify code and reset password
+  app.post("/api/password-reset", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Reset code and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(token);
+      if (!resetToken || resetToken.used || resetToken.method !== 'email') {
+        return res.status(400).json({ message: "Invalid or expired reset code" });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ message: "Reset code has expired" });
+      }
+
+      const salt = randomBytes(16).toString("hex");
+      const hashedPassword = await scryptAsync(newPassword, salt, 64) as Buffer;
+      const hashedPasswordString = `${hashedPassword.toString('hex')}.${salt}`;
+      await storage.updateUserPassword(resetToken.userId, hashedPasswordString);
+
+      await storage.markTokenAsUsed(resetToken.id);
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error: any) {
+      console.error("Email password reset error:", error);
       res.status(500).json({ message: "Failed to reset password" });
     }
   });

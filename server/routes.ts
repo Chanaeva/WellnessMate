@@ -429,14 +429,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Terminal] File uploaded to Stripe: ${file.id}`);
 
-      const configs = await stripe.terminal.configurations.list({ limit: 10 });
-      let existingConfig = configs.data.find(c => 
-        (c as any).bbpos_wisepos_e?.splashscreen
+      const configs = await stripe.terminal.configurations.list({ limit: 100 });
+      const accountDefault = configs.data.find(c => (c as any).is_account_default);
+      const existingWithSplash = configs.data.find(c =>
+        !(c as any).is_account_default && (c as any).bbpos_wisepos_e?.splashscreen
       );
 
       let configuration;
-      if (existingConfig) {
-        configuration = await stripe.terminal.configurations.update(existingConfig.id, {
+      if (accountDefault) {
+        configuration = await stripe.terminal.configurations.update(accountDefault.id, {
+          bbpos_wisepos_e: {
+            splashscreen: file.id,
+          },
+        });
+        console.log(`[Terminal] Updated account default configuration: ${configuration.id}`);
+      } else if (existingWithSplash) {
+        configuration = await stripe.terminal.configurations.update(existingWithSplash.id, {
           bbpos_wisepos_e: {
             splashscreen: file.id,
           },
@@ -449,15 +457,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
         console.log(`[Terminal] Created new configuration: ${configuration.id}`);
-      }
-
-      const locations = await stripe.terminal.locations.list({ limit: 1 });
-      if (locations.data.length > 0) {
-        const locationId = locations.data[0].id;
-        await stripe.terminal.locations.update(locationId, {
-          configuration_overrides: configuration.id,
-        });
-        console.log(`[Terminal] Applied configuration to location: ${locationId}`);
       }
 
       res.json({

@@ -736,7 +736,7 @@ export default function MemberDashboard() {
                       <div className="space-y-2">
                         {mySessionBookings
                           .filter(b => b.status !== 'cancelled' && b.bookingDate >= businessToday)
-                          .sort((a, b) => new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime())
+                          .sort((a, b) => new Date(a.bookingDate + 'T12:00:00').getTime() - new Date(b.bookingDate + 'T12:00:00').getTime())
                           .slice(0, 5)
                           .map((booking) => {
                             const session = availableSessions.find(s => s.sessionType === booking.sessionType);
@@ -749,7 +749,7 @@ export default function MemberDashboard() {
                                 <div className="flex items-center gap-2">
                                   <Icon className="h-4 w-4" />
                                   <span className="font-medium">
-                                    {format(new Date(booking.bookingDate), "EEE, MMM d")}
+                                    {format(new Date(booking.bookingDate + 'T12:00:00'), "EEE, MMM d")}
                                   </span>
                                   <span className="text-sm text-muted-foreground capitalize">
                                     {booking.sessionType} ({session?.startTime} - {session?.endTime})
@@ -1077,7 +1077,7 @@ export default function MemberDashboard() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {membership.planType.charAt(0).toUpperCase() + membership.planType.slice(1)} Plan • 
-                            Expires: {format(new Date(membership.endDate), "MMM d, yyyy")}
+                            Expires: {format(new Date(membership.endDate + 'T12:00:00'), "MMM d, yyyy")}
                           </p>
                         </div>
                         <div className="text-right">

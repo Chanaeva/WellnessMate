@@ -938,7 +938,7 @@ export default function AdminMembers() {
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap text-gray-900 hidden lg:table-cell" data-testid={`text-end-date-${member.id}`}>
                         {member.membership?.endDate
                           ? format(
-                              new Date(member.membership.endDate),
+                              new Date(member.membership.endDate + 'T12:00:00'),
                               "MMM d, yyyy",
                             )
                           : "N/A"}
@@ -1235,7 +1235,7 @@ export default function AdminMembers() {
                         <h5 className="text-xs font-medium text-gray-500 mb-1">Start Date</h5>
                         <p className="text-sm" data-testid="text-view-start-date">
                           {selectedMember.membership.startDate
-                            ? format(new Date(selectedMember.membership.startDate), "MMM d, yyyy")
+                            ? format(new Date(selectedMember.membership.startDate + 'T12:00:00'), "MMM d, yyyy")
                             : "N/A"}
                         </p>
                       </div>
@@ -1243,7 +1243,7 @@ export default function AdminMembers() {
                         <h5 className="text-xs font-medium text-gray-500 mb-1">End Date</h5>
                         <p className="text-sm" data-testid="text-view-end-date">
                           {selectedMember.membership.endDate
-                            ? format(new Date(selectedMember.membership.endDate), "MMM d, yyyy")
+                            ? format(new Date(selectedMember.membership.endDate + 'T12:00:00'), "MMM d, yyyy")
                             : "N/A"}
                         </p>
                       </div>
@@ -1800,7 +1800,7 @@ export default function AdminMembers() {
                     <p className="font-semibold mb-2">This member will lose:</p>
                     <ul className="list-disc list-inside space-y-1 text-sm">
                       <li>Access to all wellness center facilities</li>
-                      <li>Remaining time until {selectedMember.membership.endDate ? format(new Date(selectedMember.membership.endDate), 'MMMM d, yyyy') : 'end date'}</li>
+                      <li>Remaining time until {selectedMember.membership.endDate ? format(new Date(selectedMember.membership.endDate + 'T12:00:00'), 'MMMM d, yyyy') : 'end date'}</li>
                       <li>Auto-renewal of their {selectedMember.membership.planType} plan</li>
                       {selectedMember.membership.stripeSubscriptionId && (
                         <li>Their Stripe subscription will be cancelled</li>

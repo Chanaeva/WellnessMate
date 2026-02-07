@@ -293,7 +293,7 @@ export default function AdminDashboard() {
                                 : booking.user?.email || `Member #${booking.userId}`}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {booking.bookingDate ? format(new Date(booking.bookingDate), "MMM d, yyyy") : "N/A"}
+                              {booking.bookingDate ? format(new Date(booking.bookingDate + 'T12:00:00'), "MMM d, yyyy") : "N/A"}
                             </p>
                           </div>
                           <Badge variant={booking.sessionType === 'morning' ? 'default' : 'secondary'}>

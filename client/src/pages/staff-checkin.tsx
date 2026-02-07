@@ -226,7 +226,7 @@ export default function StaffCheckIn() {
                                   Active: {member.membership.planType}
                                 </Badge>
                                 <span className="text-xs text-gray-500" data-testid={`membership-dates-${member.id}`}>
-                                  Until {new Date(member.membership.endDate).toLocaleDateString()}
+                                  Until {new Date(member.membership.endDate + 'T12:00:00').toLocaleDateString()}
                                 </span>
                               </div>
                             )}

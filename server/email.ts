@@ -60,7 +60,7 @@ export async function sendSessionBookingNotification(
   try {
     const transporter = createTransporter();
 
-    const formattedDate = new Date(bookingDate).toLocaleDateString('en-US', {
+    const formattedDate = new Date(bookingDate + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',

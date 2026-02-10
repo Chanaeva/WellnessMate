@@ -1607,6 +1607,10 @@ export default function KioskMemberCreation({
   // Day pass usage option - whether to use day pass today or save for later
   const [useDayPassToday, setUseDayPassToday] = useState(true);
   
+  // Day pass quantity state
+  const [dayPassQuantity, setDayPassQuantity] = useState(1);
+  const MAX_DAY_PASSES = 10;
+  
   // Multi-membership purchase state
   const [membershipQuantity, setMembershipQuantity] = useState(1);
   const [additionalMembers, setAdditionalMembers] = useState<Array<{
@@ -1747,8 +1751,8 @@ export default function KioskMemberCreation({
       ? packageData.monthlyPrice
       : packageData.totalPrice;
     
-    // Calculate total price based on quantity (only for memberships)
-    const quantity = packageType === "membership" ? membershipQuantity : 1;
+    // Calculate total price based on quantity
+    const quantity = packageType === "membership" ? membershipQuantity : dayPassQuantity;
     const totalPrice = unitPrice * quantity;
 
     setSelectedPackage({
@@ -2114,6 +2118,43 @@ export default function KioskMemberCreation({
                     />
                   )}
 
+                  {/* Quantity selector for day passes */}
+                  {packageType === "daypass" && packageId && (
+                    <div className="space-y-4 border rounded-lg p-4 bg-amber-50/50">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-medium">
+                          Number of Day Passes
+                        </Label>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDayPassQuantity(Math.max(1, dayPassQuantity - 1))}
+                            disabled={dayPassQuantity <= 1}
+                          >
+                            -
+                          </Button>
+                          <span className="text-xl font-bold w-8 text-center">{dayPassQuantity}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDayPassQuantity(Math.min(MAX_DAY_PASSES, dayPassQuantity + 1))}
+                            disabled={dayPassQuantity >= MAX_DAY_PASSES}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
+                      {dayPassQuantity > 1 && (
+                        <p className="text-sm text-amber-700">
+                          Purchasing {dayPassQuantity} day passes
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Quantity selector for memberships */}
                   {packageType === "membership" && packageId && !existingMember && (
                     <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50">
@@ -2248,17 +2289,27 @@ export default function KioskMemberCreation({
                                   × {membershipQuantity}
                                 </span>
                               )}
+                              {packageType === "daypass" && dayPassQuantity > 1 && (
+                                <span className="text-sm font-normal text-gray-500 ml-2">
+                                  × {dayPassQuantity}
+                                </span>
+                              )}
                             </h3>
                             <p className="text-green-600 font-bold text-xl">
                               $
                               {packageType === "membership"
                                 ? ((packageData.monthlyPrice * membershipQuantity) / 100).toFixed(2)
-                                : (packageData.totalPrice / 100).toFixed(2)}
+                                : ((packageData.totalPrice * dayPassQuantity) / 100).toFixed(2)}
                               {packageType === "membership" && "/month"}
                             </p>
                             {packageType === "membership" && membershipQuantity > 1 && (
                               <p className="text-sm text-gray-500">
                                 ${(packageData.monthlyPrice / 100).toFixed(2)} each × {membershipQuantity} members
+                              </p>
+                            )}
+                            {packageType === "daypass" && dayPassQuantity > 1 && (
+                              <p className="text-sm text-gray-500">
+                                ${(packageData.totalPrice / 100).toFixed(2)} each × {dayPassQuantity} passes
                               </p>
                             )}
                           </div>
@@ -2290,13 +2341,18 @@ export default function KioskMemberCreation({
                             <div className="mt-4 space-y-4">
                               <div>
                                 <p className="text-sm font-medium">
-                                  {packageData.totalPunches} visits included
+                                  {packageData.totalPunches * dayPassQuantity} visits included
+                                  {dayPassQuantity > 1 && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      ({packageData.totalPunches} per pass × {dayPassQuantity})
+                                    </span>
+                                  )}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   $
                                   {(
-                                    packageData.totalPrice /
-                                    packageData.totalPunches
+                                    (packageData.totalPrice * dayPassQuantity) /
+                                    (packageData.totalPunches * dayPassQuantity)
                                   ).toFixed(2)}{" "}
                                   per visit
                                 </p>
@@ -2324,7 +2380,7 @@ export default function KioskMemberCreation({
                                 </div>
                                 {!useDayPassToday && (
                                   <p className="text-xs text-muted-foreground mt-2">
-                                    Your {packageData.totalPunches} visits will be saved for future use.
+                                    Your {packageData.totalPunches * dayPassQuantity} visits will be saved for future use.
                                   </p>
                                 )}
                               </div>

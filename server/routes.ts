@@ -6194,10 +6194,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // DAY PASSES: Create one-time PaymentIntent (existing behavior)
+      const dayPassQuantity = Math.min(Math.max(packageData.quantity || 1, 1), 10);
+      const dayPassDescription = dayPassQuantity > 1 
+        ? `${packageData.name} × ${dayPassQuantity}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`
+        : `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`;
       const paymentIntentConfig: any = {
         amount: Math.round(finalAmount),
         currency: 'usd',
-        description: `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`,
+        description: dayPassDescription,
         metadata: {
           memberFirstName: validatedMemberData.firstName,
           memberLastName: validatedMemberData.lastName,
@@ -6206,6 +6210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           packageType: validatedMemberData.packageType,
           packageId: validatedMemberData.packageId,
           packageName: packageData.name,
+          quantity: dayPassQuantity.toString(),
           originalAmount: originalPrice.toString(),
           discountType: discountData?.type || '',
           discountValue: discountData?.value?.toString() || '',
@@ -6551,29 +6556,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
       } else if (memberData.packageType === 'daypass') {
         const totalPunches = Math.max(packageData.totalPunches || 5, 1); // Ensure at least 1 punch
-        const punchCard = await storage.createPunchCard({
-          userId: newUser.id,
-          templateId: parseInt(memberData.packageId),
-          name: packageData.name || 'Day Pass Package',
-          totalPunches: totalPunches,
-          remainingPunches: totalPunches, // Start with full punches
-          pricePerPunch: Math.round((packageData.price || 2000) / totalPunches),
-          totalPrice: packageData.price || 2000,
-          status: 'active',
-        });
+        const dayPassQuantity = Math.min(Math.max(packageData.quantity || 1, 1), 10); // Support multiple day passes (max 10)
+        const unitPrice = packageData.price || 2000;
         
-        // Only check in and use a punch if member wants to use day pass today
-        if (memberData.useDayPassToday !== false) {
-          await storage.usePunchCardEntry(punchCard.id);
+        console.log(`📋 Creating ${dayPassQuantity} day pass(es) for ${newUser.firstName} ${newUser.lastName}`);
+        
+        let firstPunchCardId: number | null = null;
+        
+        for (let i = 0; i < dayPassQuantity; i++) {
+          const punchCard = await storage.createPunchCard({
+            userId: newUser.id,
+            templateId: parseInt(memberData.packageId),
+            name: packageData.name || 'Day Pass Package',
+            totalPunches: totalPunches,
+            remainingPunches: totalPunches,
+            pricePerPunch: Math.round(unitPrice / totalPunches),
+            totalPrice: unitPrice,
+            status: 'active',
+          });
+          
+          if (i === 0) {
+            firstPunchCardId = punchCard.id;
+          }
+        }
+        
+        // Only check in and use a punch if member wants to use day pass today (uses first punch card)
+        if (memberData.useDayPassToday !== false && firstPunchCardId) {
+          await storage.usePunchCardEntry(firstPunchCardId);
           await storage.createCheckIn({
             userId: newUser.id,
-            membershipId: `day-pass-${punchCard.id}`,
+            membershipId: `day-pass-${firstPunchCardId}`,
             location: 'Kiosk Registration',
             method: 'manual',
           });
           console.log(`✅ Day pass user ${newUser.firstName} ${newUser.lastName} automatically checked in`);
         } else {
-          console.log(`📋 Day pass purchased for ${newUser.firstName} ${newUser.lastName} - saved for later use`);
+          console.log(`📋 ${dayPassQuantity} day pass(es) purchased for ${newUser.firstName} ${newUser.lastName} - saved for later use`);
         }
       }
       
@@ -6592,7 +6610,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountType: hasDiscount ? discountData.type : null,
         discountValue: hasDiscount ? discountData.value : null,
         discountReason: hasDiscount ? discountData.reason : null,
-        description: `${packageData.name} - Kiosk Purchase${hasDiscount ? ` (${discountData.type === 'percentage' ? discountData.value + '%' : '$' + (discountData.amountCents/100).toFixed(2)} discount)` : ''}`,
+        description: `${packageData.name}${(packageData.quantity || 1) > 1 ? ` × ${packageData.quantity}` : ''} - Kiosk Purchase${hasDiscount ? ` (${discountData.type === 'percentage' ? discountData.value + '%' : '$' + (discountData.amountCents/100).toFixed(2)} discount)` : ''}`,
         status: 'successful',
         method: 'credit_card',
         stripePaymentIntentId: paymentIntent.id,

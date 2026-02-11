@@ -222,6 +222,7 @@ export interface IStorage {
   getGuestWaiversByEmail(email: string): Promise<GuestWaiver[]>;
   getTodayGuestWaivers(): Promise<GuestWaiver[]>;
   getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }>;
+  getPaginatedGuestWaivers(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: GuestWaiver[]; total: number }>;
   
   // Site settings methods
   getSiteSetting(key: string): Promise<SiteSetting | undefined>;
@@ -933,6 +934,9 @@ export class DatabaseStorage implements IStorage {
       case 'month':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
       default:
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
@@ -942,18 +946,24 @@ export class DatabaseStorage implements IStorage {
       .from(checkIns)
       .where(gte(checkIns.timestamp, startDate));
 
-    // Group by date for chart data
-    const visitsByDate = checkInResults.reduce((acc: any, checkIn) => {
+    const dateMap: Record<string, number> = {};
+    checkInResults.forEach(checkIn => {
       if (checkIn.timestamp) {
-        const date = new Date(checkIn.timestamp).toDateString();
-        acc[date] = (acc[date] || 0) + 1;
+        const d = new Date(checkIn.timestamp);
+        const isoDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        dateMap[isoDate] = (dateMap[isoDate] || 0) + 1;
       }
-      return acc;
-    }, {});
+    });
+
+    const visitsByDate = Object.entries(dateMap)
+      .map(([date, visits]) => ({ date, visits }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const dayCount = Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
 
     return {
       totalVisits: checkInResults.length,
-      averageDaily: Math.round(checkInResults.length / Math.max(1, Math.ceil((now.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)))),
+      averageDaily: Math.round(checkInResults.length / dayCount),
       visitsByDate,
       period
     };
@@ -1893,6 +1903,60 @@ export class DatabaseStorage implements IStorage {
       thisWeek: Number(weekResult?.count || 0),
       thisMonth: Number(monthResult?.count || 0),
     };
+  }
+
+  async getPaginatedGuestWaivers(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: GuestWaiver[]; total: number }> {
+    const conditions: any[] = [];
+    
+    if (period && period !== 'all') {
+      const now = new Date();
+      let startDate: Date;
+      switch (period) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - now.getDay());
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        default:
+          startDate = new Date(0);
+      }
+      conditions.push(gte(guestWaivers.checkInTimestamp, startDate));
+    }
+
+    if (search && search.trim()) {
+      const searchLower = search.trim().toLowerCase();
+      conditions.push(
+        or(
+          sql`LOWER(${guestWaivers.firstName}) LIKE ${'%' + searchLower + '%'}`,
+          sql`LOWER(${guestWaivers.lastName}) LIKE ${'%' + searchLower + '%'}`,
+          sql`LOWER(${guestWaivers.email}) LIKE ${'%' + searchLower + '%'}`,
+          sql`LOWER(${guestWaivers.phoneNumber}) LIKE ${'%' + searchLower + '%'}`
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(guestWaivers)
+      .where(whereClause);
+
+    const data = await db
+      .select()
+      .from(guestWaivers)
+      .where(whereClause)
+      .orderBy(desc(guestWaivers.checkInTimestamp))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { data, total: Number(countResult?.count || 0) };
   }
 
   // Site settings methods

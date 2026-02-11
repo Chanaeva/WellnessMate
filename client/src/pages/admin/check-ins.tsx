@@ -36,27 +36,37 @@ export default function AdminCheckIns() {
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
   const [selectedPunchMember, setSelectedPunchMember] = useState<MemberSearchResult | null>(null);
   const [deductionReason, setDeductionReason] = useState("");
+  const [waiverSearchTerm, setWaiverSearchTerm] = useState("");
+  const [waiverFilterPeriod, setWaiverFilterPeriod] = useState("all");
+  const [waiverPage, setWaiverPage] = useState(1);
+  const [waiverPageSize] = useState(20);
   const { toast } = useToast();
 
-  const { data: checkInsData, isLoading } = useQuery({
+  const { data: checkInsData, isLoading } = useQuery<{data: any[]; total: number}>({
     queryKey: ["/api/admin/check-ins", currentPage, pageSize],
     staleTime: 2 * 60 * 1000,
   });
 
-  const { data: todayCheckIns } = useQuery({
+  const { data: todayCheckIns } = useQuery<any[]>({
     queryKey: ["/api/check-ins/today"],
     staleTime: 1 * 60 * 1000,
   });
 
   // Guest waiver queries
-  const { data: todayGuestWaivers, isLoading: isLoadingGuestWaivers } = useQuery<any[]>({
-    queryKey: ["/api/admin/guest-waivers/today"],
-    staleTime: 1 * 60 * 1000,
-  });
-
-  const { data: guestWaiverAnalytics } = useQuery<{totalWaivers: number; todayWaivers: number; weekWaivers: number; monthWaivers: number}>({
+  const { data: guestWaiverAnalytics } = useQuery<{total: number; today: number; thisWeek: number; thisMonth: number}>({
     queryKey: ["/api/admin/guest-waivers/analytics"],
     staleTime: 5 * 60 * 1000,
+  });
+
+  const waiverQueryParams = new URLSearchParams({
+    page: waiverPage.toString(),
+    pageSize: waiverPageSize.toString(),
+    period: waiverFilterPeriod,
+    ...(waiverSearchTerm ? { search: waiverSearchTerm } : {}),
+  });
+  const { data: paginatedWaivers, isLoading: isLoadingPaginatedWaivers } = useQuery<{data: any[]; total: number}>({
+    queryKey: [`/api/admin/guest-waivers/paginated?${waiverQueryParams}`],
+    staleTime: 1 * 60 * 1000,
   });
 
   const { data: memberSearchResults, isLoading: isSearching } = useQuery({
@@ -243,7 +253,7 @@ export default function AdminCheckIns() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-purple-600">
-                {todayGuestWaivers?.length || 0}
+                {guestWaiverAnalytics?.today || 0}
               </div>
               <p className="text-sm text-muted-foreground">waivers today</p>
             </CardContent>
@@ -406,14 +416,14 @@ export default function AdminCheckIns() {
           </CardContent>
         </Card>
 
-        {/* Guest Waivers Section */}
+        {/* Guest Waivers Section - Full History */}
         <Card>
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5 text-purple-600" />
-                  Guest Waivers Today
+                  Guest Waiver Log
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
                   Walk-in guests who signed liability waivers
@@ -422,15 +432,19 @@ export default function AdminCheckIns() {
               {guestWaiverAnalytics && (
                 <div className="flex gap-4 text-sm">
                   <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.weekWaivers}</div>
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.today}</div>
+                    <div className="text-muted-foreground text-xs">Today</div>
+                  </div>
+                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.thisWeek}</div>
                     <div className="text-muted-foreground text-xs">This Week</div>
                   </div>
                   <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.monthWaivers}</div>
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.thisMonth}</div>
                     <div className="text-muted-foreground text-xs">This Month</div>
                   </div>
                   <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.totalWaivers}</div>
+                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.total}</div>
                     <div className="text-muted-foreground text-xs">All Time</div>
                   </div>
                 </div>
@@ -438,11 +452,38 @@ export default function AdminCheckIns() {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search by name, email, or phone..."
+                  value={waiverSearchTerm}
+                  onChange={(e) => {
+                    setWaiverSearchTerm(e.target.value);
+                    setWaiverPage(1);
+                  }}
+                  className="pl-10"
+                />
+              </div>
+              
+              <Select value={waiverFilterPeriod} onValueChange={(val) => { setWaiverFilterPeriod(val); setWaiverPage(1); }}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Time</TableHead>
+                    <TableHead>Date & Time</TableHead>
                     <TableHead>Guest Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
@@ -450,23 +491,26 @@ export default function AdminCheckIns() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingGuestWaivers ? (
+                  {isLoadingPaginatedWaivers ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8">
                         Loading guest waivers...
                       </TableCell>
                     </TableRow>
-                  ) : !todayGuestWaivers || todayGuestWaivers.length === 0 ? (
+                  ) : !paginatedWaivers?.data || paginatedWaivers.data.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No guest waivers signed today
+                        No guest waivers found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    todayGuestWaivers.map((waiver: any) => (
+                    paginatedWaivers.data.map((waiver: any) => (
                       <TableRow key={waiver.id}>
                         <TableCell>
                           <div className="font-medium">
+                            {format(new Date(waiver.waiverSignedAt), "MMM dd, yyyy")}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
                             {format(new Date(waiver.waiverSignedAt), "h:mm a")}
                           </div>
                         </TableCell>
@@ -492,6 +536,32 @@ export default function AdminCheckIns() {
                 </TableBody>
               </Table>
             </div>
+
+            {paginatedWaivers && paginatedWaivers.total > waiverPageSize && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing {((waiverPage - 1) * waiverPageSize) + 1} to {Math.min(waiverPage * waiverPageSize, paginatedWaivers.total)} of {paginatedWaivers.total} waivers
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWaiverPage(p => Math.max(1, p - 1))}
+                    disabled={waiverPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWaiverPage(p => p + 1)}
+                    disabled={waiverPage >= Math.ceil(paginatedWaivers.total / waiverPageSize)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

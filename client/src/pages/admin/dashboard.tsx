@@ -372,6 +372,62 @@ export default function AdminDashboard() {
           <TabsContent value="analytics" className="space-y-6">
             <h2 className="text-2xl font-bold">Analytics & Reports</h2>
 
+            {/* Summary Stat Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Visits</p>
+                      <p className="text-2xl font-bold">{analytics.totalVisits ?? 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Calendar className="h-5 w-5 text-blue-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Daily Average</p>
+                      <p className="text-2xl font-bold">{analytics.averageDaily ?? 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Clock className="h-5 w-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Peak Hour</p>
+                      <p className="text-2xl font-bold">{(peakHours as any).peakHour ?? '—'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Users className="h-5 w-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Peak Visits</p>
+                      <p className="text-2xl font-bold">{(peakHours as any).peakVisits ?? 0}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Visit Analytics Chart */}
             <Card>
               <CardHeader>
@@ -401,39 +457,65 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analytics.visitsByDate || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="date" 
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => format(new Date(value), "MMM dd")}
-                    />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip 
-                      labelFormatter={(value) => format(new Date(value), "EEEE, MMMM do")}
-                    />
-                    <Bar dataKey="visits" fill="#4a6741" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-
-                {/* Hourly Distribution */}
-                <div className="mt-6">
-                  <h4 className="text-lg font-semibold mb-4">Peak Hours Distribution</h4>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={analytics.hourlyData || []}>
+                {(analytics.visitsByDate || []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                    <TrendingUp className="h-12 w-12 mb-3 opacity-30" />
+                    <p className="text-lg font-medium">No visit data for this period</p>
+                    <p className="text-sm">Check-ins will appear here as members visit</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={analytics.visitsByDate || []}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
-                        dataKey="hour" 
+                        dataKey="date" 
                         tick={{ fontSize: 12 }}
-                        tickFormatter={(value) => `${value}:00`}
+                        tickFormatter={(value) => format(new Date(value + 'T12:00:00'), "MMM dd")}
                       />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip />
-                      <Bar dataKey="visits" fill="#6b8e5a" radius={[2, 2, 0, 0]} />
+                      <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                      <Tooltip 
+                        labelFormatter={(value) => format(new Date(value + 'T12:00:00'), "EEEE, MMMM do")}
+                      />
+                      <Bar dataKey="visits" fill="#4a6741" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Peak Hours Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Peak Hours Distribution</CardTitle>
+                <p className="text-sm text-muted-foreground">Based on the last 7 days of check-ins</p>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={(peakHours as any).hourlyData || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="hour" 
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => {
+                        if (value === 0) return '12AM';
+                        if (value < 12) return `${value}AM`;
+                        if (value === 12) return '12PM';
+                        return `${value - 12}PM`;
+                      }}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                    <Tooltip 
+                      labelFormatter={(value) => {
+                        const h = Number(value);
+                        if (h === 0) return '12:00 AM';
+                        if (h < 12) return `${h}:00 AM`;
+                        if (h === 12) return '12:00 PM';
+                        return `${h - 12}:00 PM`;
+                      }}
+                    />
+                    <Bar dataKey="visits" fill="#6b8e5a" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </TabsContent>

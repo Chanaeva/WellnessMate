@@ -1647,6 +1647,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/guest-waivers/paginated", isAdminOrStaff, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 20;
+      const period = req.query.period as string || 'all';
+      const search = req.query.search as string || '';
+      const result = await storage.getPaginatedGuestWaivers(page, pageSize, period, search);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error fetching paginated guest waivers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get today's guest waivers (Admin/Staff only)
   app.get("/api/admin/guest-waivers/today", isAdminOrStaff, async (req, res) => {
     try {

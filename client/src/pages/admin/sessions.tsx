@@ -20,7 +20,8 @@ export default function AdminSessions() {
     endTime: string;
     capacity: number;
     isEnabled: boolean;
-  }>({ startTime: '', endTime: '', capacity: 20, isEnabled: true });
+    bookingGraceMinutes: number;
+  }>({ startTime: '', endTime: '', capacity: 20, isEnabled: true, bookingGraceMinutes: 60 });
   const [dayPassFormData, setDayPassFormData] = useState<{
     startTime: string;
     endTime: string;
@@ -99,14 +100,15 @@ export default function AdminSessions() {
         endTime: session.endTime,
         capacity: session.capacity,
         isEnabled: session.isEnabled,
+        bookingGraceMinutes: session.bookingGraceMinutes ?? 60,
       });
     } else {
-      // Default values for creating new session
       setFormData({
         startTime: sessionType === 'morning' ? '7:00 AM' : '4:00 PM',
         endTime: sessionType === 'morning' ? '12:00 PM' : '9:00 PM',
         capacity: 20,
         isEnabled: true,
+        bookingGraceMinutes: 60,
       });
     }
   };
@@ -201,15 +203,30 @@ export default function AdminSessions() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="morning-capacity">Capacity (max members)</Label>
-                  <Input
-                    id="morning-capacity"
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
-                    min={1}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="morning-capacity">Capacity (max members)</Label>
+                    <Input
+                      id="morning-capacity"
+                      type="number"
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+                      min={1}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="morning-grace">Booking Allowance (minutes)</Label>
+                    <Input
+                      id="morning-grace"
+                      type="number"
+                      value={formData.bookingGraceMinutes}
+                      onChange={(e) => setFormData({ ...formData, bookingGraceMinutes: parseInt(e.target.value) || 0 })}
+                      min={0}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How long after session starts members can still book
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="morning-enabled">Session Enabled</Label>
@@ -246,6 +263,10 @@ export default function AdminSessions() {
                     <div className="flex items-center gap-2">
                       <Users className="h-5 w-5 text-muted-foreground" />
                       <span>Capacity: <strong>{morningSession.capacity}</strong> members</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      <span>Booking Allowance: <strong>{morningSession.bookingGraceMinutes ?? 60}</strong> min after start</span>
                     </div>
                   </>
                 ) : (
@@ -306,15 +327,30 @@ export default function AdminSessions() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="evening-capacity">Capacity (max members)</Label>
-                  <Input
-                    id="evening-capacity"
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
-                    min={1}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="evening-capacity">Capacity (max members)</Label>
+                    <Input
+                      id="evening-capacity"
+                      type="number"
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+                      min={1}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="evening-grace">Booking Allowance (minutes)</Label>
+                    <Input
+                      id="evening-grace"
+                      type="number"
+                      value={formData.bookingGraceMinutes}
+                      onChange={(e) => setFormData({ ...formData, bookingGraceMinutes: parseInt(e.target.value) || 0 })}
+                      min={0}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How long after session starts members can still book
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="evening-enabled">Session Enabled</Label>
@@ -351,6 +387,10 @@ export default function AdminSessions() {
                     <div className="flex items-center gap-2">
                       <Users className="h-5 w-5 text-muted-foreground" />
                       <span>Capacity: <strong>{eveningSession.capacity}</strong> members</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      <span>Booking Allowance: <strong>{eveningSession.bookingGraceMinutes ?? 60}</strong> min after start</span>
                     </div>
                   </>
                 ) : (

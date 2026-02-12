@@ -4932,12 +4932,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid session type" });
       }
       
-      const { startTime, endTime, capacity, isEnabled } = req.body;
+      const { startTime, endTime, capacity, isEnabled, bookingGraceMinutes } = req.body;
       const updated = await storage.updateSessionConfig(sessionType, {
         startTime,
         endTime,
         capacity,
-        isEnabled
+        isEnabled,
+        bookingGraceMinutes,
       });
       res.json(updated);
     } catch (error: any) {
@@ -5095,8 +5096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const sessionStartMinutes = parseTimeToMinutes(config.startTime);
         const sessionEndMinutes = parseTimeToMinutes(config.endTime);
         
-        // Allow booking up to 1 hour after session start time OR until session ends (whichever is later)
-        const bookingGraceMinutes = 60;
+        const bookingGraceMinutes = config.bookingGraceMinutes ?? 60;
         const bookingCutoffMinutes = Math.max(sessionStartMinutes + bookingGraceMinutes, sessionEndMinutes);
         
         if (currentMinutes >= bookingCutoffMinutes) {

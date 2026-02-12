@@ -1654,6 +1654,7 @@ export class DatabaseStorage implements IStorage {
           endTime: data.endTime || (sessionType === 'morning' ? '12:00 PM' : '9:00 PM'),
           capacity: data.capacity || 20,
           isEnabled: data.isEnabled !== undefined ? data.isEnabled : true,
+          bookingGraceMinutes: data.bookingGraceMinutes ?? 60,
         })
         .returning();
       return created;

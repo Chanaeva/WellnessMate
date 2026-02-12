@@ -703,6 +703,7 @@ export const sessionConfigs = pgTable("session_configs", {
   endTime: text("end_time").notNull(), // e.g., "12:00 PM"
   capacity: integer("capacity").notNull().default(20), // Max members per session
   isEnabled: boolean("is_enabled").notNull().default(true),
+  bookingGraceMinutes: integer("booking_grace_minutes").notNull().default(60), // Minutes after session start that booking is still allowed
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

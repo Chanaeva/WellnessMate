@@ -1469,10 +1469,10 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Item not found");
       }
 
-      // Increase available quantity
-      const newQuantity = item.quantityAvailable + 1;
-      if (newQuantity > item.quantityTotal) {
-        throw new Error("Invalid quantity - cannot exceed total quantity");
+      // Increase available quantity (cap at total to handle data inconsistencies)
+      const newQuantity = Math.min(item.quantityAvailable + 1, item.quantityTotal);
+      if (item.quantityAvailable + 1 > item.quantityTotal) {
+        console.warn(`[Inventory] Item ${item.id} (${item.name}): quantity inconsistency detected. Available (${item.quantityAvailable}) already at or exceeding total (${item.quantityTotal}). Capping at total.`);
       }
 
       await tx

@@ -5945,6 +5945,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create Terminal PaymentIntent for item checkout (card reader)
+  app.post("/api/staff/item-checkout-terminal-intent", isStaffOrAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        userId: z.number().int().positive(),
+        itemId: z.number().int().positive(),
+        quantity: z.number().int().positive().default(1),
+      });
+      const { userId, itemId, quantity } = schema.parse(req.body);
+      
+      const item = await storage.getInventoryItemById(itemId);
+      if (!item) {
+        return res.status(404).json({ message: "Item not found" });
+      }
+      
+      if (item.priceInCents <= 0) {
+        return res.status(400).json({ message: "This item has no price" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      const totalAmount = item.priceInCents * quantity;
+      
+      const freshStripe = createStripeClient();
+      const paymentIntent = await freshStripe.paymentIntents.create({
+        amount: totalAmount,
+        currency: 'usd',
+        payment_method_types: ['card_present'],
+        capture_method: 'automatic',
+        description: `Item checkout: ${quantity}x ${item.name}${item.size ? ` (${item.size})` : ''} for ${user.firstName} ${user.lastName}`,
+        metadata: {
+          userId: userId.toString(),
+          itemId: itemId.toString(),
+          quantity: quantity.toString(),
+          type: 'item_checkout',
+        },
+      });
+      
+      res.json({ paymentIntentId: paymentIntent.id });
+    } catch (error: any) {
+      console.error("Create item checkout terminal payment intent error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Charge saved payment method for item checkout
   app.post("/api/staff/item-checkout-charge-saved", isStaffOrAdmin, async (req, res) => {
     try {

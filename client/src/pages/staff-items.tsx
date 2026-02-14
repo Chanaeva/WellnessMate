@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, ShoppingCart, ArrowLeft, Search, User, Calendar, CreditCard, Loader2, X } from "lucide-react";
+import { Package, ShoppingCart, ArrowLeft, Search, User, Calendar, CreditCard, Loader2, X, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -144,7 +144,12 @@ function InlinePaymentFormContent({
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
-  const [useSavedCard, setUseSavedCard] = useState(!!savedPaymentMethod);
+  const [paymentMode, setPaymentMode] = useState<'saved' | 'new_card' | 'card_reader'>(
+    savedPaymentMethod ? 'saved' : 'new_card'
+  );
+  const [readerMessage, setReaderMessage] = useState<string | null>(null);
+  const [availableReaders, setAvailableReaders] = useState<any[]>([]);
+  const [selectedReaderId, setSelectedReaderId] = useState<string>("");
 
   const createPaymentIntentMutation = useMutation({
     mutationFn: async () => {
@@ -176,14 +181,155 @@ function InlinePaymentFormContent({
     },
   });
 
+  const discoverReaders = async () => {
+    setCardError(null);
+    setReaderMessage('Searching for card readers...');
+    try {
+      const discoverRes = await fetch('/api/stripe/terminal/discover-readers');
+      if (!discoverRes.ok) throw new Error('Failed to discover card readers');
+      const { readers } = await discoverRes.json();
+      if (!readers || readers.length === 0) {
+        throw new Error('No card readers found. Please ensure a reader is connected and online.');
+      }
+      setAvailableReaders(readers);
+      if (readers.length === 1) {
+        setSelectedReaderId(readers[0].id);
+      }
+      setReaderMessage(null);
+    } catch (error: any) {
+      setCardError(error.message);
+      setReaderMessage(null);
+    }
+  };
+
+  useEffect(() => {
+    if (paymentMode === 'card_reader') {
+      discoverReaders();
+    } else {
+      setAvailableReaders([]);
+      setSelectedReaderId("");
+    }
+  }, [paymentMode]);
+
+  const handleCardReaderPayment = async () => {
+    if (!selectedReaderId) {
+      setCardError('Please select a card reader first.');
+      return;
+    }
+
+    const reader = availableReaders.find((r: any) => r.id === selectedReaderId);
+    if (!reader) {
+      setCardError('Selected reader not found. Please refresh and try again.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setCardError(null);
+    setReaderMessage(`Using reader: ${reader.label || reader.serial_number}. Creating payment...`);
+
+    try {
+      const intentRes = await apiRequest("POST", "/api/staff/item-checkout-terminal-intent", {
+        userId,
+        itemId,
+        quantity,
+      });
+      if (!intentRes.ok) {
+        const error = await intentRes.json();
+        throw new Error(error.message || "Failed to create terminal payment");
+      }
+      const { paymentIntentId } = await intentRes.json();
+
+      setReaderMessage('Please tap, insert, or swipe card on the reader...');
+
+      const processRes = await fetch('/api/stripe/terminal/process-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readerId: reader.id, paymentIntentId }),
+      });
+
+      if (!processRes.ok) {
+        const error = await processRes.json();
+        throw new Error(error.message || 'Failed to send payment to reader');
+      }
+
+      const maxPolls = 120;
+      let pollCount = 0;
+      let readerActionDone = false;
+
+      while (pollCount < maxPolls && !readerActionDone) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const statusRes = await fetch(`/api/stripe/terminal/reader-status/${reader.id}`);
+        const statusResult = await statusRes.json();
+
+        if (statusResult.action) {
+          if (statusResult.action.status === 'succeeded') {
+            readerActionDone = true;
+          } else if (statusResult.action.status === 'failed') {
+            throw new Error(statusResult.action.failure_message || 'Payment failed on reader');
+          }
+        } else {
+          readerActionDone = true;
+        }
+        pollCount++;
+      }
+
+      if (!readerActionDone) {
+        throw new Error('Card reader timed out. Please try again.');
+      }
+
+      setReaderMessage('Card accepted! Processing payment...');
+
+      let paymentSucceeded = false;
+      let piPollCount = 0;
+      const maxPiPolls = 30;
+
+      while (piPollCount < maxPiPolls && !paymentSucceeded) {
+        const piRes = await fetch(`/api/stripe/payment-intent-status/${paymentIntentId}`);
+        if (piRes.ok) {
+          const piStatus = await piRes.json();
+          if (piStatus.status === 'succeeded') {
+            paymentSucceeded = true;
+          } else if (piStatus.status === 'canceled' || piStatus.status === 'requires_payment_method') {
+            throw new Error('Payment was declined. Please try a different card.');
+          }
+        }
+        if (!paymentSucceeded) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          piPollCount++;
+        }
+      }
+
+      if (!paymentSucceeded) {
+        throw new Error('Payment processing timed out. The charge may still complete — please check before retrying.');
+      }
+
+      onSuccess(paymentIntentId);
+    } catch (error: any) {
+      setCardError(error.message);
+      toast({
+        title: "Card Reader Payment Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      setReaderMessage(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (paymentMode === 'card_reader') {
+      handleCardReaderPayment();
+      return;
+    }
+
     setIsProcessing(true);
     setCardError(null);
 
     try {
-      if (useSavedCard && savedPaymentMethod) {
-        // Charge the saved card directly
+      if (paymentMode === 'saved' && savedPaymentMethod) {
         const result = await chargeSavedCardMutation.mutateAsync();
         if (result.paymentIntentId) {
           onSuccess(result.paymentIntentId);
@@ -191,7 +337,6 @@ function InlinePaymentFormContent({
           throw new Error("Payment was not completed");
         }
       } else {
-        // Use new card via Stripe Elements
         if (!stripe || !elements) {
           return;
         }
@@ -247,6 +392,24 @@ function InlinePaymentFormContent({
     return brands[brand.toLowerCase()] || brand;
   };
 
+  const PaymentOption = ({ mode, label, sublabel, icon }: { mode: 'saved' | 'new_card' | 'card_reader'; label: string; sublabel?: string; icon?: any }) => (
+    <div 
+      className={`p-3 border rounded-md cursor-pointer transition-colors ${paymentMode === mode ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 hover:border-gray-300'}`}
+      onClick={() => !isLoading && setPaymentMode(mode)}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${paymentMode === mode ? 'border-blue-500' : 'border-gray-300'}`}>
+          {paymentMode === mode && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+        </div>
+        <div className="flex-1">
+          <p className="font-medium text-sm">{label}</p>
+          {sublabel && <p className="text-xs text-slate-600 dark:text-slate-400">{sublabel}</p>}
+        </div>
+        {icon}
+      </div>
+    </div>
+  );
+
   return (
     <Card className="border-blue-300 bg-blue-50/50 dark:bg-blue-900/20">
       <CardHeader className="pb-3">
@@ -265,41 +428,57 @@ function InlinePaymentFormContent({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {savedPaymentMethod && (
-            <div className="space-y-3">
-              <div 
-                className={`p-3 border rounded-md cursor-pointer transition-colors ${useSavedCard ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 hover:border-gray-300'}`}
-                onClick={() => setUseSavedCard(true)}
-                data-testid="option-saved-card"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${useSavedCard ? 'border-blue-500' : 'border-gray-300'}`}>
-                    {useSavedCard && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Use saved card</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      {formatCardBrand(savedPaymentMethod.cardBrand)} ending in {savedPaymentMethod.cardLast4}
-                    </p>
-                  </div>
+          <div className="space-y-3">
+            <PaymentOption
+              mode="card_reader"
+              label="Use card reader"
+              sublabel="Tap, insert, or swipe on the physical reader"
+              icon={<Smartphone className="h-4 w-4 text-slate-400" />}
+            />
+            {savedPaymentMethod && (
+              <PaymentOption
+                mode="saved"
+                label="Use saved card"
+                sublabel={`${formatCardBrand(savedPaymentMethod.cardBrand)} ending in ${savedPaymentMethod.cardLast4}`}
+              />
+            )}
+            <PaymentOption
+              mode="new_card"
+              label="Enter new card"
+            />
+          </div>
+
+          {paymentMode === 'card_reader' && (
+            <div className="space-y-2">
+              {availableReaders.length === 0 && !cardError && (
+                <p className="text-sm text-muted-foreground">Searching for readers...</p>
+              )}
+              {availableReaders.length > 1 && (
+                <div className="space-y-1">
+                  <Label>Select Reader</Label>
+                  <select
+                    className="w-full border rounded-md p-2 text-sm bg-white dark:bg-slate-900"
+                    value={selectedReaderId}
+                    onChange={(e) => setSelectedReaderId(e.target.value)}
+                  >
+                    <option value="">Choose a reader...</option>
+                    {availableReaders.map((r: any) => (
+                      <option key={r.id} value={r.id}>
+                        {r.label || r.serial_number} ({r.status})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-              <div 
-                className={`p-3 border rounded-md cursor-pointer transition-colors ${!useSavedCard ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-gray-200 hover:border-gray-300'}`}
-                onClick={() => setUseSavedCard(false)}
-                data-testid="option-new-card"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${!useSavedCard ? 'border-blue-500' : 'border-gray-300'}`}>
-                    {!useSavedCard && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                  </div>
-                  <p className="font-medium text-sm">Enter new card</p>
-                </div>
-              </div>
+              )}
+              {availableReaders.length === 1 && (
+                <p className="text-sm text-muted-foreground">
+                  Reader: {availableReaders[0].label || availableReaders[0].serial_number}
+                </p>
+              )}
             </div>
           )}
 
-          {!useSavedCard && (
+          {paymentMode === 'new_card' && (
             <>
               <div className="space-y-2">
                 <Label>Card Number</Label>
@@ -325,6 +504,15 @@ function InlinePaymentFormContent({
             </>
           )}
 
+          {paymentMode === 'card_reader' && readerMessage && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">{readerMessage}</p>
+              </div>
+            </div>
+          )}
+
           {cardError && (
             <p className="text-sm text-red-600">{cardError}</p>
           )}
@@ -332,13 +520,18 @@ function InlinePaymentFormContent({
           <Button
             type="submit"
             className="w-full"
-            disabled={(!useSavedCard && !stripe) || isLoading}
+            disabled={(paymentMode === 'new_card' && !stripe) || isLoading}
             data-testid="button-process-payment"
           >
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing...
+                {paymentMode === 'card_reader' ? 'Waiting for card reader...' : 'Processing...'}
+              </>
+            ) : paymentMode === 'card_reader' ? (
+              <>
+                <Smartphone className="h-4 w-4 mr-2" />
+                {`Pay $${(totalPriceCents / 100).toFixed(2)} via Card Reader`}
               </>
             ) : (
               `Pay $${(totalPriceCents / 100).toFixed(2)} & Checkout`

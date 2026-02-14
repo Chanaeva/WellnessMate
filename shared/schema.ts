@@ -793,3 +793,79 @@ export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({
 
 export type SiteSetting = typeof siteSettings.$inferSelect;
 export type InsertSiteSetting = z.infer<typeof insertSiteSettingSchema>;
+
+// Gift card status enum
+export const giftCardStatusEnum = pgEnum('gift_card_status', ['active', 'redeemed', 'expired', 'disabled']);
+
+// Gift cards table
+export const giftCards = pgTable("gift_cards", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  type: text("type").notNull().default('monetary'), // 'monetary' or 'day_pass_bundle'
+  initialAmount: integer("initial_amount").notNull(), // in cents for monetary, number of passes for bundles
+  remainingAmount: integer("remaining_amount").notNull(), // in cents for monetary, remaining passes for bundles
+  status: giftCardStatusEnum("status").notNull().default('active'),
+  purchaserEmail: text("purchaser_email").notNull(),
+  purchaserName: text("purchaser_name").notNull(),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name").notNull(),
+  personalMessage: text("personal_message"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  redeemedByUserId: integer("redeemed_by_user_id").references(() => users.id),
+  redeemedAt: timestamp("redeemed_at"),
+  expiresAt: timestamp("expires_at"),
+  emailSent: boolean("email_sent").notNull().default(false),
+  emailSentAt: timestamp("email_sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertGiftCardSchema = createInsertSchema(giftCards).omit({
+  id: true,
+  createdAt: true,
+  redeemedAt: true,
+  emailSent: true,
+  emailSentAt: true,
+});
+
+export type GiftCard = typeof giftCards.$inferSelect;
+export type InsertGiftCard = z.infer<typeof insertGiftCardSchema>;
+
+// Gift card redemption history
+export const giftCardRedemptions = pgTable("gift_card_redemptions", {
+  id: serial("id").primaryKey(),
+  giftCardId: integer("gift_card_id").notNull().references(() => giftCards.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  amount: integer("amount").notNull(), // cents redeemed or passes used
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertGiftCardRedemptionSchema = createInsertSchema(giftCardRedemptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type GiftCardRedemption = typeof giftCardRedemptions.$inferSelect;
+export type InsertGiftCardRedemption = z.infer<typeof insertGiftCardRedemptionSchema>;
+
+// Gift card denomination templates (admin configurable)
+export const giftCardDenominations = pgTable("gift_card_denominations", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull().default('monetary'), // 'monetary' or 'day_pass_bundle'
+  label: text("label").notNull(), // e.g., "$25 Gift Card" or "5-Day Pass Bundle"
+  value: integer("value").notNull(), // in cents for monetary, number of passes for bundles
+  price: integer("price").notNull(), // selling price in cents
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertGiftCardDenominationSchema = createInsertSchema(giftCardDenominations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type GiftCardDenomination = typeof giftCardDenominations.$inferSelect;
+export type InsertGiftCardDenomination = z.infer<typeof insertGiftCardDenominationSchema>;

@@ -14,7 +14,7 @@ import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
-import { sendSessionBookingNotification, sendPasswordResetEmail } from "./email";
+import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail } from "./email";
 
 const scryptAsync = promisify(scrypt);
 
@@ -5156,6 +5156,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const cancelled = await storage.cancelSessionBooking(bookingId);
       res.json(cancelled);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================
+  // GIFT CARD ROUTES
+  // ============================================
+
+  // Admin: List all gift cards with pagination, search, and status filter
+  app.get("/api/admin/gift-cards", isAdminOrStaff, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 20;
+      const status = req.query.status as string | undefined;
+      const search = req.query.search as string | undefined;
+      const result = await storage.getAllGiftCards(page, pageSize, status, search);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Get single gift card with redemption history
+  app.get("/api/admin/gift-cards/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const card = await storage.getGiftCardById(id);
+      if (!card) {
+        return res.status(404).json({ message: "Gift card not found" });
+      }
+      const redemptions = await storage.getRedemptionsByGiftCardId(id);
+      res.json({ ...card, redemptions });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Update gift card
+  app.put("/api/admin/gift-cards/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const card = await storage.updateGiftCard(id, req.body);
+      res.json(card);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Create gift card manually (for in-person sales)
+  app.post("/api/admin/gift-cards", isAdmin, async (req, res) => {
+    try {
+      const code = randomBytes(8).toString('hex').toUpperCase();
+      const { type, initialAmount, purchaserEmail, purchaserName, recipientEmail, recipientName, personalMessage, expiresAt } = req.body;
+
+      if (!initialAmount || !purchaserEmail || !purchaserName || !recipientEmail || !recipientName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const card = await storage.createGiftCard({
+        code,
+        type: type || 'monetary',
+        initialAmount,
+        remainingAmount: initialAmount,
+        status: 'active',
+        purchaserEmail,
+        purchaserName,
+        recipientEmail,
+        recipientName,
+        personalMessage: personalMessage || null,
+        stripePaymentIntentId: null,
+        redeemedByUserId: null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+
+      sendGiftCardEmail(
+        recipientEmail,
+        recipientName,
+        purchaserName,
+        code,
+        type || 'monetary',
+        initialAmount,
+        personalMessage
+      ).then(async (sent) => {
+        if (sent) {
+          await storage.updateGiftCard(card.id, { emailSent: true, emailSentAt: new Date() });
+        }
+      }).catch(err => console.error('Failed to send gift card email:', err));
+
+      res.status(201).json(card);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: List all denominations
+  app.get("/api/admin/gift-card-denominations", isAdminOrStaff, async (req, res) => {
+    try {
+      const denominations = await storage.getAllDenominations();
+      res.json(denominations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Create denomination
+  app.post("/api/admin/gift-card-denominations", isAdmin, async (req, res) => {
+    try {
+      const denomination = await storage.createDenomination(req.body);
+      res.status(201).json(denomination);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Update denomination
+  app.put("/api/admin/gift-card-denominations/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const denomination = await storage.updateDenomination(id, req.body);
+      res.json(denomination);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Delete denomination
+  app.delete("/api/admin/gift-card-denominations/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteDenomination(id);
+      res.json({ message: "Denomination deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Get active denominations (for purchase page)
+  app.get("/api/gift-card-denominations", async (req, res) => {
+    try {
+      const denominations = await storage.getActiveDenominations();
+      res.json(denominations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Check gift card balance
+  app.get("/api/gift-cards/check/:code", async (req, res) => {
+    try {
+      const card = await storage.getGiftCardByCode(req.params.code);
+      if (!card) {
+        return res.status(404).json({ message: "Gift card not found" });
+      }
+      res.json({
+        code: card.code,
+        type: card.type,
+        status: card.status,
+        initialAmount: card.initialAmount,
+        remainingAmount: card.remainingAmount,
+        expiresAt: card.expiresAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Purchase a gift card (no auth required - guest checkout supported)
+  app.post("/api/gift-cards/purchase", async (req, res) => {
+    try {
+      const { denominationId, recipientEmail, recipientName, personalMessage, purchaserEmail, purchaserName } = req.body;
+
+      if (!denominationId || !recipientEmail || !recipientName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const denominations = await storage.getActiveDenominations();
+      const denomination = denominations.find(d => d.id === denominationId);
+      if (!denomination) {
+        return res.status(404).json({ message: "Denomination not found" });
+      }
+
+      const code = randomBytes(8).toString('hex').toUpperCase();
+
+      const buyerEmail = req.isAuthenticated() ? req.user!.email : (purchaserEmail || recipientEmail);
+      const buyerName = req.isAuthenticated() ? `${req.user!.firstName} ${req.user!.lastName}` : (purchaserName || 'Guest');
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: denomination.price,
+        currency: 'usd',
+        metadata: {
+          type: 'gift_card_purchase',
+          giftCardCode: code,
+          denominationId: denomination.id.toString(),
+        },
+      });
+
+      const card = await storage.createGiftCard({
+        code,
+        type: denomination.type,
+        initialAmount: denomination.value,
+        remainingAmount: denomination.value,
+        status: 'active',
+        purchaserEmail: buyerEmail,
+        purchaserName: buyerName,
+        recipientEmail,
+        recipientName,
+        personalMessage: personalMessage || null,
+        stripePaymentIntentId: paymentIntent.id,
+        redeemedByUserId: null,
+        expiresAt: null,
+      });
+
+      sendGiftCardEmail(
+        recipientEmail,
+        recipientName,
+        buyerName,
+        code,
+        denomination.type,
+        denomination.value,
+        personalMessage
+      ).then(async (sent) => {
+        if (sent) {
+          await storage.updateGiftCard(card.id, { emailSent: true, emailSentAt: new Date() });
+        }
+      }).catch(err => console.error('Failed to send gift card email:', err));
+
+      res.status(201).json({
+        giftCard: card,
+        clientSecret: paymentIntent.client_secret,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Authenticated: Redeem a gift card
+  app.post("/api/gift-cards/redeem", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.sendStatus(401);
+    }
+    try {
+      const { code } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: "Gift card code is required" });
+      }
+
+      const card = await storage.getGiftCardByCode(code);
+      if (!card) {
+        return res.status(404).json({ message: "Gift card not found" });
+      }
+      if (card.status !== 'active') {
+        return res.status(400).json({ message: `Gift card is ${card.status}` });
+      }
+      if (card.expiresAt && new Date(card.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Gift card has expired" });
+      }
+      if (card.remainingAmount <= 0) {
+        return res.status(400).json({ message: "Gift card has no remaining balance" });
+      }
+
+      const userId = req.user!.id;
+
+      if (card.type === 'day_pass_bundle') {
+        const punchCard = await storage.createPunchCard({
+          userId,
+          name: `Gift Card Day Pass Bundle`,
+          totalPunches: card.remainingAmount,
+          remainingPunches: card.remainingAmount,
+          pricePerPunch: 0,
+          totalPrice: 0,
+          status: 'active',
+        });
+
+        const redeemedCard = await storage.redeemGiftCard(
+          card.id,
+          userId,
+          card.remainingAmount,
+          `Redeemed ${card.remainingAmount} day passes`
+        );
+
+        res.json({ giftCard: redeemedCard, punchCard });
+      } else {
+        const amountInCents = card.remainingAmount;
+
+        await storage.createPayment({
+          userId,
+          amount: amountInCents,
+          description: `Gift card credit (${card.code})`,
+          status: 'successful',
+          method: 'credit_card',
+        });
+
+        const redeemedCard = await storage.redeemGiftCard(
+          card.id,
+          userId,
+          amountInCents,
+          `Redeemed $${(amountInCents / 100).toFixed(2)} credit`
+        );
+
+        res.json({ giftCard: redeemedCard });
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

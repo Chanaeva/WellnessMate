@@ -25,7 +25,10 @@ import {
   dayPassHours, type DayPassHours,
   guestWaivers, type GuestWaiver, type InsertGuestWaiver,
   siteSettings, type SiteSetting, type InsertSiteSetting,
-  treatmentTypeEnum
+  treatmentTypeEnum,
+  giftCards, type GiftCard, type InsertGiftCard,
+  giftCardRedemptions, type GiftCardRedemption, type InsertGiftCardRedemption,
+  giftCardDenominations, type GiftCardDenomination, type InsertGiftCardDenomination
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
@@ -229,6 +232,24 @@ export interface IStorage {
   getAllSiteSettings(): Promise<SiteSetting[]>;
   upsertSiteSetting(key: string, value: string, description?: string): Promise<SiteSetting>;
   
+  // Gift card methods
+  createGiftCard(data: InsertGiftCard): Promise<GiftCard>;
+  getGiftCardByCode(code: string): Promise<GiftCard | undefined>;
+  getGiftCardById(id: number): Promise<GiftCard | undefined>;
+  getAllGiftCards(page?: number, pageSize?: number, status?: string, search?: string): Promise<{ data: GiftCard[]; total: number }>;
+  updateGiftCard(id: number, data: Partial<GiftCard>): Promise<GiftCard>;
+  redeemGiftCard(id: number, userId: number, amount: number, description: string): Promise<GiftCard>;
+
+  // Gift card denomination methods
+  getAllDenominations(): Promise<GiftCardDenomination[]>;
+  getActiveDenominations(): Promise<GiftCardDenomination[]>;
+  createDenomination(data: InsertGiftCardDenomination): Promise<GiftCardDenomination>;
+  updateDenomination(id: number, data: Partial<GiftCardDenomination>): Promise<GiftCardDenomination>;
+  deleteDenomination(id: number): Promise<void>;
+
+  // Gift card redemption methods
+  getRedemptionsByGiftCardId(giftCardId: number): Promise<GiftCardRedemption[]>;
+
   // Session store
   sessionStore: any;
 }
@@ -1984,6 +2005,126 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async createGiftCard(data: InsertGiftCard): Promise<GiftCard> {
+    const [card] = await db.insert(giftCards).values(data).returning();
+    return card;
+  }
+
+  async getGiftCardByCode(code: string): Promise<GiftCard | undefined> {
+    const [card] = await db.select().from(giftCards).where(eq(giftCards.code, code));
+    return card || undefined;
+  }
+
+  async getGiftCardById(id: number): Promise<GiftCard | undefined> {
+    const [card] = await db.select().from(giftCards).where(eq(giftCards.id, id));
+    return card || undefined;
+  }
+
+  async getAllGiftCards(page: number = 1, pageSize: number = 20, status?: string, search?: string): Promise<{ data: GiftCard[]; total: number }> {
+    const conditions: any[] = [];
+
+    if (status) {
+      conditions.push(eq(giftCards.status, status as any));
+    }
+
+    if (search) {
+      const searchPattern = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(giftCards.code, searchPattern),
+          ilike(giftCards.purchaserEmail, searchPattern),
+          ilike(giftCards.purchaserName, searchPattern),
+          ilike(giftCards.recipientEmail, searchPattern),
+          ilike(giftCards.recipientName, searchPattern)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(giftCards)
+      .where(whereClause);
+
+    const data = await db
+      .select()
+      .from(giftCards)
+      .where(whereClause)
+      .orderBy(desc(giftCards.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { data, total: Number(countResult?.count || 0) };
+  }
+
+  async updateGiftCard(id: number, data: Partial<GiftCard>): Promise<GiftCard> {
+    const [card] = await db.update(giftCards).set(data).where(eq(giftCards.id, id)).returning();
+    return card;
+  }
+
+  async redeemGiftCard(id: number, userId: number, amount: number, description: string): Promise<GiftCard> {
+    const card = await this.getGiftCardById(id);
+    if (!card) throw new Error("Gift card not found");
+
+    const newRemaining = card.remainingAmount - amount;
+    if (newRemaining < 0) throw new Error("Insufficient gift card balance");
+
+    const updateData: Partial<GiftCard> = {
+      remainingAmount: newRemaining,
+      redeemedByUserId: userId,
+    };
+
+    if (newRemaining === 0) {
+      updateData.status = 'redeemed';
+      updateData.redeemedAt = new Date();
+    }
+
+    const [updatedCard] = await db.update(giftCards)
+      .set(updateData)
+      .where(eq(giftCards.id, id))
+      .returning();
+
+    await db.insert(giftCardRedemptions).values({
+      giftCardId: id,
+      userId,
+      amount,
+      description,
+    });
+
+    return updatedCard;
+  }
+
+  async getAllDenominations(): Promise<GiftCardDenomination[]> {
+    return await db.select().from(giftCardDenominations).orderBy(giftCardDenominations.sortOrder);
+  }
+
+  async getActiveDenominations(): Promise<GiftCardDenomination[]> {
+    return await db.select().from(giftCardDenominations)
+      .where(eq(giftCardDenominations.isActive, true))
+      .orderBy(giftCardDenominations.sortOrder);
+  }
+
+  async createDenomination(data: InsertGiftCardDenomination): Promise<GiftCardDenomination> {
+    const [denom] = await db.insert(giftCardDenominations).values(data).returning();
+    return denom;
+  }
+
+  async updateDenomination(id: number, data: Partial<GiftCardDenomination>): Promise<GiftCardDenomination> {
+    const [denom] = await db.update(giftCardDenominations).set(data).where(eq(giftCardDenominations.id, id)).returning();
+    return denom;
+  }
+
+  async deleteDenomination(id: number): Promise<void> {
+    await db.delete(giftCardDenominations).where(eq(giftCardDenominations.id, id));
+  }
+
+  async getRedemptionsByGiftCardId(giftCardId: number): Promise<GiftCardRedemption[]> {
+    return await db.select().from(giftCardRedemptions)
+      .where(eq(giftCardRedemptions.giftCardId, giftCardId))
+      .orderBy(desc(giftCardRedemptions.createdAt));
   }
 }
 

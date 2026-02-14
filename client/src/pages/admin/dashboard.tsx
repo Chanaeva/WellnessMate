@@ -48,6 +48,7 @@ import StaffItems from "@/pages/staff-items";
 import AdminDayPasses from "./day-passes";
 import AdminCheckIns from "./check-ins";
 import AdminCardReaderSplash from "./card-reader-splash";
+import AdminGiftCards from "./gift-cards";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -196,6 +197,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="inventory" className="flex-shrink-0">Inventory</TabsTrigger>
             <TabsTrigger value="landing-page" className="flex-shrink-0">Landing Page</TabsTrigger>
             <TabsTrigger value="notifications" className="flex-shrink-0">Notifications</TabsTrigger>
+            <TabsTrigger value="gift-cards" className="flex-shrink-0">Gift Cards</TabsTrigger>
             <TabsTrigger value="analytics" className="flex-shrink-0">Analytics</TabsTrigger>
             <TabsTrigger value="card-reader" className="flex-shrink-0">Card Reader</TabsTrigger>
           </TabsList>
@@ -518,6 +520,11 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Gift Cards Tab */}
+          <TabsContent value="gift-cards" className="space-y-6">
+            <AdminGiftCards />
           </TabsContent>
 
           {/* Card Reader Tab */}

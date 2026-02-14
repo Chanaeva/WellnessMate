@@ -111,3 +111,62 @@ export async function sendSessionBookingNotification(
     return false;
   }
 }
+
+export async function sendGiftCardEmail(
+  recipientEmail: string,
+  recipientName: string,
+  purchaserName: string,
+  giftCardCode: string,
+  giftCardType: string,
+  amount: number,
+  personalMessage?: string | null
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+
+    const isMonetary = giftCardType === 'monetary';
+    const valueDisplay = isMonetary 
+      ? `$${(amount / 100).toFixed(2)}` 
+      : `${amount} Day Pass${amount > 1 ? 'es' : ''}`;
+    const cardTitle = isMonetary ? 'Gift Card' : 'Day Pass Bundle';
+
+    const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: recipientEmail,
+      subject: `You've received a Wolf Mother Wellness ${cardTitle}!`,
+      text: `Hi ${recipientName},\n\n${purchaserName} has sent you a ${cardTitle} worth ${valueDisplay}!\n\nYour gift card code is: ${giftCardCode}\n\n${personalMessage ? `Personal message: "${personalMessage}"\n\n` : ''}To redeem, visit Wolf Mother Wellness and enter this code during checkout.\n\nBest regards,\nWolf Mother Wellness Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4a5d4a;">Wolf Mother Wellness</h2>
+          <p>Hi ${recipientName},</p>
+          <p><strong>${purchaserName}</strong> has sent you a ${cardTitle}!</p>
+          <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); color: white; padding: 30px; border-radius: 12px; margin: 20px 0; text-align: center;">
+            <p style="font-size: 14px; margin: 0 0 10px 0; opacity: 0.9;">WOLF MOTHER WELLNESS</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 0 0 5px 0;">${valueDisplay}</p>
+            <p style="font-size: 12px; margin: 0; opacity: 0.8;">${cardTitle}</p>
+            <div style="background: rgba(255,255,255,0.2); padding: 12px 20px; border-radius: 8px; margin-top: 20px;">
+              <p style="font-size: 12px; margin: 0 0 5px 0; opacity: 0.9;">YOUR CODE</p>
+              <p style="font-size: 24px; font-weight: bold; letter-spacing: 3px; margin: 0;">${giftCardCode}</p>
+            </div>
+          </div>
+          ${personalMessage ? `
+            <div style="background-color: #f9f9f9; padding: 15px 20px; border-left: 4px solid #4a5d4a; border-radius: 4px; margin: 20px 0;">
+              <p style="font-style: italic; margin: 0; color: #555;">"${personalMessage}"</p>
+              <p style="margin: 5px 0 0 0; color: #888; font-size: 12px;">— ${purchaserName}</p>
+            </div>
+          ` : ''}
+          <p>To redeem your ${cardTitle.toLowerCase()}, visit Wolf Mother Wellness and enter your code during checkout or at the front desk.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #999; font-size: 12px;">Best regards,<br>Wolf Mother Wellness Team</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(msg);
+    console.log(`Gift card email sent to ${recipientEmail} (code: ${giftCardCode})`);
+    return true;
+  } catch (error) {
+    console.error('Gmail gift card email error:', error);
+    return false;
+  }
+}

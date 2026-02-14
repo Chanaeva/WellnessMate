@@ -31,6 +31,7 @@ import AdminSessions from "@/pages/admin/sessions";
 import AdminSessionBookings from "@/pages/admin/session-bookings";
 import AdminGallery from "@/pages/admin/gallery";
 import AdminCheckIns from "@/pages/admin/check-ins";
+import GiftCardsPage from "@/pages/gift-cards";
 
 import KioskCheckIn from "@/pages/kiosk-checkin";
 import KioskMemberCreation from "@/pages/kiosk-member-creation";
@@ -71,6 +72,7 @@ function Router() {
       {/* Member routes */}
       <ProtectedRoute path="/dashboard" component={MemberDashboard} />
 
+      <Route path="/gift-cards" component={GiftCardsPage} />
       <Route path="/packages" component={PackagesPage} />
       <ProtectedRoute path="/checkout" component={CheckoutPage} />
       <Route path="/checkout/success" component={CheckoutSuccess} />

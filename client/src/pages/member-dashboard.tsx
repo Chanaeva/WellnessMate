@@ -25,6 +25,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -74,6 +75,7 @@ import {
   Moon,
   Clock,
   CalendarCheck,
+  Gift,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Elements } from "@stripe/react-stripe-js";
@@ -96,6 +98,7 @@ export default function MemberDashboard() {
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
   const [showCancelMembershipDialog, setShowCancelMembershipDialog] = useState(false);
+  const [giftCardCode, setGiftCardCode] = useState("");
   const [selectedBookingDate, setSelectedBookingDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
@@ -486,6 +489,41 @@ export default function MemberDashboard() {
       toast({
         title: "Cancellation Failed",
         description: error.message || "Failed to cancel booking",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const redeemGiftCardMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const response = await apiRequest("POST", "/api/gift-cards/redeem", { code });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to redeem gift card");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setGiftCardCode("");
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      const card = data.giftCard;
+      if (data.punchCard) {
+        toast({
+          title: "Gift Card Redeemed!",
+          description: `${data.punchCard.totalPunches} day passes have been added to your account.`,
+        });
+      } else {
+        toast({
+          title: "Gift Card Redeemed!",
+          description: `$${(card.initialAmount / 100).toFixed(2)} credit has been applied to your account.`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Redemption Failed",
+        description: error.message || "Could not redeem gift card",
         variant: "destructive",
       });
     },
@@ -1098,6 +1136,40 @@ export default function MemberDashboard() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Redeem Gift Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5" />
+                  Redeem Gift Card
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Have a gift card? Enter the code below to redeem it.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter gift card code"
+                    value={giftCardCode}
+                    onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                    className="font-mono tracking-wider"
+                    maxLength={16}
+                  />
+                  <Button
+                    onClick={() => redeemGiftCardMutation.mutate(giftCardCode)}
+                    disabled={!giftCardCode.trim() || redeemGiftCardMutation.isPending}
+                  >
+                    {redeemGiftCardMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Redeem"
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Recent Transactions */}
             <Card>

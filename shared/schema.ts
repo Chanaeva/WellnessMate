@@ -704,6 +704,7 @@ export const sessionConfigs = pgTable("session_configs", {
   capacity: integer("capacity").notNull().default(20), // Max members per session
   isEnabled: boolean("is_enabled").notNull().default(true),
   bookingGraceMinutes: integer("booking_grace_minutes").notNull().default(60), // Minutes after session start that booking is still allowed
+  availableDays: integer("available_days").array().notNull().default([0, 1, 2, 3, 4, 5, 6]), // Days of week session is available (0=Sunday, 6=Saturday)
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 

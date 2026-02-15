@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sun, Moon, Users, Clock, Save, Loader2, Ticket } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar } from "lucide-react";
 
 export default function AdminSessions() {
   const { toast } = useToast();
@@ -21,7 +22,11 @@ export default function AdminSessions() {
     capacity: number;
     isEnabled: boolean;
     bookingGraceMinutes: number;
-  }>({ startTime: '', endTime: '', capacity: 20, isEnabled: true, bookingGraceMinutes: 60 });
+    availableDays: number[];
+  }>({ startTime: '', endTime: '', capacity: 20, isEnabled: true, bookingGraceMinutes: 60, availableDays: [0, 1, 2, 3, 4, 5, 6] });
+
+  const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const DAY_FULL_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const [dayPassFormData, setDayPassFormData] = useState<{
     startTime: string;
     endTime: string;
@@ -101,6 +106,7 @@ export default function AdminSessions() {
         capacity: session.capacity,
         isEnabled: session.isEnabled,
         bookingGraceMinutes: session.bookingGraceMinutes ?? 60,
+        availableDays: session.availableDays ?? [0, 1, 2, 3, 4, 5, 6],
       });
     } else {
       setFormData({
@@ -109,8 +115,26 @@ export default function AdminSessions() {
         capacity: 20,
         isEnabled: true,
         bookingGraceMinutes: 60,
+        availableDays: [0, 1, 2, 3, 4, 5, 6],
       });
     }
+  };
+
+  const toggleDay = (day: number) => {
+    setFormData(prev => ({
+      ...prev,
+      availableDays: prev.availableDays.includes(day)
+        ? prev.availableDays.filter(d => d !== day)
+        : [...prev.availableDays, day].sort()
+    }));
+  };
+
+  const formatAvailableDays = (days: number[] | null | undefined) => {
+    if (!days || days.length === 0) return 'No days selected';
+    if (days.length === 7) return 'Every day';
+    if (JSON.stringify([...days].sort()) === JSON.stringify([1, 2, 3, 4, 5])) return 'Weekdays only';
+    if (JSON.stringify([...days].sort()) === JSON.stringify([0, 6])) return 'Weekends only';
+    return days.map(d => DAY_LABELS[d]).join(', ');
   };
 
   const startEditingDayPass = () => {
@@ -126,6 +150,14 @@ export default function AdminSessions() {
 
   const handleSave = () => {
     if (!editingSession) return;
+    if (formData.availableDays.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "At least one available day must be selected.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateSessionMutation.mutate({
       sessionType: editingSession,
       data: formData,
@@ -228,6 +260,31 @@ export default function AdminSessions() {
                     </p>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>Available Days</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAY_LABELS.map((label, index) => (
+                      <label
+                        key={index}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border cursor-pointer text-sm transition-colors ${
+                          formData.availableDays.includes(index)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={formData.availableDays.includes(index)}
+                          onCheckedChange={() => toggleDay(index)}
+                          className="sr-only"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Select which days of the week this session is available for booking
+                  </p>
+                </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="morning-enabled">Session Enabled</Label>
                   <Switch
@@ -267,6 +324,10 @@ export default function AdminSessions() {
                     <div className="flex items-center gap-2">
                       <Clock className="h-5 w-5 text-muted-foreground" />
                       <span>Booking Allowance: <strong>{morningSession.bookingGraceMinutes ?? 60}</strong> min after start</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <span>Available: <strong>{formatAvailableDays(morningSession.availableDays)}</strong></span>
                     </div>
                   </>
                 ) : (
@@ -352,6 +413,31 @@ export default function AdminSessions() {
                     </p>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>Available Days</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAY_LABELS.map((label, index) => (
+                      <label
+                        key={index}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border cursor-pointer text-sm transition-colors ${
+                          formData.availableDays.includes(index)
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={formData.availableDays.includes(index)}
+                          onCheckedChange={() => toggleDay(index)}
+                          className="sr-only"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Select which days of the week this session is available for booking
+                  </p>
+                </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="evening-enabled">Session Enabled</Label>
                   <Switch
@@ -391,6 +477,10 @@ export default function AdminSessions() {
                     <div className="flex items-center gap-2">
                       <Clock className="h-5 w-5 text-muted-foreground" />
                       <span>Booking Allowance: <strong>{eveningSession.bookingGraceMinutes ?? 60}</strong> min after start</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <span>Available: <strong>{formatAvailableDays(eveningSession.availableDays)}</strong></span>
                     </div>
                   </>
                 ) : (

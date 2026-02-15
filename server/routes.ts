@@ -4932,14 +4932,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid session type" });
       }
       
-      const { startTime, endTime, capacity, isEnabled, bookingGraceMinutes } = req.body;
-      const updated = await storage.updateSessionConfig(sessionType, {
+      const { startTime, endTime, capacity, isEnabled, bookingGraceMinutes, availableDays } = req.body;
+      const updateData: any = {
         startTime,
         endTime,
         capacity,
         isEnabled,
         bookingGraceMinutes,
-      });
+      };
+      if (availableDays !== undefined) {
+        if (!Array.isArray(availableDays) || availableDays.length === 0) {
+          return res.status(400).json({ message: "At least one available day must be selected" });
+        }
+        const validDays = availableDays.every((d: any) => Number.isInteger(d) && d >= 0 && d <= 6);
+        if (!validDays) {
+          return res.status(400).json({ message: "Available days must be integers between 0 (Sunday) and 6 (Saturday)" });
+        }
+        updateData.availableDays = availableDays;
+      }
+      const updated = await storage.updateSessionConfig(sessionType, updateData);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -5062,6 +5073,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate booking date is not in the past
       if (bookingDateInBusinessTz < todayInBusinessTz) {
         return res.status(400).json({ message: "Cannot book sessions for past dates" });
+      }
+      
+      // Check if session is available on this day of the week
+      const dayOfWeek = bookingDateInBusinessTz.weekday % 7; // Luxon: 1=Mon..7=Sun -> convert to 0=Sun..6=Sat
+      const availableDays = config.availableDays ?? [0, 1, 2, 3, 4, 5, 6];
+      if (!availableDays.includes(dayOfWeek)) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        return res.status(400).json({ 
+          message: `The ${sessionType} session is not available on ${dayNames[dayOfWeek]}s.` 
+        });
       }
       
       // Parse session time to minutes helper

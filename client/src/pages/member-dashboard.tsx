@@ -703,10 +703,16 @@ export default function MemberDashboard() {
                         ? 'text-amber-500'
                         : 'text-indigo-500';
 
+                      const [year, month, day] = selectedBookingDate.split('-').map(Number);
+                      const selectedDateObj = new Date(year, month - 1, day);
+                      const dayOfWeek = selectedDateObj.getDay();
+                      const sessionAvailableDays = (session as any).availableDays ?? [0, 1, 2, 3, 4, 5, 6];
+                      const isAvailableOnDay = sessionAvailableDays.includes(dayOfWeek);
+
                       return (
                         <div 
                           key={session.id} 
-                          className={`p-4 rounded-lg border ${bgColor} space-y-3`}
+                          className={`p-4 rounded-lg border ${bgColor} space-y-3 ${!isAvailableOnDay ? 'opacity-50' : ''}`}
                         >
                           <div className="flex items-center gap-2">
                             <Icon className={`h-5 w-5 ${iconColor}`} />
@@ -723,7 +729,11 @@ export default function MemberDashboard() {
                             <span>Capacity: {session.capacity}</span>
                           </div>
                           
-                          {isBooked ? (
+                          {!isAvailableOnDay ? (
+                            <div className="text-sm text-muted-foreground italic">
+                              Not available on {['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][dayOfWeek]}
+                            </div>
+                          ) : isBooked ? (
                             <div className="space-y-2">
                               <Badge variant="default" className="bg-green-600">
                                 <CheckCircle className="h-3 w-3 mr-1" />

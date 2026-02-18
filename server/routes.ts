@@ -6680,7 +6680,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For kiosk subscription payments (both Terminal and Online), create the subscription now
       let finalSubscriptionId = subscriptionId;
       if (isSubscription && !subscriptionId && paymentIntent.metadata?.isSubscription === 'true') {
-        // Kiosk payment - need to create subscription with saved payment method
         const savedPaymentMethodId = paymentIntent.payment_method as string;
         const customerIdFromIntent = paymentIntent.customer as string || customerId;
         const priceId = paymentIntent.metadata?.stripePriceId || stripePriceId;
@@ -6688,17 +6687,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (savedPaymentMethodId && customerIdFromIntent && priceId) {
           console.log('📋 Creating subscription after kiosk payment:', { customerIdFromIntent, priceId, savedPaymentMethodId, useTerminal: paymentIntent.metadata?.useTerminal });
           
-          // Set the payment method as default for the customer
+          // Attach the payment method to the customer explicitly
+          try {
+            await stripe.paymentMethods.attach(savedPaymentMethodId, { customer: customerIdFromIntent });
+            console.log('✅ Payment method attached to customer:', savedPaymentMethodId);
+          } catch (attachErr: any) {
+            // If already attached (code: resource_already_exists), that's expected and fine
+            if (attachErr.code === 'resource_already_exists' || attachErr.message?.includes('already been attached')) {
+              console.log('ℹ️ Payment method already attached to customer (expected):', savedPaymentMethodId);
+            } else {
+              console.error('❌ Failed to attach payment method:', attachErr.code, attachErr.message);
+              throw new Error('Failed to save card on file. Please try again.');
+            }
+          }
+          
+          // Set the payment method as default for invoices on the customer
           await stripe.customers.update(customerIdFromIntent, {
             invoice_settings: { default_payment_method: savedPaymentMethodId }
           });
+          console.log('✅ Set default payment method on customer:', savedPaymentMethodId);
           
-          // Create subscription with 30-day trial (first month already paid via PaymentIntent)
-          // Note: We don't set default_payment_method here - it's already saved on the customer
+          // Create an active subscription with billing_cycle_anchor set 30 days from now.
+          // The first month was already paid via the PaymentIntent, so the subscription's first
+          // real charge happens at the anchor date (30 days out).
+          // billing_cycle_anchor in the future + proration_behavior: 'none' = no immediate charge,
+          // subscription status is 'active', and next billing date is the anchor.
+          const billingAnchor = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days from now
+          
           const subscription = await stripe.subscriptions.create({
             customer: customerIdFromIntent,
             items: [{ price: priceId }],
-            trial_period_days: 30, // Subscription starts in trialing status, no charge until trial ends
+            default_payment_method: savedPaymentMethodId,
+            billing_cycle_anchor: billingAnchor,
+            proration_behavior: 'none',
+            payment_behavior: 'allow_incomplete',
             metadata: {
               source: paymentIntent.metadata?.useTerminal === 'true' ? 'kiosk_terminal' : 'kiosk_online',
               memberEmail: memberData.email,
@@ -6707,7 +6729,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           finalSubscriptionId = subscription.id;
-          console.log('✅ Created subscription after kiosk payment:', finalSubscriptionId);
+          console.log('✅ Created subscription after kiosk payment:', {
+            subscriptionId: finalSubscriptionId,
+            status: subscription.status,
+            nextBilling: new Date(billingAnchor * 1000).toISOString(),
+            defaultPaymentMethod: savedPaymentMethodId,
+          });
+          
+          if (subscription.status !== 'active') {
+            console.warn('⚠️ Subscription created but status is:', subscription.status, '- expected active');
+          }
+        } else {
+          const missingFields = [];
+          if (!savedPaymentMethodId) missingFields.push('paymentMethod');
+          if (!customerIdFromIntent) missingFields.push('customerId');
+          if (!priceId) missingFields.push('priceId');
+          console.error('❌ Missing required data for subscription creation:', missingFields.join(', '));
+          return res.status(400).json({ error: `Missing required data for subscription: ${missingFields.join(', ')}` });
         }
       }
       

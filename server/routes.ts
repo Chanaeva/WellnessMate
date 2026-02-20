@@ -831,6 +831,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (subscription.status === 'active' || subscription.status === 'trialing') {
           // Type assertion for current_period_end since Stripe types don't always expose it
           const currentPeriodEnd = (subscription as any).current_period_end as number;
+          if (!currentPeriodEnd || isNaN(currentPeriodEnd)) {
+            console.warn('⚠️ Subscription missing current_period_end:', subscription.id);
+            return res.json({
+              nextBillingDate: membership.endDate,
+              source: 'database',
+              subscriptionStatus: subscription.status,
+              billingInterval: 'month',
+            });
+          }
           const nextBillingDate = new Date(currentPeriodEnd * 1000).toISOString().split('T')[0];
           
           // Get billing interval from the subscription's price
@@ -6666,9 +6675,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('⏭️ Skipping agreement validation for returning member:', existingMemberId);
       }
       
-      // Verify payment was successful
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      console.log('💳 Payment Intent status:', paymentIntent.status);
+      // Verify payment was successful - expand latest_charge to access generated_card for Terminal
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ['latest_charge.payment_method_details'],
+      });
+      console.log('💳 Payment Intent status:', paymentIntent.status, 'payment_method:', paymentIntent.payment_method);
       if (paymentIntent.status !== 'succeeded') {
         console.error(`❌ Payment not completed. PI ${paymentIntentId} status: ${paymentIntent.status}`);
         return res.status(400).json({ 
@@ -6680,9 +6691,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For kiosk subscription payments (both Terminal and Online), create the subscription now
       let finalSubscriptionId = subscriptionId;
       if (isSubscription && !subscriptionId && paymentIntent.metadata?.isSubscription === 'true') {
-        const savedPaymentMethodId = paymentIntent.payment_method as string;
         const customerIdFromIntent = paymentIntent.customer as string || customerId;
         const priceId = paymentIntent.metadata?.stripePriceId || stripePriceId;
+        
+        // For Terminal (card_present) payments, we need the generated_card PM, not the card_present PM.
+        // card_present PMs can't be used for subscriptions - Stripe generates a reusable card PM.
+        let savedPaymentMethodId = paymentIntent.payment_method as string;
+        const isTerminalPayment = paymentIntent.metadata?.useTerminal === 'true';
+        
+        if (isTerminalPayment) {
+          const latestCharge = (paymentIntent as any).latest_charge;
+          const generatedCard = latestCharge?.payment_method_details?.card_present?.generated_card;
+          if (generatedCard) {
+            console.log('🔄 Terminal payment: using generated_card instead of card_present:', generatedCard);
+            savedPaymentMethodId = generatedCard;
+          } else {
+            console.warn('⚠️ Terminal payment: no generated_card found, falling back to payment_method:', savedPaymentMethodId);
+          }
+        }
         
         if (savedPaymentMethodId && customerIdFromIntent && priceId) {
           console.log('📋 Creating subscription after kiosk payment:', { customerIdFromIntent, priceId, savedPaymentMethodId, useTerminal: paymentIntent.metadata?.useTerminal });
@@ -6862,11 +6888,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   await storage.updateUserStripeCustomerId(existingAdditionalMember.id, newStripeCustomer.id);
                 }
                 
-                // Create subscription for existing member with 30-day trial (first month already paid)
+                // Create active subscription for existing member with billing anchor 30 days out
+                // (first month already paid via PaymentIntent)
+                const additionalBillingAnchor = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
                 const existingMemberSubscription = await stripe.subscriptions.create({
                   customer: existingStripeCustomerId,
                   items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
-                  trial_period_days: 30, // Subscription starts in trialing status, no charge until trial ends
+                  billing_cycle_anchor: additionalBillingAnchor,
+                  proration_behavior: 'none',
+                  payment_behavior: 'allow_incomplete',
                   metadata: {
                     source: 'kiosk_gift_membership',
                     purchasedBy: memberData.email,
@@ -6927,11 +6957,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               await storage.updateUserStripeCustomerId(additionalUser.id, additionalStripeCustomer.id);
               
-              // Create a subscription for the additional member with 30-day trial (first month already paid)
+              // Create active subscription for additional member with billing anchor 30 days out
+              // (first month already paid via PaymentIntent)
+              const newMemberBillingAnchor = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
               const additionalSubscription = await stripe.subscriptions.create({
                 customer: additionalStripeCustomer.id,
                 items: [{ price: paymentIntent.metadata?.stripePriceId || stripePriceId }],
-                trial_period_days: 30, // Subscription starts in trialing status, no charge until trial ends
+                billing_cycle_anchor: newMemberBillingAnchor,
+                proration_behavior: 'none',
+                payment_behavior: 'allow_incomplete',
                 metadata: {
                   source: 'kiosk_gift_membership',
                   purchasedBy: memberData.email,

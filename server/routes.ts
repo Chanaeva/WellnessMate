@@ -212,8 +212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         readers = await stripe.terminal.readers.list({ limit: 20 });
       }
       
-      // Filter to only online readers and map to a simpler format
-      const onlineReaders = readers.data.filter(r => r.status === 'online').map(r => ({
+      // Log all reader details for diagnostics
+      readers.data.forEach(r => {
+        console.log(`[Terminal] Reader: ${r.id}, type: ${r.device_type}, status: ${r.status}, label: ${r.label}, serial: ${r.serial_number}, location: ${typeof r.location === 'string' ? r.location : r.location}`);
+      });
+      
+      // Map all readers (don't filter by status - dashboard may show online while API reports differently)
+      const availableReaders = readers.data.map(r => ({
         id: r.id,
         object: 'terminal.reader',
         device_type: r.device_type,
@@ -224,8 +229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: r.status,
       }));
       
-      console.log(`[Terminal] Server-driven discovery found ${onlineReaders.length} online readers out of ${readers.data.length} total`);
-      res.json({ readers: onlineReaders, locationId });
+      console.log(`[Terminal] Server-driven discovery found ${availableReaders.length} readers (${availableReaders.filter(r => r.status === 'online').length} online)`);
+      res.json({ readers: availableReaders, locationId });
     } catch (error: any) {
       console.error("Failed to discover readers:", error);
       res.status(500).json({ message: error.message });

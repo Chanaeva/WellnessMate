@@ -188,8 +188,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This is more reliable for WisePOS E than client-side discovery
   app.get("/api/stripe/terminal/discover-readers", async (req, res) => {
     try {
-      // Get the location ID if provided, otherwise get the first location
+      // Get the location ID if provided
       let locationId = req.query.location as string | undefined;
+      
+      // First, try listing readers filtered by location if provided
+      // If no readers found, fall back to listing ALL readers across all locations
+      let readers;
       
       if (!locationId) {
         const locations = await stripe.terminal.locations.list({ limit: 1 });
@@ -198,13 +202,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // List readers, optionally filtered by location
-      const listParams: any = { limit: 20 };
       if (locationId) {
-        listParams.location = locationId;
+        readers = await stripe.terminal.readers.list({ limit: 20, location: locationId });
       }
       
-      const readers = await stripe.terminal.readers.list(listParams);
+      // If no readers found at the specific location, search across ALL locations
+      if (!readers || readers.data.length === 0) {
+        console.log('[Terminal] No readers at primary location, searching all locations...');
+        readers = await stripe.terminal.readers.list({ limit: 20 });
+      }
       
       // Filter to only online readers and map to a simpler format
       const onlineReaders = readers.data.filter(r => r.status === 'online').map(r => ({
@@ -218,7 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: r.status,
       }));
       
-      console.log(`[Terminal] Server-driven discovery found ${onlineReaders.length} online readers`);
+      console.log(`[Terminal] Server-driven discovery found ${onlineReaders.length} online readers out of ${readers.data.length} total`);
       res.json({ readers: onlineReaders, locationId });
     } catch (error: any) {
       console.error("Failed to discover readers:", error);

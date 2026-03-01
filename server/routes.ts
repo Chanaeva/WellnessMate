@@ -5734,6 +5734,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Daily capacity setting (public read)
+  app.get("/api/settings/daily-capacity", async (req, res) => {
+    try {
+      const setting = await storage.getSiteSetting('dailyCapacity');
+      const dailyCapacity = setting ? parseInt(setting.value) : 50;
+      res.json({ dailyCapacity });
+    } catch (error: any) {
+      res.json({ dailyCapacity: 50 });
+    }
+  });
+
+  // Admin: update daily capacity
+  app.put("/api/admin/settings/daily-capacity", isAdmin, async (req, res) => {
+    try {
+      const { dailyCapacity } = req.body;
+      if (typeof dailyCapacity !== 'number' || dailyCapacity < 1) {
+        return res.status(400).json({ message: "dailyCapacity must be a positive number" });
+      }
+      await storage.upsertSiteSetting('dailyCapacity', String(dailyCapacity), 'Maximum daily space capacity for waitlist tracking');
+      res.json({ dailyCapacity });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: get waitlist entries for a date
+  app.get("/api/admin/waitlist", isAdminOrStaff, async (req, res) => {
+    try {
+      const { DateTime } = await import('luxon');
+      const dateParam = req.query.date as string;
+      const date = dateParam || DateTime.now().setZone('America/Chicago').toFormat('yyyy-MM-dd');
+      const entries = await storage.getWaitlistEntries(date);
+      res.json(entries);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: add waitlist entry
+  app.post("/api/admin/waitlist", isAdminOrStaff, async (req, res) => {
+    try {
+      const { insertWaitlistSchema } = await import('@shared/schema');
+      const parsed = insertWaitlistSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+      const entry = await storage.createWaitlistEntry(parsed.data);
+      res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: update waitlist entry status
+  app.patch("/api/admin/waitlist/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      if (!['pending', 'notified', 'removed'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const entry = await storage.updateWaitlistEntry(id, { status });
+      res.json(entry);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: delete waitlist entry
+  app.delete("/api/admin/waitlist/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteWaitlistEntry(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin route to get all site settings
   app.get("/api/admin/config-settings", isAdmin, async (req, res) => {
     try {

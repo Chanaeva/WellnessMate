@@ -28,7 +28,8 @@ import {
   treatmentTypeEnum,
   giftCards, type GiftCard, type InsertGiftCard,
   giftCardRedemptions, type GiftCardRedemption, type InsertGiftCardRedemption,
-  giftCardDenominations, type GiftCardDenomination, type InsertGiftCardDenomination
+  giftCardDenominations, type GiftCardDenomination, type InsertGiftCardDenomination,
+  waitlist, type Waitlist, type InsertWaitlist
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
@@ -249,6 +250,12 @@ export interface IStorage {
 
   // Gift card redemption methods
   getRedemptionsByGiftCardId(giftCardId: number): Promise<GiftCardRedemption[]>;
+
+  // Waitlist methods
+  createWaitlistEntry(data: InsertWaitlist): Promise<Waitlist>;
+  getWaitlistEntries(date: string): Promise<Waitlist[]>;
+  updateWaitlistEntry(id: number, data: Partial<InsertWaitlist>): Promise<Waitlist>;
+  deleteWaitlistEntry(id: number): Promise<void>;
 
   // Session store
   sessionStore: any;
@@ -2125,6 +2132,26 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(giftCardRedemptions)
       .where(eq(giftCardRedemptions.giftCardId, giftCardId))
       .orderBy(desc(giftCardRedemptions.createdAt));
+  }
+
+  async createWaitlistEntry(data: InsertWaitlist): Promise<Waitlist> {
+    const [entry] = await db.insert(waitlist).values(data).returning();
+    return entry;
+  }
+
+  async getWaitlistEntries(date: string): Promise<Waitlist[]> {
+    return await db.select().from(waitlist)
+      .where(and(eq(waitlist.date, date), sql`${waitlist.status} != 'removed'`))
+      .orderBy(waitlist.createdAt);
+  }
+
+  async updateWaitlistEntry(id: number, data: Partial<InsertWaitlist>): Promise<Waitlist> {
+    const [entry] = await db.update(waitlist).set(data).where(eq(waitlist.id, id)).returning();
+    return entry;
+  }
+
+  async deleteWaitlistEntry(id: number): Promise<void> {
+    await db.delete(waitlist).where(eq(waitlist.id, id));
   }
 }
 

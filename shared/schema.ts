@@ -870,3 +870,23 @@ export const insertGiftCardDenominationSchema = createInsertSchema(giftCardDenom
 
 export type GiftCardDenomination = typeof giftCardDenominations.$inferSelect;
 export type InsertGiftCardDenomination = z.infer<typeof insertGiftCardDenominationSchema>;
+
+// Waitlist table - daily space capacity waitlist tracking
+export const waitlist = pgTable("waitlist", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  date: text("date").notNull(), // YYYY-MM-DD
+  notes: text("notes"),
+  status: text("status").notNull().default('pending'), // pending | notified | removed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWaitlistSchema = createInsertSchema(waitlist).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Waitlist = typeof waitlist.$inferSelect;
+export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;

@@ -1862,6 +1862,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync all memberships with their Stripe subscription status (Admin only)
+  app.post("/api/admin/sync-stripe-memberships", isAdmin, async (req, res) => {
+    try {
+      console.log('[Stripe Sync] Starting membership sync...');
+
+      // Get all memberships that have a Stripe subscription ID
+      const allMembers = await storage.getAllMembers();
+      const results: { membershipId: string; email: string; oldStatus: string; newStatus: string; action: string }[] = [];
+      const errors: { membershipId: string; email: string; error: string }[] = [];
+
+      const mapStripeStatus = (stripeStatus: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
+        if (stripeStatus === 'active' || stripeStatus === 'trialing') return 'active';
+        if (stripeStatus === 'canceled' || stripeStatus === 'unpaid') return 'expired';
+        if (stripeStatus === 'past_due') return 'frozen';
+        return 'inactive';
+      };
+
+      for (const member of allMembers) {
+        if (!member.membership) continue;
+        const { membership } = member;
+
+        if (!membership.stripeSubscriptionId) {
+          // No subscription ID — skip (manually managed membership)
+          continue;
+        }
+
+        try {
+          const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+          const correctStatus = mapStripeStatus(subscription.status);
+          const currentPeriodEnd = (subscription as any).current_period_end;
+          const newEndDate = currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0] : undefined;
+          const newAutoRenew = !subscription.cancel_at_period_end;
+
+          if (
+            membership.status !== correctStatus ||
+            (newEndDate && membership.endDate !== newEndDate) ||
+            membership.autoRenew !== newAutoRenew
+          ) {
+            await storage.updateMembership(membership.membershipId, {
+              status: correctStatus,
+              endDate: newEndDate || membership.endDate,
+              autoRenew: newAutoRenew,
+            });
+
+            results.push({
+              membershipId: membership.membershipId,
+              email: member.email,
+              oldStatus: membership.status,
+              newStatus: correctStatus,
+              action: 'updated',
+            });
+
+            console.log(`[Stripe Sync] Updated ${member.email}: ${membership.status} → ${correctStatus}`);
+          } else {
+            results.push({
+              membershipId: membership.membershipId,
+              email: member.email,
+              oldStatus: membership.status,
+              newStatus: correctStatus,
+              action: 'ok',
+            });
+          }
+        } catch (err: any) {
+          // Subscription not found in Stripe means it was deleted
+          if (err?.statusCode === 404 || err?.code === 'resource_missing') {
+            if (membership.status === 'active') {
+              await storage.updateMembership(membership.membershipId, {
+                status: 'expired',
+                autoRenew: false,
+              });
+              results.push({
+                membershipId: membership.membershipId,
+                email: member.email,
+                oldStatus: membership.status,
+                newStatus: 'expired',
+                action: 'expired (subscription missing in Stripe)',
+              });
+              console.log(`[Stripe Sync] Expired ${member.email}: subscription not found in Stripe`);
+            }
+          } else {
+            errors.push({ membershipId: membership.membershipId, email: member.email, error: err.message });
+            console.error(`[Stripe Sync] Error for ${member.email}:`, err.message);
+          }
+        }
+      }
+
+      const updated = results.filter(r => r.action !== 'ok').length;
+      console.log(`[Stripe Sync] Complete. Checked ${results.length}, updated ${updated}, errors ${errors.length}`);
+
+      res.json({
+        checked: results.length,
+        updated,
+        errors: errors.length,
+        results,
+        errorDetails: errors,
+      });
+    } catch (error: any) {
+      console.error('[Stripe Sync] Fatal error:', error);
+      res.status(500).json({ message: error.message || 'Sync failed' });
+    }
+  });
+
   // Update member details (Admin only)
   app.put("/api/admin/members/:id", isAdmin, async (req, res) => {
     try {

@@ -80,6 +80,8 @@ import {
   AlertTriangle,
   Plus,
   Trash2,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Select,
@@ -143,6 +145,8 @@ export default function AdminMembers() {
   const [paymentMethodClientSecret, setPaymentMethodClientSecret] = useState<string | null>(null);
   const [isCreateMembershipOpen, setIsCreateMembershipOpen] = useState(false);
   const [selectedPlanType, setSelectedPlanType] = useState<string>("");
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [syncResults, setSyncResults] = useState<null | { checked: number; updated: number; errors: number; results: any[]; errorDetails: any[] }>(null);
   const itemsPerPage = 10;
 
   // Form for adding new member
@@ -551,6 +555,28 @@ export default function AdminMembers() {
     }
   };
 
+  const syncStripeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/sync-stripe-memberships");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setSyncResults(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      toast({
+        title: "Sync Complete",
+        description: `Checked ${data.checked} memberships, updated ${data.updated}.${data.errors > 0 ? ` ${data.errors} errors.` : ''}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync memberships with Stripe",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Filter and search members
   const filteredMembers =
     members?.filter((member) => {
@@ -604,6 +630,14 @@ export default function AdminMembers() {
             Member Management
           </CardTitle>
           <div className="flex flex-wrap gap-2">
+            {/* Stripe Sync Button */}
+            <Button
+              variant="outline"
+              onClick={() => { setSyncResults(null); setIsSyncDialogOpen(true); }}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> Sync with Stripe
+            </Button>
+
             <Dialog
               open={isAddMemberOpen}
               onOpenChange={setIsAddMemberOpen}
@@ -2015,6 +2049,98 @@ export default function AdminMembers() {
             >
               {createMembershipMutation.isPending ? "Creating..." : "Create Membership"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Stripe Sync Dialog */}
+      <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sync Memberships with Stripe</DialogTitle>
+            <DialogDescription>
+              This checks every membership that has a Stripe subscription ID against the live Stripe status and corrects any mismatches — useful for fixing memberships that got out of sync due to missed webhooks or manual changes.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!syncResults ? (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Memberships <strong>without</strong> a Stripe subscription ID (manually managed or manually activated) will be skipped.
+              </p>
+              <Button
+                onClick={() => syncStripeMutation.mutate()}
+                disabled={syncStripeMutation.isPending}
+                className="w-full"
+              >
+                {syncStripeMutation.isPending ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Syncing…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Run Sync Now
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <p className="text-2xl font-bold">{syncResults.checked}</p>
+                  <p className="text-xs text-muted-foreground">Checked</p>
+                </div>
+                <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600">{syncResults.updated}</p>
+                  <p className="text-xs text-muted-foreground">Updated</p>
+                </div>
+                <div className={`text-center p-3 rounded-lg ${syncResults.errors > 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                  <p className={`text-2xl font-bold ${syncResults.errors > 0 ? 'text-red-600' : 'text-green-600'}`}>{syncResults.errors}</p>
+                  <p className="text-xs text-muted-foreground">Errors</p>
+                </div>
+              </div>
+
+              {syncResults.results.filter(r => r.action !== 'ok').length > 0 && (
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  <p className="text-sm font-medium">Changes made:</p>
+                  {syncResults.results.filter(r => r.action !== 'ok').map((r, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs p-2 bg-muted/50 rounded">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="font-medium truncate block">{r.email}</span>
+                        <span className="text-muted-foreground">{r.oldStatus} → {r.newStatus} ({r.action})</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {syncResults.errors === 0 && syncResults.updated === 0 && (
+                <p className="text-sm text-center text-green-600 font-medium">All memberships are in sync with Stripe.</p>
+              )}
+
+              {syncResults.errorDetails.length > 0 && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  <p className="text-sm font-medium text-destructive">Errors:</p>
+                  {syncResults.errorDetails.map((e, i) => (
+                    <div key={i} className="text-xs p-2 bg-red-50 dark:bg-red-950/20 rounded">
+                      <span className="font-medium">{e.email}:</span> {e.error}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button variant="outline" className="w-full" onClick={() => { setSyncResults(null); }}>
+                Run Again
+              </Button>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSyncDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

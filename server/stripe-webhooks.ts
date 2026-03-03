@@ -141,25 +141,35 @@ const handleCheckoutSessionExpired = async (session: Stripe.Checkout.Session) =>
   // Could track abandoned checkouts for analytics
 };
 
+// Resolve a membership from a subscription — matches by stripeSubscriptionId first,
+// then falls back to the user's primary membership if it has no subscription ID yet.
+const resolveMembershipForSubscription = async (subscription: Stripe.Subscription) => {
+  // Primary lookup: find the exact membership with this subscription ID
+  const bySubId = await storage.getMembershipByStripeSubscriptionId(subscription.id);
+  if (bySubId) return bySubId;
+
+  // Fallback: look up by customer → user, only accept if the membership has no subscription
+  // attached yet (so we don't overwrite a different subscription's membership)
+  const customerId = subscription.customer as string;
+  if (!customerId) return null;
+  const user = await storage.getUserByCustomerId(customerId);
+  if (!user) return null;
+  const membership = await storage.getMembershipByUserId(user.id);
+  if (membership && !membership.stripeSubscriptionId) return membership;
+
+  if (!bySubId) {
+    console.warn(`⚠️  No membership found for subscription ${subscription.id} (customer ${customerId})`);
+  }
+  return null;
+};
+
 // Handle subscription creation/updates
 const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
   console.log('📋 Subscription updated:', subscription.id, 'Status:', subscription.status);
   
   try {
-    const customerId = subscription.customer as string;
-    if (!customerId) return;
-    
-    const user = await storage.getUserByCustomerId(customerId);
-    if (!user) {
-      console.warn('⚠️  User not found for subscription customer:', customerId);
-      return;
-    }
-    
-    const membership = await storage.getMembershipByUserId(user.id);
-    if (!membership) {
-      console.warn('⚠️  Membership not found for user:', user.id);
-      return;
-    }
+    const membership = await resolveMembershipForSubscription(subscription);
+    if (!membership) return;
     
     // Map Stripe subscription status to membership status
     let membershipStatus: 'active' | 'inactive' | 'expired' | 'frozen' = 'inactive';
@@ -180,7 +190,7 @@ const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
       autoRenew: !subscription.cancel_at_period_end,
     });
     
-    console.log('✅ Membership updated for user:', user.email, 'Status:', membershipStatus);
+    console.log('✅ Membership updated:', membership.membershipId, 'Status:', membershipStatus);
   } catch (error) {
     console.error('❌ Error handling subscription update:', error);
   }
@@ -191,13 +201,7 @@ const handleSubscriptionDeleted = async (subscription: Stripe.Subscription) => {
   console.log('🗑️ Subscription deleted:', subscription.id);
   
   try {
-    const customerId = subscription.customer as string;
-    if (!customerId) return;
-    
-    const user = await storage.getUserByCustomerId(customerId);
-    if (!user) return;
-    
-    const membership = await storage.getMembershipByUserId(user.id);
+    const membership = await resolveMembershipForSubscription(subscription);
     if (!membership) return;
     
     // Mark membership as expired
@@ -206,7 +210,7 @@ const handleSubscriptionDeleted = async (subscription: Stripe.Subscription) => {
       autoRenew: false,
     });
     
-    console.log('✅ Membership expired for user:', user.email);
+    console.log('✅ Membership expired:', membership.membershipId);
   } catch (error) {
     console.error('❌ Error handling subscription deletion:', error);
   }

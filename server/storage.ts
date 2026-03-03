@@ -71,6 +71,7 @@ export interface IStorage {
   // Membership methods
   getMembershipByUserId(userId: number): Promise<Membership | undefined>;
   getMembershipById(id: string): Promise<Membership | undefined>;
+  getMembershipByStripeSubscriptionId(subscriptionId: string): Promise<Membership | undefined>;
   createMembership(membership: InsertMembership): Promise<Membership>;
   updateMembership(id: string, data: Partial<Membership>): Promise<Membership>;
   deleteMembership(id: string): Promise<void>;
@@ -458,12 +459,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMembershipByUserId(userId: number): Promise<Membership | undefined> {
-    const [membership] = await db.select().from(memberships).where(eq(memberships.userId, userId));
-    return membership || undefined;
+    // Return the most recent active membership first, then any other by newest creation
+    const results = await db.select().from(memberships)
+      .where(eq(memberships.userId, userId))
+      .orderBy(
+        sql`CASE WHEN ${memberships.status} = 'active' THEN 0 ELSE 1 END`,
+        desc(memberships.createdAt)
+      );
+    return results[0] || undefined;
   }
 
   async getMembershipById(id: string): Promise<Membership | undefined> {
     const [membership] = await db.select().from(memberships).where(eq(memberships.membershipId, id));
+    return membership || undefined;
+  }
+
+  async getMembershipByStripeSubscriptionId(subscriptionId: string): Promise<Membership | undefined> {
+    const [membership] = await db.select().from(memberships)
+      .where(eq(memberships.stripeSubscriptionId, subscriptionId));
     return membership || undefined;
   }
 

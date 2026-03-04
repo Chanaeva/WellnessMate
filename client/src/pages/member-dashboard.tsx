@@ -98,6 +98,7 @@ export default function MemberDashboard() {
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
   const [showCancelMembershipDialog, setShowCancelMembershipDialog] = useState(false);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(true);
   const [giftCardCode, setGiftCardCode] = useState("");
   const [selectedBookingDate, setSelectedBookingDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
@@ -415,19 +416,22 @@ export default function MemberDashboard() {
 
   // Cancel membership mutation
   const cancelMembershipMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("DELETE", "/api/membership/cancel");
+    mutationFn: async (opts: { cancelAtPeriodEnd: boolean }) => {
+      const response = await apiRequest("DELETE", "/api/membership/cancel", { cancelAtPeriodEnd: opts.cancelAtPeriodEnd });
       if (!response.ok) {
         throw new Error("Failed to cancel membership");
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
       setShowCancelMembershipDialog(false);
+      setCancelAtPeriodEnd(true);
       toast({
         title: "Membership Cancelled",
-        description: "Your membership has been cancelled effective immediately. No prorated refund will be issued.",
+        description: variables.cancelAtPeriodEnd
+          ? `Your membership will not renew. You'll keep access until ${data.endDate || 'the end of your billing period'}.`
+          : "Your membership has been cancelled immediately.",
       });
     },
     onError: (error: any) => {
@@ -1432,34 +1436,70 @@ export default function MemberDashboard() {
       </AlertDialog>
 
       {/* Cancel Membership Dialog */}
-      <AlertDialog
+      <Dialog
         open={showCancelMembershipDialog}
-        onOpenChange={setShowCancelMembershipDialog}
+        onOpenChange={(open) => { setShowCancelMembershipDialog(open); if (!open) setCancelAtPeriodEnd(true); }}
       >
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-2">
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
               <div className="bg-destructive/10 p-2 rounded-full">
                 <AlertTriangle className="h-6 w-6 text-destructive" />
               </div>
-              <AlertDialogTitle className="text-xl">Cancel Membership</AlertDialogTitle>
+              <DialogTitle className="text-xl">Cancel Membership</DialogTitle>
             </div>
-            <AlertDialogDescription className="text-base leading-relaxed">
-              Are you sure you want to cancel your membership? This action cannot be undone.
-              <br/><br/>
-              <strong>Important:</strong> Your membership will be cancelled immediately and no prorated refund will be issued for the remaining time on your current billing cycle.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel 
-              onClick={() => setShowCancelMembershipDialog(false)}
-              className="px-8 py-3"
+          </DialogHeader>
+
+          <p className="text-sm text-muted-foreground mb-4">
+            Choose how you'd like to cancel your membership.
+          </p>
+
+          <div className="space-y-3 mb-5">
+            {/* Option 1: Cancel at end of period */}
+            <button
+              type="button"
+              onClick={() => setCancelAtPeriodEnd(true)}
+              className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                cancelAtPeriodEnd
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-muted-foreground'
+              }`}
+            >
+              <div className="font-semibold text-sm mb-0.5">Cancel at end of billing period</div>
+              <div className="text-xs text-muted-foreground">
+                You'll keep full access until <strong>{membership?.endDate || 'your billing period ends'}</strong>. Your membership will not renew after that.
+              </div>
+            </button>
+
+            {/* Option 2: Cancel immediately */}
+            <button
+              type="button"
+              onClick={() => setCancelAtPeriodEnd(false)}
+              className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                !cancelAtPeriodEnd
+                  ? 'border-destructive bg-destructive/5'
+                  : 'border-border hover:border-muted-foreground'
+              }`}
+            >
+              <div className="font-semibold text-sm mb-0.5">Cancel immediately</div>
+              <div className="text-xs text-muted-foreground">
+                Access ends today. No prorated refund will be issued for the remaining time in your billing cycle.
+              </div>
+            </button>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => { setShowCancelMembershipDialog(false); setCancelAtPeriodEnd(true); }}
             >
               Keep Membership
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => cancelMembershipMutation.mutate()}
-              className="bg-destructive hover:bg-destructive/90 text-white font-semibold px-8 py-3"
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => cancelMembershipMutation.mutate({ cancelAtPeriodEnd })}
               disabled={cancelMembershipMutation.isPending}
             >
               {cancelMembershipMutation.isPending ? (
@@ -1468,12 +1508,12 @@ export default function MemberDashboard() {
                   Cancelling...
                 </>
               ) : (
-                "Cancel Membership"
+                cancelAtPeriodEnd ? "Confirm Cancellation" : "Cancel Immediately"
               )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Payment Method Dialog */}
       <Dialog open={showAddPaymentMethod} onOpenChange={setShowAddPaymentMethod}>

@@ -901,36 +901,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // If there's a Stripe subscription, cancel it first
-      if (membership.stripeSubscriptionId) {
+      const cancelAtPeriodEnd = req.body?.cancelAtPeriodEnd === true;
+
+      if (cancelAtPeriodEnd && membership.stripeSubscriptionId) {
+        // Schedule cancellation at end of billing period — member keeps access until then
         try {
-          // First check if the subscription exists and its current status
           const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
-          
           if (subscription.status !== 'canceled') {
-            // Cancel the subscription immediately
-            await stripe.subscriptions.del(membership.stripeSubscriptionId);
-            console.log(`Cancelled Stripe subscription: ${membership.stripeSubscriptionId}`);
-          } else {
-            console.log(`Subscription already cancelled: ${membership.stripeSubscriptionId}`);
+            await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+              cancel_at_period_end: true,
+            });
+            console.log(`Scheduled subscription cancellation at period end: ${membership.stripeSubscriptionId}`);
           }
         } catch (stripeError: any) {
-          // Log but don't fail if Stripe cancellation fails (subscription might already be cancelled or not exist)
+          console.error("Stripe period-end cancel error:", stripeError.message);
+          // Continue — update DB regardless
+        }
+        // Keep status active, just disable auto-renew
+        await storage.updateMembership(membership.membershipId, { autoRenew: false });
+        return res.json({
+          message: "Your membership will not renew. You'll keep access until the end of your current billing period.",
+          endDate: membership.endDate,
+          membership: await storage.getMembershipByUserId(userId),
+        });
+      }
+
+      // Immediate cancellation (default)
+      if (membership.stripeSubscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+          if (subscription.status !== 'canceled') {
+            await stripe.subscriptions.del(membership.stripeSubscriptionId);
+            console.log(`Cancelled Stripe subscription immediately: ${membership.stripeSubscriptionId}`);
+          }
+        } catch (stripeError: any) {
           console.error("Stripe subscription cancellation error:", stripeError.message, stripeError.code);
-          // Continue with local cancellation even if Stripe fails - the subscription might not exist in Stripe
-          // This allows users to cancel their membership even if there's a Stripe sync issue
         }
       }
 
-      // Update membership status to cancelled
       await storage.updateMembership(membership.membershipId, { 
         status: 'inactive',
-        endDate: new Date().toISOString().split('T')[0] // Set end date to now for immediate cancellation
+        endDate: new Date().toISOString().split('T')[0],
+        autoRenew: false,
       });
 
       res.json({ 
         message: "Membership cancelled successfully",
-        membership: await storage.getMembershipByUserId(userId)
+        membership: await storage.getMembershipByUserId(userId),
       });
     } catch (error: any) {
       console.error("Error cancelling membership:", error);
@@ -2331,8 +2348,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Membership not found" });
       }
 
+      let warning: string | undefined;
+
+      // If admin is reactivating a membership, sync with Stripe
+      if (req.body.status === 'active' && membership.status !== 'active' && membership.stripeSubscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+
+          if (subscription.status === 'past_due') {
+            // Try to pay the outstanding invoice to reactivate
+            const latestInvoiceId = (subscription as any).latest_invoice as string;
+            if (latestInvoiceId) {
+              try {
+                await stripe.invoices.pay(latestInvoiceId);
+                console.log(`[Admin Reactivate] Paid invoice ${latestInvoiceId} to reactivate subscription ${membership.stripeSubscriptionId}`);
+              } catch (payErr: any) {
+                warning = `Could not collect payment from Stripe: ${payErr.message}. DB status updated but subscription remains past_due.`;
+                console.warn('[Admin Reactivate] Invoice payment failed:', payErr.message);
+              }
+            }
+          } else if (subscription.status === 'canceled') {
+            warning = 'The Stripe subscription is canceled — billing will not resume automatically. Create a new subscription from the member profile if recurring billing is needed.';
+            console.warn(`[Admin Reactivate] Subscription ${membership.stripeSubscriptionId} is canceled in Stripe.`);
+          }
+          // active/trialing: no Stripe action needed, just update DB below
+        } catch (stripeErr: any) {
+          warning = `Could not reach Stripe to verify subscription: ${stripeErr.message}`;
+          console.warn('[Admin Reactivate] Stripe lookup failed:', stripeErr.message);
+        }
+      }
+
       const updatedMembership = await storage.updateMembership(id, req.body);
-      res.json(updatedMembership);
+      res.json({ ...updatedMembership, ...(warning ? { warning } : {}) });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors });

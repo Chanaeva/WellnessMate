@@ -301,7 +301,7 @@ export default function AdminMembers() {
         // Only make the request if there are actual updates
         if (Object.keys(membershipUpdate).length > 0) {
           try {
-            await apiRequest("PATCH", `/api/admin/memberships/${selectedMember.membership.id}`, membershipUpdate);
+            await apiRequest("PATCH", `/api/admin/memberships/${selectedMember.membership.membershipId}`, membershipUpdate);
           } catch (error) {
             // Log but don't fail the whole operation if membership update fails
             console.warn("Membership update failed, member data was updated successfully");

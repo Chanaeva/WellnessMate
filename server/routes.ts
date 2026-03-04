@@ -14,7 +14,8 @@ import { walletService } from "./wallet/wallet-service";
 import { eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
-import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail } from "./email";
+import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail, sendWaitlistNotificationEmail } from "./email";
+import { sendWaitlistNotificationSMS } from "./sms";
 
 const scryptAsync = promisify(scrypt);
 
@@ -5944,7 +5945,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!['pending', 'notified', 'removed'].includes(status)) {
         return res.status(400).json({ message: "Invalid status" });
       }
+
+      // Fetch the entry before updating so we have contact details
+      const existing = await storage.getWaitlistEntryById(id);
+
       const entry = await storage.updateWaitlistEntry(id, { status });
+
+      // When marking as notified, send email and/or SMS
+      if (status === 'notified' && existing) {
+        const notificationResults: string[] = [];
+
+        if (existing.email) {
+          const emailSent = await sendWaitlistNotificationEmail(existing.email, existing.name, existing.date);
+          notificationResults.push(emailSent ? 'email sent' : 'email failed');
+        }
+
+        if (existing.phone) {
+          const smsSent = await sendWaitlistNotificationSMS(existing.phone, existing.name, existing.date);
+          notificationResults.push(smsSent ? 'SMS sent' : 'SMS failed');
+        }
+
+        if (notificationResults.length === 0) {
+          notificationResults.push('no contact info — status updated only');
+        }
+
+        console.log(`[Waitlist] Notified entry ${id} (${existing.name}): ${notificationResults.join(', ')}`);
+        return res.json({ ...entry, notificationResults });
+      }
+
       res.json(entry);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

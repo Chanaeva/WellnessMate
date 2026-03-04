@@ -112,6 +112,50 @@ export async function sendSessionBookingNotification(
   }
 }
 
+export async function sendWaitlistNotificationEmail(
+  toEmail: string,
+  name: string,
+  date: string
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+
+    const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: toEmail,
+      subject: `Wolf Mother Wellness — Space Available for ${formattedDate}`,
+      text: `Hi ${name},\n\nGreat news! A spot has opened up for ${formattedDate} at Wolf Mother Wellness. Please contact us or stop by as soon as possible to reserve your place — spots are limited and fill quickly.\n\nWe look forward to seeing you!\n\nBest regards,\nWolf Mother Wellness Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4a5d4a;">Wolf Mother Wellness</h2>
+          <p>Hi ${name},</p>
+          <p>Great news! A spot has opened up for <strong>${formattedDate}</strong> at Wolf Mother Wellness.</p>
+          <div style="background-color: #f0f4f0; border-left: 4px solid #4a5d4a; padding: 16px 20px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #333;">Please contact us or stop by as soon as possible to reserve your place — spots are limited and fill quickly.</p>
+          </div>
+          <p>We look forward to seeing you!</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #999; font-size: 12px;">Best regards,<br>Wolf Mother Wellness Team</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(msg);
+    console.log(`Waitlist notification email sent to ${toEmail} for ${date}`);
+    return true;
+  } catch (error) {
+    console.error('Waitlist notification email error:', error);
+    return false;
+  }
+}
+
 export async function sendGiftCardEmail(
   recipientEmail: string,
   recipientName: string,

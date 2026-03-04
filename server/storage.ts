@@ -255,6 +255,7 @@ export interface IStorage {
   // Waitlist methods
   createWaitlistEntry(data: InsertWaitlist): Promise<Waitlist>;
   getWaitlistEntries(date: string): Promise<Waitlist[]>;
+  getWaitlistEntryById(id: number): Promise<Waitlist | undefined>;
   updateWaitlistEntry(id: number, data: Partial<InsertWaitlist>): Promise<Waitlist>;
   deleteWaitlistEntry(id: number): Promise<void>;
 
@@ -2156,6 +2157,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(waitlist)
       .where(and(eq(waitlist.date, date), sql`${waitlist.status} != 'removed'`))
       .orderBy(waitlist.createdAt);
+  }
+
+  async getWaitlistEntryById(id: number): Promise<Waitlist | undefined> {
+    const [entry] = await db.select().from(waitlist).where(eq(waitlist.id, id));
+    return entry;
   }
 
   async updateWaitlistEntry(id: number, data: Partial<InsertWaitlist>): Promise<Waitlist> {

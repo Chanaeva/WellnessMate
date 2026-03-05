@@ -2903,7 +2903,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/punch-card-templates", isAdmin, async (req, res) => {
     try {
       const templates = await storage.getAllPunchCardTemplates();
-      res.json(templates);
+      // Attach sold count to each template so admin can see stock usage
+      const withCounts = await Promise.all(
+        templates.map(async (t) => ({
+          ...t,
+          soldCount: await storage.countPunchCardsByTemplateId(t.id),
+        }))
+      );
+      res.json(withCounts);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }
@@ -2953,9 +2960,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/punch-card-templates", async (req, res) => {
     try {
       const templates = await storage.getAllPunchCardTemplates();
-      // Filter to only return active templates
-      const activeTemplates = templates.filter(t => t.isActive);
-      res.json(activeTemplates);
+      // Filter to only return active templates that still have stock available
+      const available = await Promise.all(
+        templates.filter(t => t.isActive).map(async (t) => {
+          if (t.stockLimit === null || t.stockLimit === undefined) return t;
+          const sold = await storage.countPunchCardsByTemplateId(t.id);
+          return sold < t.stockLimit ? t : null;
+        })
+      );
+      res.json(available.filter(Boolean));
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }
@@ -3369,6 +3382,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.status(400).json({ message: `Invalid day pass: ${templateId}` });
           }
           const quantity = item.quantity || 1;
+          // Enforce stock limit
+          if (template.stockLimit !== null && template.stockLimit !== undefined) {
+            const sold = await storage.countPunchCardsByTemplateId(template.id);
+            if (sold + quantity > template.stockLimit) {
+              const remaining = Math.max(0, template.stockLimit - sold);
+              return res.status(400).json({
+                message: remaining === 0
+                  ? `"${template.name}" is sold out.`
+                  : `"${template.name}" only has ${remaining} package${remaining === 1 ? '' : 's'} remaining.`
+              });
+            }
+          }
           subtotal += template.totalPrice * quantity;
         }
 
@@ -3762,6 +3787,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (template) {
             const quantity = item.quantity || 1;
+            // Safety check: enforce stock limit at finalize time as well
+            if (template.stockLimit !== null && template.stockLimit !== undefined) {
+              const sold = await storage.countPunchCardsByTemplateId(template.id);
+              if (sold + quantity > template.stockLimit) {
+                const remaining = Math.max(0, template.stockLimit - sold);
+                return res.status(400).json({
+                  message: remaining === 0
+                    ? `"${template.name}" is sold out.`
+                    : `"${template.name}" only has ${remaining} package${remaining === 1 ? '' : 's'} remaining.`
+                });
+              }
+            }
             
             for (let i = 0; i < quantity; i++) {
               await storage.createPunchCard({

@@ -174,6 +174,8 @@ export const punchCardTemplates = pgTable("punch_card_templates", {
   availableOnKiosk: boolean("available_on_kiosk").notNull().default(true),
   availableOnWebsite: boolean("available_on_website").notNull().default(true),
   availableInCart: boolean("available_in_cart").notNull().default(true),
+  // Stock limit: null = unlimited, integer = max packages that can be sold total
+  stockLimit: integer("stock_limit"),
 });
 
 // Punch cards table for day pass packages

@@ -111,6 +111,7 @@ export interface IStorage {
   createPunchCardTemplate(template: InsertPunchCardTemplate): Promise<PunchCardTemplate>;
   updatePunchCardTemplate(id: number, template: Partial<PunchCardTemplate>): Promise<PunchCardTemplate>;
   deletePunchCardTemplate(id: number): Promise<void>;
+  countPunchCardsByTemplateId(templateId: number): Promise<number>;
 
   // Punch card methods
   getPunchCardsByUserId(userId: number): Promise<PunchCard[]>;
@@ -969,6 +970,13 @@ export class DatabaseStorage implements IStorage {
 
   async deletePunchCardTemplate(id: number): Promise<void> {
     await db.delete(punchCardTemplates).where(eq(punchCardTemplates.id, id));
+  }
+
+  async countPunchCardsByTemplateId(templateId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(punchCards)
+      .where(and(eq(punchCards.templateId, templateId), sql`${punchCards.status} != 'expired'`));
+    return Number(result[0]?.count ?? 0);
   }
 
   async getAvailablePunchCardOptions(): Promise<PunchCardTemplate[]> {

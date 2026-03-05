@@ -54,7 +54,7 @@ export default function PackagesManagement() {
   // Punch card template state
   const [editingTemplate, setEditingTemplate] = useState<PunchCardTemplate | null>(null);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
-  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate>>({
+  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate> & { stockLimit?: number | null }>({
     name: '',
     totalPunches: 0,
     pricePerPunch: 0,
@@ -66,11 +66,13 @@ export default function PackagesManagement() {
     availableUntil: undefined,
     availableOnKiosk: true,
     availableOnWebsite: true,
-    availableInCart: true
+    availableInCart: true,
+    stockLimit: null,
   });
   const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
   const [templateHasAvailabilityDates, setTemplateHasAvailabilityDates] = useState(false);
   const [templateHasNoEndDate, setTemplateHasNoEndDate] = useState(false);
+  const [templateHasStockLimit, setTemplateHasStockLimit] = useState(false);
 
   // Fetch max memberships per purchase setting
   const { data: maxMembershipsData } = useQuery({
@@ -296,10 +298,12 @@ export default function PackagesManagement() {
       availableUntil: undefined,
       availableOnKiosk: true,
       availableOnWebsite: true,
-      availableInCart: true
+      availableInCart: true,
+      stockLimit: null,
     });
     setTemplateHasAvailabilityDates(false);
     setTemplateHasNoEndDate(false);
+    setTemplateHasStockLimit(false);
     setEditingTemplate(null);
     setIsCreateTemplateOpen(false);
   };
@@ -325,7 +329,7 @@ export default function PackagesManagement() {
     setIsCreatePlanOpen(true);
   };
 
-  const handleEditTemplate = (template: PunchCardTemplate) => {
+  const handleEditTemplate = (template: PunchCardTemplate & { soldCount?: number }) => {
     setEditingTemplate(template);
     setTemplateFormData({
       name: template.name,
@@ -339,10 +343,12 @@ export default function PackagesManagement() {
       availableUntil: template.availableUntil || undefined,
       availableOnKiosk: template.availableOnKiosk ?? true,
       availableOnWebsite: template.availableOnWebsite ?? true,
-      availableInCart: template.availableInCart ?? true
+      availableInCart: template.availableInCart ?? true,
+      stockLimit: (template as any).stockLimit ?? null,
     });
     setTemplateHasAvailabilityDates(!!(template.availableFrom || template.availableUntil));
     setTemplateHasNoEndDate(!template.availableUntil && !!template.availableFrom);
+    setTemplateHasStockLimit((template as any).stockLimit !== null && (template as any).stockLimit !== undefined);
     setIsCreateTemplateOpen(true);
   };
 
@@ -376,6 +382,7 @@ export default function PackagesManagement() {
     templateMutation.mutate({
       ...templateFormData,
       totalPrice,
+      stockLimit: templateHasStockLimit ? (templateFormData.stockLimit ?? null) : null,
     } as InsertPunchCardTemplate);
   };
 
@@ -922,6 +929,15 @@ export default function PackagesManagement() {
                       <span>Total Price:</span>
                       <span>${(template.totalPrice / 100).toFixed(2)}</span>
                     </div>
+                    {(template as any).stockLimit !== null && (template as any).stockLimit !== undefined && (
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span className="text-muted-foreground">Stock sold:</span>
+                        <span className={`font-medium ${(template as any).soldCount >= (template as any).stockLimit ? 'text-destructive' : ''}`}>
+                          {(template as any).soldCount ?? 0} / {(template as any).stockLimit}
+                          {(template as any).soldCount >= (template as any).stockLimit && ' (Sold out)'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex gap-2">
@@ -1108,6 +1124,47 @@ export default function PackagesManagement() {
                             />
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3 border-t pt-4">
+                    <Label className="text-sm font-medium">Stock / Availability Limit</Label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="template-has-stock-limit"
+                        checked={templateHasStockLimit}
+                        onChange={(e) => {
+                          setTemplateHasStockLimit(e.target.checked);
+                          if (!e.target.checked) {
+                            setTemplateFormData(prev => ({ ...prev, stockLimit: null }));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300"
+                        data-testid="checkbox-template-has-stock-limit"
+                      />
+                      <Label htmlFor="template-has-stock-limit" className="cursor-pointer">
+                        Limit total packages available for sale
+                      </Label>
+                    </div>
+                    {templateHasStockLimit && (
+                      <div>
+                        <Label htmlFor="template-stock-limit">Maximum packages available</Label>
+                        <Input
+                          id="template-stock-limit"
+                          type="number"
+                          min={1}
+                          placeholder="e.g. 50"
+                          value={templateFormData.stockLimit ?? ''}
+                          onChange={(e) => setTemplateFormData(prev => ({
+                            ...prev,
+                            stockLimit: e.target.value ? Number(e.target.value) : null
+                          }))}
+                          data-testid="input-template-stock-limit"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Once this many packages are sold, the day pass will no longer appear for purchase.
+                        </p>
                       </div>
                     )}
                   </div>

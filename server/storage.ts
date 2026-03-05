@@ -29,7 +29,9 @@ import {
   giftCards, type GiftCard, type InsertGiftCard,
   giftCardRedemptions, type GiftCardRedemption, type InsertGiftCardRedemption,
   giftCardDenominations, type GiftCardDenomination, type InsertGiftCardDenomination,
-  waitlist, type Waitlist, type InsertWaitlist
+  waitlist, type Waitlist, type InsertWaitlist,
+  events, type Event, type InsertEvent,
+  eventBookings, type EventBooking, type InsertEventBooking,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
@@ -258,6 +260,21 @@ export interface IStorage {
   getWaitlistEntryById(id: number): Promise<Waitlist | undefined>;
   updateWaitlistEntry(id: number, data: Partial<InsertWaitlist>): Promise<Waitlist>;
   deleteWaitlistEntry(id: number): Promise<void>;
+
+  // Special events methods
+  createEvent(data: InsertEvent): Promise<Event>;
+  getEvents(includeInactive?: boolean): Promise<Event[]>;
+  getEventById(id: number): Promise<Event | undefined>;
+  updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event>;
+  deleteEvent(id: number): Promise<void>;
+
+  // Event bookings methods
+  createEventBooking(data: InsertEventBooking): Promise<EventBooking>;
+  getEventBookingsByUserId(userId: number): Promise<(EventBooking & { event: Event })[]>;
+  getEventBookingsByEventId(eventId: number): Promise<EventBooking[]>;
+  getEventBookingByUserAndEvent(userId: number, eventId: number): Promise<EventBooking | undefined>;
+  cancelEventBooking(id: number): Promise<EventBooking>;
+  getEventBookingById(id: number): Promise<EventBooking | undefined>;
 
   // Session store
   sessionStore: any;
@@ -2171,6 +2188,69 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWaitlistEntry(id: number): Promise<void> {
     await db.delete(waitlist).where(eq(waitlist.id, id));
+  }
+
+  // Special events
+  async createEvent(data: InsertEvent): Promise<Event> {
+    const [event] = await db.insert(events).values(data).returning();
+    return event;
+  }
+
+  async getEvents(includeInactive = false): Promise<Event[]> {
+    const query = db.select().from(events);
+    if (!includeInactive) {
+      return query.where(eq(events.isActive, true)).orderBy(events.date, events.startTime);
+    }
+    return query.orderBy(events.date, events.startTime);
+  }
+
+  async getEventById(id: number): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    return event;
+  }
+
+  async updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event> {
+    const [event] = await db.update(events).set(data).where(eq(events.id, id)).returning();
+    return event;
+  }
+
+  async deleteEvent(id: number): Promise<void> {
+    await db.delete(events).where(eq(events.id, id));
+  }
+
+  // Event bookings
+  async createEventBooking(data: InsertEventBooking): Promise<EventBooking> {
+    const [booking] = await db.insert(eventBookings).values(data).returning();
+    return booking;
+  }
+
+  async getEventBookingsByUserId(userId: number): Promise<(EventBooking & { event: Event })[]> {
+    const rows = await db.select().from(eventBookings)
+      .innerJoin(events, eq(eventBookings.eventId, events.id))
+      .where(and(eq(eventBookings.userId, userId), eq(eventBookings.status, 'confirmed')))
+      .orderBy(events.date);
+    return rows.map(r => ({ ...r.event_bookings, event: r.events }));
+  }
+
+  async getEventBookingsByEventId(eventId: number): Promise<EventBooking[]> {
+    return db.select().from(eventBookings)
+      .where(and(eq(eventBookings.eventId, eventId), eq(eventBookings.status, 'confirmed')));
+  }
+
+  async getEventBookingByUserAndEvent(userId: number, eventId: number): Promise<EventBooking | undefined> {
+    const [booking] = await db.select().from(eventBookings)
+      .where(and(eq(eventBookings.userId, userId), eq(eventBookings.eventId, eventId), eq(eventBookings.status, 'confirmed')));
+    return booking;
+  }
+
+  async cancelEventBooking(id: number): Promise<EventBooking> {
+    const [booking] = await db.update(eventBookings).set({ status: 'cancelled' }).where(eq(eventBookings.id, id)).returning();
+    return booking;
+  }
+
+  async getEventBookingById(id: number): Promise<EventBooking | undefined> {
+    const [booking] = await db.select().from(eventBookings).where(eq(eventBookings.id, id));
+    return booking;
   }
 }
 

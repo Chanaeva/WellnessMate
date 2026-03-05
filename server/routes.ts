@@ -5990,6 +5990,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========================================================
+  // Special Events
+  // =========================================================
+
+  // Public: get all upcoming active events (for member dashboard)
+  app.get("/api/events", isAuthenticated, async (req, res) => {
+    try {
+      const allEvents = await storage.getEvents(false);
+      res.json(allEvents);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: get all events (including inactive)
+  app.get("/api/admin/events", isAdminOrStaff, async (req, res) => {
+    try {
+      const allEvents = await storage.getEvents(true);
+      // Attach booking counts
+      const withCounts = await Promise.all(
+        allEvents.map(async (event) => {
+          const bookings = await storage.getEventBookingsByEventId(event.id);
+          return { ...event, bookedCount: bookings.length };
+        })
+      );
+      res.json(withCounts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: create event
+  app.post("/api/admin/events", isAdmin, async (req, res) => {
+    try {
+      const data = req.body;
+      if (!data.title || !data.date || !data.startTime || !data.endTime) {
+        return res.status(400).json({ message: "title, date, startTime, and endTime are required" });
+      }
+      const event = await storage.createEvent(data);
+      res.json(event);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: update event
+  app.patch("/api/admin/events/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const event = await storage.getEventById(id);
+      if (!event) return res.status(404).json({ message: "Event not found" });
+      const updated = await storage.updateEvent(id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: delete event
+  app.delete("/api/admin/events/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteEvent(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: get my event bookings
+  app.get("/api/event-bookings", isAuthenticated, async (req, res) => {
+    try {
+      const bookings = await storage.getEventBookingsByUserId(req.user!.id);
+      res.json(bookings);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: book an event
+  app.post("/api/event-bookings", isAuthenticated, async (req, res) => {
+    try {
+      const { eventId } = req.body;
+      if (!eventId) return res.status(400).json({ message: "eventId is required" });
+
+      const event = await storage.getEventById(eventId);
+      if (!event || !event.isActive) {
+        return res.status(404).json({ message: "Event not found or no longer available" });
+      }
+
+      // Check capacity
+      const existingBookings = await storage.getEventBookingsByEventId(eventId);
+      if (existingBookings.length >= event.capacity) {
+        return res.status(400).json({ message: "This event is fully booked" });
+      }
+
+      // Check for duplicate booking
+      const alreadyBooked = await storage.getEventBookingByUserAndEvent(req.user!.id, eventId);
+      if (alreadyBooked) {
+        return res.status(400).json({ message: "You have already booked this event" });
+      }
+
+      const booking = await storage.createEventBooking({ userId: req.user!.id, eventId, status: 'confirmed' });
+      res.json(booking);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: cancel an event booking
+  app.delete("/api/event-bookings/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const booking = await storage.getEventBookingById(id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (booking.userId !== req.user!.id) return res.status(403).json({ message: "Not authorized" });
+      const cancelled = await storage.cancelEventBooking(id);
+      res.json(cancelled);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Admin route to get all site settings
   app.get("/api/admin/config-settings", isAdmin, async (req, res) => {
     try {

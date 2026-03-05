@@ -890,3 +890,41 @@ export const insertWaitlistSchema = createInsertSchema(waitlist).omit({
 
 export type Waitlist = typeof waitlist.$inferSelect;
 export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
+
+// Special events table - one-time bookable events created by admins
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  date: text("date").notNull(), // YYYY-MM-DD
+  startTime: text("start_time").notNull(), // e.g., "6:00 PM"
+  endTime: text("end_time").notNull(), // e.g., "8:00 PM"
+  capacity: integer("capacity").notNull().default(20),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertEventSchema = createInsertSchema(events).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+
+// Event bookings table - member reservations for special events
+export const eventBookings = pgTable("event_bookings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  eventId: integer("event_id").notNull().references(() => events.id),
+  status: text("status").notNull().default('confirmed'), // confirmed | cancelled
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertEventBookingSchema = createInsertSchema(eventBookings).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type EventBooking = typeof eventBookings.$inferSelect;
+export type InsertEventBooking = z.infer<typeof insertEventBookingSchema>;

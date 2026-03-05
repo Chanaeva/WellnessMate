@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { SessionConfig, DayPassHours, Waitlist } from "@shared/schema";
+import { SessionConfig, DayPassHours, Waitlist, Event } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar, Pencil, Trash2, UserPlus, ClipboardList, BellRing } from "lucide-react";
+import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar, Pencil, Trash2, UserPlus, ClipboardList, BellRing, Sparkles, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function AdminSessions() {
   const { toast } = useToast();
@@ -176,6 +176,85 @@ export default function AdminSessions() {
       toast({ title: "Error", description: error.message || "Failed to remove entry", variant: "destructive" });
     },
   });
+
+  // Events state
+  type EventWithCount = Event & { bookedCount: number };
+  const blankEventForm = { title: '', description: '', date: todayLocal, startTime: '', endTime: '', capacity: 20, isActive: true };
+  const [showAddEventForm, setShowAddEventForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventWithCount | null>(null);
+  const [eventFormData, setEventFormData] = useState(blankEventForm);
+
+  const { data: adminEvents = [], isLoading: isEventsLoading } = useQuery<EventWithCount[]>({
+    queryKey: ["/api/admin/events"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/events");
+      return res.json();
+    },
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: async (data: typeof blankEventForm) => {
+      const res = await apiRequest("POST", "/api/admin/events", data);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Event Created", description: "The special event has been created." });
+      setShowAddEventForm(false);
+      setEventFormData(blankEventForm);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create event", variant: "destructive" });
+    },
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof blankEventForm }) => {
+      const res = await apiRequest("PATCH", `/api/admin/events/${id}`, data);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Event Updated", description: "The event has been saved." });
+      setEditingEvent(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update event", variant: "destructive" });
+    },
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/events/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Deleted", description: "The event has been removed." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete event", variant: "destructive" });
+    },
+  });
+
+  const startEditEvent = (event: EventWithCount) => {
+    setEditingEvent(event);
+    setEventFormData({
+      title: event.title,
+      description: event.description ?? '',
+      date: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      capacity: event.capacity,
+      isActive: event.isActive,
+    });
+    setShowAddEventForm(false);
+  };
 
   const morningSession = sessions?.find(s => s.sessionType === 'morning');
   const eveningSession = sessions?.find(s => s.sessionType === 'evening');
@@ -871,6 +950,179 @@ export default function AdminSessions() {
               ))
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Special Events Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <CardTitle>Special Events</CardTitle>
+                <CardDescription>Create one-time events that members can book from their dashboard</CardDescription>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => { setShowAddEventForm(true); setEditingEvent(null); setEventFormData(blankEventForm); }}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              New Event
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add / Edit Event Form */}
+          {(showAddEventForm || editingEvent) && (
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-sm">{editingEvent ? 'Edit Event' : 'Create New Event'}</h4>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setShowAddEventForm(false); setEditingEvent(null); }}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label className="text-xs">Event Title *</Label>
+                  <Input
+                    placeholder="e.g., Moonlit Soak Night, Wellness Workshop"
+                    value={eventFormData.title}
+                    onChange={e => setEventFormData(p => ({ ...p, title: e.target.value }))}
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label className="text-xs">Description (optional)</Label>
+                  <Textarea
+                    placeholder="Briefly describe the event for members"
+                    rows={2}
+                    value={eventFormData.description}
+                    onChange={e => setEventFormData(p => ({ ...p, description: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Date *</Label>
+                  <Input
+                    type="date"
+                    value={eventFormData.date}
+                    onChange={e => setEventFormData(p => ({ ...p, date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Capacity</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={eventFormData.capacity}
+                    onChange={e => setEventFormData(p => ({ ...p, capacity: parseInt(e.target.value) || 20 }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Start Time *</Label>
+                  <Input
+                    placeholder="e.g., 6:00 PM"
+                    value={eventFormData.startTime}
+                    onChange={e => setEventFormData(p => ({ ...p, startTime: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">End Time *</Label>
+                  <Input
+                    placeholder="e.g., 9:00 PM"
+                    value={eventFormData.endTime}
+                    onChange={e => setEventFormData(p => ({ ...p, endTime: e.target.value }))}
+                  />
+                </div>
+                <div className="sm:col-span-2 flex items-center gap-2">
+                  <Switch
+                    checked={eventFormData.isActive}
+                    onCheckedChange={v => setEventFormData(p => ({ ...p, isActive: v }))}
+                  />
+                  <Label className="text-sm">Visible to members (active)</Label>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (!eventFormData.title.trim() || !eventFormData.date || !eventFormData.startTime || !eventFormData.endTime) {
+                      toast({ title: "Required fields missing", description: "Please fill in title, date, start time, and end time.", variant: "destructive" });
+                      return;
+                    }
+                    if (editingEvent) {
+                      updateEventMutation.mutate({ id: editingEvent.id, data: eventFormData });
+                    } else {
+                      createEventMutation.mutate(eventFormData);
+                    }
+                  }}
+                  disabled={createEventMutation.isPending || updateEventMutation.isPending}
+                >
+                  {(createEventMutation.isPending || updateEventMutation.isPending) && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                  {editingEvent ? 'Save Changes' : 'Create Event'}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setShowAddEventForm(false); setEditingEvent(null); }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Event list */}
+          {isEventsLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : adminEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No special events yet. Create one to let members book it from their dashboard.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {adminEvents.map(event => {
+                const formattedDate = new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                const isPast = event.date < todayLocal;
+                return (
+                  <div key={event.id} className={`flex items-start justify-between p-3 border rounded-lg gap-3 ${isPast ? 'opacity-60' : ''}`}>
+                    <div className="min-w-0 space-y-0.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate">{event.title}</p>
+                        {!event.isActive && <Badge variant="secondary" className="text-xs">Hidden</Badge>}
+                        {isPast && <Badge variant="outline" className="text-xs text-muted-foreground">Past</Badge>}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{formattedDate} · {event.startTime} – {event.endTime}</p>
+                      {event.description && <p className="text-xs text-muted-foreground italic">{event.description}</p>}
+                      <p className="text-xs text-muted-foreground">{event.bookedCount} / {event.capacity} booked</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        title="Edit event"
+                        onClick={() => startEditEvent(event)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Delete event"
+                        onClick={() => deleteEventMutation.mutate(event.id)}
+                        disabled={deleteEventMutation.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 

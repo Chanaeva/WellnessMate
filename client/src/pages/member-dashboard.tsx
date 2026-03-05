@@ -12,6 +12,8 @@ import {
   SessionConfig,
   SessionBooking,
   HoursOfOperation,
+  Event,
+  EventBooking,
 } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -207,6 +209,18 @@ export default function MemberDashboard() {
   // Fetch user's session bookings
   const { data: mySessionBookings = [] } = useQuery<SessionBooking[]>({
     queryKey: ["/api/session-bookings"],
+    enabled: !!user,
+  });
+
+  // Fetch available events
+  const { data: upcomingEvents = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
+    enabled: !!user,
+  });
+
+  // Fetch my event bookings
+  const { data: myEventBookings = [] } = useQuery<(EventBooking & { event: Event })[]>({
+    queryKey: ["/api/event-bookings"],
     enabled: !!user,
   });
 
@@ -495,6 +509,46 @@ export default function MemberDashboard() {
         description: error.message || "Failed to cancel booking",
         variant: "destructive",
       });
+    },
+  });
+
+  // Book an event
+  const bookEventMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const response = await apiRequest("POST", "/api/event-bookings", { eventId });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to book event");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/event-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Event Booked", description: "You're registered for this event." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Booking Failed", description: error.message || "Could not book this event", variant: "destructive" });
+    },
+  });
+
+  // Cancel an event booking
+  const cancelEventBookingMutation = useMutation({
+    mutationFn: async (bookingId: number) => {
+      const response = await apiRequest("DELETE", `/api/event-bookings/${bookingId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to cancel event booking");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/event-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Booking Cancelled", description: "Your event booking has been cancelled." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to cancel event booking", variant: "destructive" });
     },
   });
 
@@ -819,6 +873,64 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Special Events */}
+            {upcomingEvents.length > 0 && (
+              <Card className="wellness-card">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading text-foreground flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-purple-500" />
+                    Special Events
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {upcomingEvents.map(event => {
+                    const myBooking = myEventBookings.find(b => b.eventId === event.id && b.status === 'confirmed');
+                    const isBooked = !!myBooking;
+                    const formattedDate = new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', {
+                      weekday: 'long', month: 'long', day: 'numeric',
+                    });
+                    return (
+                      <div key={event.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <p className="font-semibold text-foreground">{event.title}</p>
+                            <p className="text-sm text-muted-foreground">{formattedDate} · {event.startTime} – {event.endTime}</p>
+                            {event.description && (
+                              <p className="text-sm text-muted-foreground">{event.description}</p>
+                            )}
+                          </div>
+                          {isBooked && (
+                            <Badge className="bg-green-600 shrink-0">Booked</Badge>
+                          )}
+                        </div>
+                        {isBooked ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive border-destructive/40 hover:bg-destructive/5 hover:border-destructive"
+                            onClick={() => cancelEventBookingMutation.mutate(myBooking.id)}
+                            disabled={cancelEventBookingMutation.isPending}
+                          >
+                            {cancelEventBookingMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                            Cancel Booking
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => bookEventMutation.mutate(event.id)}
+                            disabled={bookEventMutation.isPending}
+                          >
+                            {bookEventMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                            Book Event
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </CardContent>
               </Card>
             )}

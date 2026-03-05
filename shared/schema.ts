@@ -932,3 +932,58 @@ export const insertEventBookingSchema = createInsertSchema(eventBookings).omit({
 
 export type EventBooking = typeof eventBookings.$inferSelect;
 export type InsertEventBooking = z.infer<typeof insertEventBookingSchema>;
+
+// ─── Operational Checklists ───────────────────────────────────────────────────
+
+// Configurable master list of tasks per checklist type
+export const checklistItems = pgTable("checklist_items", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // 'opening' | 'closing' | 'hourly'
+  category: text("category"),   // optional grouping label e.g. "Safety", "Facilities"
+  text: text("text").notNull(), // the task description
+  sortOrder: integer("sort_order").notNull().default(0),
+  isRequired: boolean("is_required").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertChecklistItemSchema = createInsertSchema(checklistItems).omit({
+  id: true,
+  createdAt: true,
+});
+export type ChecklistItem = typeof checklistItems.$inferSelect;
+export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
+
+// A "run" = one instance of staff working through a checklist for a given shift/date
+export const checklistRuns = pgTable("checklist_runs", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // 'opening' | 'closing' | 'hourly'
+  date: text("date").notNull(), // YYYY-MM-DD
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  startedByUserId: integer("started_by_user_id"),
+  notes: text("notes"),
+});
+
+export const insertChecklistRunSchema = createInsertSchema(checklistRuns).omit({
+  id: true,
+  startedAt: true,
+});
+export type ChecklistRun = typeof checklistRuns.$inferSelect;
+export type InsertChecklistRun = z.infer<typeof insertChecklistRunSchema>;
+
+// Individual items checked off within a run
+export const checklistRunItems = pgTable("checklist_run_items", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull().references(() => checklistRuns.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").notNull().references(() => checklistItems.id, { onDelete: "cascade" }),
+  completedAt: timestamp("completed_at").notNull().defaultNow(),
+  completedByUserId: integer("completed_by_user_id"),
+});
+
+export const insertChecklistRunItemSchema = createInsertSchema(checklistRunItems).omit({
+  id: true,
+  completedAt: true,
+});
+export type ChecklistRunItem = typeof checklistRunItems.$inferSelect;
+export type InsertChecklistRunItem = z.infer<typeof insertChecklistRunItemSchema>;

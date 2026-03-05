@@ -7535,6 +7535,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Checklist Routes ─────────────────────────────────────────────────────
+
+  // Summary for overview cards (today's completion counts for all three types)
+  app.get("/api/admin/checklist-summary", isAdminOrStaff, async (req, res) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const summary = await storage.getTodayChecklistSummary(today);
+      res.json(summary);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Get items for a checklist type (or all)
+  app.get("/api/admin/checklist-items", isAdminOrStaff, async (req, res) => {
+    try {
+      const type = req.query.type as string | undefined;
+      const items = await storage.getChecklistItems(type);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/admin/checklist-items", isAdminOrStaff, async (req, res) => {
+    try {
+      const item = await storage.createChecklistItem(req.body);
+      res.status(201).json(item);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.put("/api/admin/checklist-items/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const item = await storage.updateChecklistItem(id, req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.delete("/api/admin/checklist-items/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteChecklistItem(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Get runs for a type + date
+  app.get("/api/admin/checklist-runs", isAdminOrStaff, async (req, res) => {
+    try {
+      const { type, date } = req.query as { type: string; date: string };
+      if (!type || !date) return res.status(400).json({ message: "type and date required" });
+      const runs = await storage.getChecklistRuns(type, date);
+      res.json(runs);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/admin/checklist-runs", isAdminOrStaff, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const run = await storage.createChecklistRun({ ...req.body, startedByUserId: userId });
+      res.status(201).json(run);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.put("/api/admin/checklist-runs/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const run = await storage.updateChecklistRun(id, req.body);
+      res.json(run);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Get checked items for a run
+  app.get("/api/admin/checklist-runs/:id/items", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const items = await storage.getChecklistRunItems(id);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Check an item (mark done)
+  app.post("/api/admin/checklist-runs/:id/items/:itemId", isAdminOrStaff, async (req, res) => {
+    try {
+      const runId = Number(req.params.id);
+      const itemId = Number(req.params.itemId);
+      const userId = req.user?.id;
+      const runItem = await storage.checkChecklistItem(runId, itemId, userId);
+      res.status(201).json(runItem);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Uncheck an item
+  app.delete("/api/admin/checklist-runs/:id/items/:itemId", isAdminOrStaff, async (req, res) => {
+    try {
+      const runId = Number(req.params.id);
+      const itemId = Number(req.params.itemId);
+      await storage.uncheckChecklistItem(runId, itemId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

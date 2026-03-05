@@ -32,6 +32,9 @@ import {
   waitlist, type Waitlist, type InsertWaitlist,
   events, type Event, type InsertEvent,
   eventBookings, type EventBooking, type InsertEventBooking,
+  checklistItems, type ChecklistItem, type InsertChecklistItem,
+  checklistRuns, type ChecklistRun, type InsertChecklistRun,
+  checklistRunItems, type ChecklistRunItem,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
@@ -276,6 +279,23 @@ export interface IStorage {
   getEventBookingByUserAndEvent(userId: number, eventId: number): Promise<EventBooking | undefined>;
   cancelEventBooking(id: number): Promise<EventBooking>;
   getEventBookingById(id: number): Promise<EventBooking | undefined>;
+
+  // Checklist methods
+  getChecklistItems(type?: string): Promise<ChecklistItem[]>;
+  createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem>;
+  updateChecklistItem(id: number, item: Partial<InsertChecklistItem>): Promise<ChecklistItem>;
+  deleteChecklistItem(id: number): Promise<void>;
+  getChecklistRuns(type: string, date: string): Promise<ChecklistRun[]>;
+  createChecklistRun(run: InsertChecklistRun): Promise<ChecklistRun>;
+  updateChecklistRun(id: number, data: Partial<ChecklistRun>): Promise<ChecklistRun>;
+  getChecklistRunItems(runId: number): Promise<ChecklistRunItem[]>;
+  checkChecklistItem(runId: number, itemId: number, userId?: number): Promise<ChecklistRunItem>;
+  uncheckChecklistItem(runId: number, itemId: number): Promise<void>;
+  getTodayChecklistSummary(today: string): Promise<{
+    opening: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+    closing: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+    hourly: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+  }>;
 
   // Session store
   sessionStore: any;
@@ -2259,6 +2279,95 @@ export class DatabaseStorage implements IStorage {
   async getEventBookingById(id: number): Promise<EventBooking | undefined> {
     const [booking] = await db.select().from(eventBookings).where(eq(eventBookings.id, id));
     return booking;
+  }
+
+  // ─── Checklist methods ────────────────────────────────────────────────────
+
+  async getChecklistItems(type?: string): Promise<ChecklistItem[]> {
+    if (type) {
+      return db.select().from(checklistItems)
+        .where(and(eq(checklistItems.type, type), eq(checklistItems.isActive, true)))
+        .orderBy(checklistItems.sortOrder, checklistItems.id);
+    }
+    return db.select().from(checklistItems)
+      .where(eq(checklistItems.isActive, true))
+      .orderBy(checklistItems.type, checklistItems.sortOrder, checklistItems.id);
+  }
+
+  async createChecklistItem(item: InsertChecklistItem): Promise<ChecklistItem> {
+    const [created] = await db.insert(checklistItems).values(item).returning();
+    return created;
+  }
+
+  async updateChecklistItem(id: number, item: Partial<InsertChecklistItem>): Promise<ChecklistItem> {
+    const [updated] = await db.update(checklistItems).set(item).where(eq(checklistItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteChecklistItem(id: number): Promise<void> {
+    await db.update(checklistItems).set({ isActive: false }).where(eq(checklistItems.id, id));
+  }
+
+  async getChecklistRuns(type: string, date: string): Promise<ChecklistRun[]> {
+    return db.select().from(checklistRuns)
+      .where(and(eq(checklistRuns.type, type), eq(checklistRuns.date, date)))
+      .orderBy(desc(checklistRuns.startedAt));
+  }
+
+  async createChecklistRun(run: InsertChecklistRun): Promise<ChecklistRun> {
+    const [created] = await db.insert(checklistRuns).values(run).returning();
+    return created;
+  }
+
+  async updateChecklistRun(id: number, data: Partial<ChecklistRun>): Promise<ChecklistRun> {
+    const [updated] = await db.update(checklistRuns).set(data).where(eq(checklistRuns.id, id)).returning();
+    return updated;
+  }
+
+  async getChecklistRunItems(runId: number): Promise<ChecklistRunItem[]> {
+    return db.select().from(checklistRunItems).where(eq(checklistRunItems.runId, runId));
+  }
+
+  async checkChecklistItem(runId: number, itemId: number, userId?: number): Promise<ChecklistRunItem> {
+    // Upsert: remove existing then insert
+    await db.delete(checklistRunItems)
+      .where(and(eq(checklistRunItems.runId, runId), eq(checklistRunItems.itemId, itemId)));
+    const [created] = await db.insert(checklistRunItems)
+      .values({ runId, itemId, completedByUserId: userId ?? null })
+      .returning();
+    return created;
+  }
+
+  async uncheckChecklistItem(runId: number, itemId: number): Promise<void> {
+    await db.delete(checklistRunItems)
+      .where(and(eq(checklistRunItems.runId, runId), eq(checklistRunItems.itemId, itemId)));
+  }
+
+  async getTodayChecklistSummary(today: string): Promise<{
+    opening: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+    closing: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+    hourly: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+  }> {
+    const types = ['opening', 'closing', 'hourly'] as const;
+    const result: any = {};
+    for (const type of types) {
+      const items = await this.getChecklistItems(type);
+      const total = items.length;
+      const runs = await this.getChecklistRuns(type, today);
+      const latestRun = runs[0];
+      let completed = 0;
+      if (latestRun) {
+        const runItems = await this.getChecklistRunItems(latestRun.id);
+        completed = runItems.length;
+      }
+      result[type] = {
+        total,
+        completed,
+        hasRun: !!latestRun,
+        isComplete: !!latestRun?.completedAt,
+      };
+    }
+    return result;
   }
 }
 

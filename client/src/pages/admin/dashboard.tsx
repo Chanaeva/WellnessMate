@@ -26,7 +26,13 @@ import {
   DollarSign,
   Monitor,
   ExternalLink,
-  QrCode
+  QrCode,
+  Sunrise,
+  Sunset,
+  ClipboardList,
+  CheckCircle2,
+  CircleDashed,
+  ArrowRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -49,6 +55,7 @@ import AdminDayPasses from "./day-passes";
 import AdminCheckIns from "./check-ins";
 import AdminCardReaderSplash from "./card-reader-splash";
 import AdminGiftCards from "./gift-cards";
+import AdminChecklists from "./checklists";
 
 // Form schema for adding new member
 const newMemberSchema = insertUserSchema.extend({
@@ -65,6 +72,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [selectedPeriod, setSelectedPeriod] = useState("week");
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Queries
   const { data: members, isLoading: membersLoading } = useQuery<(User & {membership?: Membership})[]>({
@@ -114,6 +122,19 @@ export default function AdminDashboard() {
       const res = await apiRequest("GET", `/api/admin/session-bookings?fromDate=${today}`);
       return res.json();
     },
+  });
+
+  const { data: checklistSummary } = useQuery<{
+    opening: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+    closing: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+    hourly: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
+  }>({
+    queryKey: ["/api/admin/checklist-summary"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/checklist-summary");
+      return res.json();
+    },
+    refetchInterval: 60000,
   });
 
   // Form for adding new member
@@ -184,7 +205,7 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">Manage your wellness center operations</p>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="flex w-full overflow-x-auto gap-1 px-1 whitespace-nowrap">
             <TabsTrigger value="overview" className="flex-shrink-0">Overview</TabsTrigger>
             <TabsTrigger value="members" className="flex-shrink-0">Members</TabsTrigger>
@@ -198,6 +219,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="landing-page" className="flex-shrink-0">Landing Page</TabsTrigger>
             <TabsTrigger value="notifications" className="flex-shrink-0">Notifications</TabsTrigger>
             <TabsTrigger value="gift-cards" className="flex-shrink-0">Gift Cards</TabsTrigger>
+            <TabsTrigger value="checklists" className="flex-shrink-0">Checklists</TabsTrigger>
             <TabsTrigger value="analytics" className="flex-shrink-0">Analytics</TabsTrigger>
             <TabsTrigger value="card-reader" className="flex-shrink-0">Card Reader</TabsTrigger>
           </TabsList>
@@ -317,6 +339,78 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+              {/* Shift Checklists Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    Shift Checklists
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">Today's operational checklist status</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {([
+                      { key: "opening", label: "Opening", icon: Sunrise, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-950/20" },
+                      { key: "closing", label: "Closing", icon: Sunset, color: "text-indigo-500", bg: "bg-indigo-50 dark:bg-indigo-950/20" },
+                      { key: "hourly",  label: "Hourly",  icon: Clock,   color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-950/20" },
+                    ] as const).map(({ key, label, icon: Icon, color, bg }) => {
+                      const s = checklistSummary?.[key];
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setActiveTab("checklists")}
+                          className={`rounded-xl p-4 text-left border transition-all hover:shadow-md ${bg} border-border`}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Icon className={`h-5 w-5 ${color}`} />
+                              <span className="font-semibold text-sm">{label}</span>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          {s ? (
+                            <>
+                              <div className="text-2xl font-bold mb-1">
+                                {s.completed}/{s.total}
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all ${s.isComplete ? "bg-green-500" : "bg-primary"}`}
+                                  style={{ width: s.total > 0 ? `${Math.round((s.completed / s.total) * 100)}%` : "0%" }}
+                                />
+                              </div>
+                              {s.isComplete ? (
+                                <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Complete
+                                </Badge>
+                              ) : s.hasRun ? (
+                                <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                                  In Progress
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-muted-foreground text-xs">
+                                  <CircleDashed className="h-3 w-3 mr-1" />
+                                  Not Started
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">Loading...</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+          </TabsContent>
+
+          {/* Checklists Tab */}
+          <TabsContent value="checklists" className="space-y-6">
+            <AdminChecklists />
           </TabsContent>
 
           {/* Members Tab */}

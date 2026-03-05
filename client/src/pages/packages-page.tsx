@@ -513,16 +513,23 @@ export default function PackagesPage() {
                 >
                   <div className="h-40 bg-gradient-to-br from-accent/20 to-muted/15 relative">
                     <div className="absolute inset-0 bg-black/5"></div>
+                    {(template as any).badgeText && (
+                      <Badge className="absolute top-3 right-3 bg-secondary text-secondary-foreground border-0 shadow-sm z-10">
+                        {(template as any).badgeText}
+                      </Badge>
+                    )}
                     <div className="relative h-full flex flex-col items-center justify-center p-4">
                       <div className="bg-primary/15 p-3 rounded-full mb-2">
                         <Waves className="h-8 w-8 text-primary" />
                       </div>
                       <h3 className="text-lg font-heading text-foreground text-center font-semibold">
-                        Sacred Passage
+                        {template.name}
                       </h3>
-                      <p className="text-xs text-foreground/80 text-center mt-1 font-medium">
-                        Flexible wellness visits
-                      </p>
+                      {template.description && (
+                        <p className="text-xs text-foreground/80 text-center mt-1 font-medium line-clamp-2">
+                          {template.description}
+                        </p>
+                      )}
                     </div>
                   </div>
 

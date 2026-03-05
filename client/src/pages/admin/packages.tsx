@@ -54,7 +54,7 @@ export default function PackagesManagement() {
   // Punch card template state
   const [editingTemplate, setEditingTemplate] = useState<PunchCardTemplate | null>(null);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
-  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate> & { stockLimit?: number | null }>({
+  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate> & { stockLimit?: number | null; badgeText?: string | null }>({
     name: '',
     totalPunches: 0,
     pricePerPunch: 0,
@@ -68,6 +68,7 @@ export default function PackagesManagement() {
     availableOnWebsite: true,
     availableInCart: true,
     stockLimit: null,
+    badgeText: null,
   });
   const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
   const [templateHasAvailabilityDates, setTemplateHasAvailabilityDates] = useState(false);
@@ -300,6 +301,7 @@ export default function PackagesManagement() {
       availableOnWebsite: true,
       availableInCart: true,
       stockLimit: null,
+      badgeText: null,
     });
     setTemplateHasAvailabilityDates(false);
     setTemplateHasNoEndDate(false);
@@ -345,6 +347,7 @@ export default function PackagesManagement() {
       availableOnWebsite: template.availableOnWebsite ?? true,
       availableInCart: template.availableInCart ?? true,
       stockLimit: (template as any).stockLimit ?? null,
+      badgeText: (template as any).badgeText ?? null,
     });
     setTemplateHasAvailabilityDates(!!(template.availableFrom || template.availableUntil));
     setTemplateHasNoEndDate(!template.availableUntil && !!template.availableFrom);
@@ -911,9 +914,16 @@ export default function PackagesManagement() {
                       <h3 className="font-semibold text-lg">{template.name}</h3>
                       <p className="text-sm text-muted-foreground">{template.description}</p>
                     </div>
-                    <Badge variant={template.isActive ? "default" : "secondary"}>
-                      {template.isActive ? "Active" : "Inactive"}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={template.isActive ? "default" : "secondary"}>
+                        {template.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                      {(template as any).badgeText && (
+                        <Badge variant="outline" className="text-xs bg-secondary/20 border-secondary/40">
+                          {(template as any).badgeText}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="space-y-2 mb-4">
@@ -1054,6 +1064,17 @@ export default function PackagesManagement() {
                       onChange={(e) => setTemplateFormData(prev => ({...prev, description: e.target.value}))}
                       placeholder="Brief description of this package"
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="template-badge-text">Badge Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      id="template-badge-text"
+                      value={templateFormData.badgeText || ''}
+                      onChange={(e) => setTemplateFormData(prev => ({...prev, badgeText: e.target.value || null}))}
+                      placeholder="e.g. Best Value, Popular, Limited Time"
+                      data-testid="input-template-badge-text"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Shown as a highlighted badge on the card visible to members.</p>
                   </div>
                   <div className="space-y-3 border-t pt-4">
                     <div className="flex items-center space-x-2">

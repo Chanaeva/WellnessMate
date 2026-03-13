@@ -6045,14 +6045,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/events", isAdminOrStaff, async (req, res) => {
     try {
       const allEvents = await storage.getEvents(true);
-      // Attach booking counts
-      const withCounts = await Promise.all(
+      const withBookings = await Promise.all(
         allEvents.map(async (event) => {
-          const bookings = await storage.getEventBookingsByEventId(event.id);
-          return { ...event, bookedCount: bookings.length };
+          const bookings = await storage.getEventBookingsByEventIdWithUsers(event.id);
+          return {
+            ...event,
+            bookedCount: bookings.length,
+            bookings: bookings.map(b => ({
+              id: b.id,
+              userId: b.user.id,
+              firstName: b.user.firstName,
+              lastName: b.user.lastName,
+              email: b.user.email,
+              createdAt: b.createdAt,
+            })),
+          };
         })
       );
-      res.json(withCounts);
+      res.json(withBookings);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

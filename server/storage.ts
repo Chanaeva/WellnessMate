@@ -276,6 +276,7 @@ export interface IStorage {
   createEventBooking(data: InsertEventBooking): Promise<EventBooking>;
   getEventBookingsByUserId(userId: number): Promise<(EventBooking & { event: Event })[]>;
   getEventBookingsByEventId(eventId: number): Promise<EventBooking[]>;
+  getEventBookingsByEventIdWithUsers(eventId: number): Promise<(EventBooking & { user: { id: number; firstName: string | null; lastName: string | null; email: string } })[]>;
   getEventBookingByUserAndEvent(userId: number, eventId: number): Promise<EventBooking | undefined>;
   cancelEventBooking(id: number): Promise<EventBooking>;
   getEventBookingById(id: number): Promise<EventBooking | undefined>;
@@ -2263,6 +2264,23 @@ export class DatabaseStorage implements IStorage {
   async getEventBookingsByEventId(eventId: number): Promise<EventBooking[]> {
     return db.select().from(eventBookings)
       .where(and(eq(eventBookings.eventId, eventId), eq(eventBookings.status, 'confirmed')));
+  }
+
+  async getEventBookingsByEventIdWithUsers(eventId: number): Promise<(EventBooking & { user: { id: number; firstName: string | null; lastName: string | null; email: string } })[]> {
+    const rows = await db.select({
+      booking: eventBookings,
+      userId: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    }).from(eventBookings)
+      .innerJoin(users, eq(eventBookings.userId, users.id))
+      .where(and(eq(eventBookings.eventId, eventId), eq(eventBookings.status, 'confirmed')))
+      .orderBy(eventBookings.createdAt);
+    return rows.map(r => ({
+      ...r.booking,
+      user: { id: r.userId, firstName: r.firstName, lastName: r.lastName, email: r.email },
+    }));
   }
 
   async getEventBookingByUserAndEvent(userId: number, eventId: number): Promise<EventBooking | undefined> {

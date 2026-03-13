@@ -178,11 +178,13 @@ export default function AdminSessions() {
   });
 
   // Events state
-  type EventWithCount = Event & { bookedCount: number };
+  type EventBookingUser = { id: number; userId: number; firstName: string | null; lastName: string | null; email: string; createdAt: string };
+  type EventWithCount = Event & { bookedCount: number; bookings: EventBookingUser[] };
   const blankEventForm = { title: '', description: '', date: todayLocal, startTime: '', endTime: '', capacity: 20, isActive: true };
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithCount | null>(null);
   const [eventFormData, setEventFormData] = useState(blankEventForm);
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<number>>(new Set());
 
   const { data: adminEvents = [], isLoading: isEventsLoading } = useQuery<EventWithCount[]>({
     queryKey: ["/api/admin/events"],
@@ -1085,39 +1087,78 @@ export default function AdminSessions() {
               {adminEvents.map(event => {
                 const formattedDate = new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
                 const isPast = event.date < todayLocal;
+                const isExpanded = expandedEventIds.has(event.id);
+                const toggleExpand = () => {
+                  setExpandedEventIds(prev => {
+                    const next = new Set(prev);
+                    if (next.has(event.id)) next.delete(event.id);
+                    else next.add(event.id);
+                    return next;
+                  });
+                };
                 return (
-                  <div key={event.id} className={`flex items-start justify-between p-3 border rounded-lg gap-3 ${isPast ? 'opacity-60' : ''}`}>
-                    <div className="min-w-0 space-y-0.5 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate">{event.title}</p>
-                        {!event.isActive && <Badge variant="secondary" className="text-xs">Hidden</Badge>}
-                        {isPast && <Badge variant="outline" className="text-xs text-muted-foreground">Past</Badge>}
+                  <div key={event.id} className={`border rounded-lg ${isPast ? 'opacity-60' : ''}`}>
+                    <div className="flex items-start justify-between p-3 gap-3">
+                      <div className="min-w-0 space-y-0.5 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold truncate">{event.title}</p>
+                          {!event.isActive && <Badge variant="secondary" className="text-xs">Hidden</Badge>}
+                          {isPast && <Badge variant="outline" className="text-xs text-muted-foreground">Past</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{formattedDate} · {event.startTime} – {event.endTime}</p>
+                        {event.description && <p className="text-xs text-muted-foreground italic">{event.description}</p>}
+                        <p className="text-xs text-muted-foreground">{event.bookedCount} / {event.capacity} booked</p>
+                        {event.bookedCount > 0 && (
+                          <button
+                            onClick={toggleExpand}
+                            className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                          >
+                            <Users className="h-3 w-3" />
+                            {isExpanded ? 'Hide attendees' : 'Show attendees'}
+                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">{formattedDate} · {event.startTime} – {event.endTime}</p>
-                      {event.description && <p className="text-xs text-muted-foreground italic">{event.description}</p>}
-                      <p className="text-xs text-muted-foreground">{event.bookedCount} / {event.capacity} booked</p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          title="Edit event"
+                          onClick={() => startEditEvent(event)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Delete event"
+                          onClick={() => deleteEventMutation.mutate(event.id)}
+                          disabled={deleteEventMutation.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        title="Edit event"
-                        onClick={() => startEditEvent(event)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="Delete event"
-                        onClick={() => deleteEventMutation.mutate(event.id)}
-                        disabled={deleteEventMutation.isPending}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    {isExpanded && event.bookings && event.bookings.length > 0 && (
+                      <div className="border-t px-3 py-2 bg-muted/30">
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5">Attendees ({event.bookings.length})</p>
+                        <div className="space-y-1">
+                          {event.bookings.map((b) => (
+                            <div key={b.id} className="flex items-center gap-2 text-xs">
+                              <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0">
+                                {(b.firstName?.[0] || b.email[0]).toUpperCase()}
+                              </div>
+                              <span className="font-medium truncate">
+                                {b.firstName || b.lastName ? `${b.firstName ?? ''} ${b.lastName ?? ''}`.trim() : 'Unknown'}
+                              </span>
+                              <span className="text-muted-foreground truncate">{b.email}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

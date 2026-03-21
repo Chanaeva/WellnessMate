@@ -107,7 +107,18 @@ export default function AdminDashboard() {
     },
   });
 
-  const { data: dashboardSummary = {} } = useQuery({
+  type DashboardSummary = {
+    todayVisits: number;
+    monthlyVisits: number;
+    activeMembers: number;
+    frozenMembers: number;
+    expiredMembers: number;
+    inactiveMembers: number;
+    totalMemberships: number;
+    newMembers: number;
+    growth: { visits: number };
+  };
+  const { data: dashboardSummary } = useQuery<DashboardSummary>({
     queryKey: ["/api/admin/dashboard-summary"],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/admin/dashboard-summary");
@@ -485,7 +496,7 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Active</p>
-                      <p className="text-2xl font-bold">{(dashboardSummary as any).activeMembers ?? 0}</p>
+                      <p className="text-2xl font-bold">{dashboardSummary?.activeMembers ?? 0}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900">
@@ -494,7 +505,7 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Frozen</p>
-                      <p className="text-2xl font-bold">{(dashboardSummary as any).frozenMembers ?? 0}</p>
+                      <p className="text-2xl font-bold">{dashboardSummary?.frozenMembers ?? 0}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900">
@@ -503,7 +514,7 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Expired</p>
-                      <p className="text-2xl font-bold">{(dashboardSummary as any).expiredMembers ?? 0}</p>
+                      <p className="text-2xl font-bold">{dashboardSummary?.expiredMembers ?? 0}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
@@ -512,13 +523,13 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Inactive</p>
-                      <p className="text-2xl font-bold">{(dashboardSummary as any).inactiveMembers ?? 0}</p>
+                      <p className="text-2xl font-bold">{dashboardSummary?.inactiveMembers ?? 0}</p>
                     </div>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3">
-                  Total memberships: <span className="font-medium">{(dashboardSummary as any).totalMemberships ?? 0}</span>
-                  {' · '}New this month: <span className="font-medium">{(dashboardSummary as any).newMembers ?? 0}</span>
+                  Total memberships: <span className="font-medium">{dashboardSummary?.totalMemberships ?? 0}</span>
+                  {' · '}New this month: <span className="font-medium">{dashboardSummary?.newMembers ?? 0}</span>
                 </p>
               </CardContent>
             </Card>

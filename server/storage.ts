@@ -1119,11 +1119,13 @@ export class DatabaseStorage implements IStorage {
         lte(checkIns.timestamp, lastMonthEnd)
       ));
 
-    // Active memberships
-    const activeMembers = await db
-      .select()
-      .from(memberships)
-      .where(eq(memberships.status, 'active'));
+    // Membership counts by status
+    const [activeMemberships, frozenMemberships, expiredMemberships, inactiveMemberships] = await Promise.all([
+      db.select({ id: memberships.id }).from(memberships).where(eq(memberships.status, 'active')),
+      db.select({ id: memberships.id }).from(memberships).where(eq(memberships.status, 'frozen')),
+      db.select({ id: memberships.id }).from(memberships).where(eq(memberships.status, 'expired')),
+      db.select({ id: memberships.id }).from(memberships).where(eq(memberships.status, 'inactive')),
+    ]);
 
     // New members this month
     const newMembersThisMonth = await db
@@ -1134,7 +1136,11 @@ export class DatabaseStorage implements IStorage {
     return {
       todayVisits: todayCheckIns.length,
       monthlyVisits: thisMonthCheckIns.length,
-      activeMembers: activeMembers.length,
+      activeMembers: activeMemberships.length,
+      frozenMembers: frozenMemberships.length,
+      expiredMembers: expiredMemberships.length,
+      inactiveMembers: inactiveMemberships.length,
+      totalMemberships: activeMemberships.length + frozenMemberships.length + expiredMemberships.length + inactiveMemberships.length,
       newMembers: newMembersThisMonth.length,
       growth: {
         visits: lastMonthCheckIns.length > 0 ? 

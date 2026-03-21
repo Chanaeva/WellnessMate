@@ -468,6 +468,61 @@ export default function AdminDashboard() {
           <TabsContent value="analytics" className="space-y-6">
             <h2 className="text-2xl font-bold">Analytics & Reports</h2>
 
+            {/* Member Breakdown */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Member Breakdown
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Current membership counts by status</p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900">
+                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg shrink-0">
+                      <CheckCircle className="h-5 w-5 text-green-700 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Active</p>
+                      <p className="text-2xl font-bold">{(dashboardSummary as any).activeMembers ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg shrink-0">
+                      <Clock className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Frozen</p>
+                      <p className="text-2xl font-bold">{(dashboardSummary as any).frozenMembers ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg shrink-0">
+                      <Calendar className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Expired</p>
+                      <p className="text-2xl font-bold">{(dashboardSummary as any).expiredMembers ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg shrink-0">
+                      <Users className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Inactive</p>
+                      <p className="text-2xl font-bold">{(dashboardSummary as any).inactiveMembers ?? 0}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Total memberships: <span className="font-medium">{(dashboardSummary as any).totalMemberships ?? 0}</span>
+                  {' · '}New this month: <span className="font-medium">{(dashboardSummary as any).newMembers ?? 0}</span>
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Summary Stat Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>

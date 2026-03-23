@@ -2,8 +2,7 @@ import { User, Membership, MembershipPlan, PunchCard, Payment } from "@shared/sc
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Crown, Calendar, CreditCard, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { CheckCircle, Crown, Calendar, CreditCard, AlertTriangle, Clock } from "lucide-react";
 
 interface MemberCardProps {
   user: User | null;
@@ -32,10 +31,10 @@ const MemberCard = ({
   billingInterval = 'month',
 }: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
+  const isPendingCancellation = isActive && membership?.autoRenew === false;
   const membershipPrice = currentPlan?.monthlyPrice ? (currentPlan.monthlyPrice / 100).toFixed(0) : '65';
   const billingLabel = billingInterval === 'year' ? 'Yearly' : 'Monthly';
   
-  // Check if user has any purchased items
   const hasPurchasedItems = userPunchCards.length > 0 || payments.length > 0;
   
   if (isLoading) {
@@ -81,7 +80,7 @@ const MemberCard = ({
             <div className="flex items-center space-x-2 mb-2">
               <Crown className="h-5 w-5 text-white" />
               <Badge className="bg-white/20 text-white border-white/30 text-xs sm:text-sm">
-                Active Plan
+                {isPendingCancellation ? 'Cancellation Scheduled' : 'Active Plan'}
               </Badge>
             </div>
             <h3 className="text-sm sm:text-lg md:text-xl font-display font-bold text-white">
@@ -96,12 +95,24 @@ const MemberCard = ({
       </div>
 
       <CardContent className="p-6">
+        {/* Pending cancellation notice */}
+        {isPendingCancellation && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 mb-4">
+            <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-800 dark:text-amber-300">
+              Your membership is scheduled to end on <strong>{membershipEndDate}</strong>. You'll keep full access until then and will not be charged again.
+            </p>
+          </div>
+        )}
+
         {/* Membership Details */}
         <div className="space-y-4 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs sm:text-sm text-muted-foreground">Next Billing</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">
+                {isPendingCancellation ? 'Access Until' : 'Next Billing'}
+              </span>
             </div>
             <span className="font-semibold text-xs sm:text-sm">{membershipEndDate}</span>
           </div>
@@ -139,8 +150,8 @@ const MemberCard = ({
           </div>
         )}
         
-        {/* Cancel Membership Button */}
-        {onCancelMembership && (
+        {/* Cancel Membership Button — hidden when cancellation already scheduled */}
+        {onCancelMembership && !isPendingCancellation && (
           <div className="border-t pt-4 mt-4">
             <Button
               variant="outline"

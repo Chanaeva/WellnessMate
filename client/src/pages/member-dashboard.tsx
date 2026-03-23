@@ -449,9 +449,20 @@ export default function MemberDashboard() {
       });
     },
     onError: (error: any) => {
+      let description = "Failed to cancel membership. Please try again or contact support.";
+      try {
+        const raw = error.message || "";
+        const jsonStart = raw.indexOf("{");
+        if (jsonStart !== -1) {
+          const parsed = JSON.parse(raw.slice(jsonStart));
+          description = parsed.error || parsed.message || description;
+        }
+      } catch {
+        // keep default message
+      }
       toast({
-        title: "Error",
-        description: error.message || "Failed to cancel membership",
+        title: "Cancellation Failed",
+        description,
         variant: "destructive",
       });
     },

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar, Pencil, Trash2, UserPlus, ClipboardList, BellRing, Sparkles, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar, Pencil, Trash2, UserPlus, ClipboardList, BellRing, Sparkles, Plus, X, ChevronDown, ChevronUp, DollarSign, AlertTriangle } from "lucide-react";
 
 export default function AdminSessions() {
   const { toast } = useToast();
@@ -180,11 +180,12 @@ export default function AdminSessions() {
   // Events state
   type EventBookingUser = { id: number; userId: number; firstName: string | null; lastName: string | null; email: string; createdAt: string };
   type EventWithCount = Event & { bookedCount: number; bookings: EventBookingUser[] };
-  const blankEventForm = { title: '', description: '', date: todayLocal, startTime: '', endTime: '', capacity: 20, isActive: true };
+  const blankEventForm = { title: '', description: '', date: todayLocal, startTime: '', endTime: '', capacity: 20, priceDollars: '', isActive: true };
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithCount | null>(null);
   const [eventFormData, setEventFormData] = useState(blankEventForm);
   const [expandedEventIds, setExpandedEventIds] = useState<Set<number>>(new Set());
+  const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<number | null>(null);
 
   const { data: adminEvents = [], isLoading: isEventsLoading } = useQuery<EventWithCount[]>({
     queryKey: ["/api/admin/events"],
@@ -194,9 +195,17 @@ export default function AdminSessions() {
     },
   });
 
+  const toEventPayload = (data: typeof blankEventForm) => {
+    const { priceDollars, ...rest } = data;
+    const price = priceDollars && parseFloat(priceDollars) > 0
+      ? Math.round(parseFloat(priceDollars) * 100)
+      : null;
+    return { ...rest, price };
+  };
+
   const createEventMutation = useMutation({
     mutationFn: async (data: typeof blankEventForm) => {
-      const res = await apiRequest("POST", "/api/admin/events", data);
+      const res = await apiRequest("POST", "/api/admin/events", toEventPayload(data));
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
     },
@@ -214,7 +223,7 @@ export default function AdminSessions() {
 
   const updateEventMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof blankEventForm }) => {
-      const res = await apiRequest("PATCH", `/api/admin/events/${id}`, data);
+      const res = await apiRequest("PATCH", `/api/admin/events/${id}`, toEventPayload(data));
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
     },
@@ -253,6 +262,7 @@ export default function AdminSessions() {
       startTime: event.startTime,
       endTime: event.endTime,
       capacity: event.capacity,
+      priceDollars: event.price && event.price > 0 ? (event.price / 100).toFixed(2) : '',
       isActive: event.isActive,
     });
     setShowAddEventForm(false);
@@ -1024,6 +1034,21 @@ export default function AdminSessions() {
                   />
                 </div>
                 <div className="space-y-1.5">
+                  <Label className="text-xs">Price (leave blank for free)</Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="0.00"
+                      className="pl-7"
+                      value={eventFormData.priceDollars}
+                      onChange={e => setEventFormData(p => ({ ...p, priceDollars: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
                   <Label className="text-xs">Start Time *</Label>
                   <Input
                     placeholder="e.g., 6:00 PM"
@@ -1088,6 +1113,7 @@ export default function AdminSessions() {
                 const formattedDate = new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
                 const isPast = event.date < todayLocal;
                 const isExpanded = expandedEventIds.has(event.id);
+                const isConfirmingDelete = confirmDeleteEventId === event.id;
                 const toggleExpand = () => {
                   setExpandedEventIds(prev => {
                     const next = new Set(prev);
@@ -1102,6 +1128,11 @@ export default function AdminSessions() {
                       <div className="min-w-0 space-y-0.5 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold truncate">{event.title}</p>
+                          {event.price && event.price > 0 && (
+                            <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50">
+                              ${(event.price / 100).toFixed(2)}
+                            </Badge>
+                          )}
                           {!event.isActive && <Badge variant="secondary" className="text-xs">Hidden</Badge>}
                           {isPast && <Badge variant="outline" className="text-xs text-muted-foreground">Past</Badge>}
                         </div>
@@ -1120,25 +1151,50 @@ export default function AdminSessions() {
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          title="Edit event"
-                          onClick={() => startEditEvent(event)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          title="Delete event"
-                          onClick={() => deleteEventMutation.mutate(event.id)}
-                          disabled={deleteEventMutation.isPending}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {isConfirmingDelete ? (
+                          <div className="flex items-center gap-1.5 bg-destructive/5 border border-destructive/20 rounded-md px-2 py-1">
+                            <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                            <span className="text-xs text-destructive font-medium">Delete?</span>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-6 text-xs px-2"
+                              onClick={() => { deleteEventMutation.mutate(event.id); setConfirmDeleteEventId(null); }}
+                              disabled={deleteEventMutation.isPending}
+                            >
+                              Yes
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-xs px-2"
+                              onClick={() => setConfirmDeleteEventId(null)}
+                            >
+                              No
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              title="Edit event"
+                              onClick={() => startEditEvent(event)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Delete event"
+                              onClick={() => setConfirmDeleteEventId(event.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                     {isExpanded && event.bookings && event.bookings.length > 0 && (

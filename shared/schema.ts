@@ -904,6 +904,7 @@ export const events = pgTable("events", {
   startTime: text("start_time").notNull(), // e.g., "6:00 PM"
   endTime: text("end_time").notNull(), // e.g., "8:00 PM"
   capacity: integer("capacity").notNull().default(20),
+  price: integer("price"), // price in cents; null or 0 = free
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

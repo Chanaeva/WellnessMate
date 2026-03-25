@@ -523,7 +523,7 @@ export default function MemberDashboard() {
     },
   });
 
-  // Book an event
+  // Book an event (free)
   const bookEventMutation = useMutation({
     mutationFn: async (eventId: number) => {
       const response = await apiRequest("POST", "/api/event-bookings", { eventId });
@@ -540,6 +540,29 @@ export default function MemberDashboard() {
     },
     onError: (error: any) => {
       toast({ title: "Booking Failed", description: error.message || "Could not book this event", variant: "destructive" });
+    },
+  });
+
+  // Book a paid event (charges saved card)
+  const [pendingPaidEvent, setPendingPaidEvent] = useState<{ id: number; title: string; price: number } | null>(null);
+  const bookPaidEventMutation = useMutation({
+    mutationFn: async (eventId: number) => {
+      const response = await apiRequest("POST", "/api/event-bookings/pay", { eventId });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to complete paid booking");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setPendingPaidEvent(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/event-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Event Booked!", description: data.message || "Payment processed and you're registered." });
+    },
+    onError: (error: any) => {
+      setPendingPaidEvent(null);
+      toast({ title: "Payment Failed", description: error.message || "Could not process payment", variant: "destructive" });
     },
   });
 
@@ -901,6 +924,7 @@ export default function MemberDashboard() {
                   {upcomingEvents.map(event => {
                     const myBooking = myEventBookings.find(b => b.eventId === event.id && b.status === 'confirmed');
                     const isBooked = !!myBooking;
+                    const isPriced = event.price && event.price > 0;
                     const formattedDate = new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', {
                       weekday: 'long', month: 'long', day: 'numeric',
                     });
@@ -908,7 +932,19 @@ export default function MemberDashboard() {
                       <div key={event.id} className="border rounded-lg p-4 space-y-2">
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-0.5 min-w-0 flex-1">
-                            <p className="font-semibold text-foreground">{event.title}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-foreground">{event.title}</p>
+                              {isPriced ? (
+                                <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 bg-amber-50 shrink-0">
+                                  <DollarSign className="h-3 w-3 mr-0.5" />
+                                  {(event.price! / 100).toFixed(2)}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50 shrink-0">
+                                  Free
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">{formattedDate} · {event.startTime} – {event.endTime}</p>
                             {event.description && (
                               <p className="text-sm text-muted-foreground">{event.description}</p>
@@ -928,6 +964,15 @@ export default function MemberDashboard() {
                           >
                             {cancelEventBookingMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
                             Cancel Booking
+                          </Button>
+                        ) : isPriced ? (
+                          <Button
+                            size="sm"
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                            onClick={() => setPendingPaidEvent({ id: event.id, title: event.title, price: event.price! })}
+                          >
+                            <DollarSign className="h-3.5 w-3.5 mr-1" />
+                            Book &amp; Pay ${(event.price! / 100).toFixed(2)}
                           </Button>
                         ) : (
                           <Button
@@ -1511,6 +1556,38 @@ export default function MemberDashboard() {
       </main>
 
       <Footer />
+
+      {/* Paid Event Booking Confirmation Dialog */}
+      <AlertDialog open={!!pendingPaidEvent} onOpenChange={open => { if (!open) setPendingPaidEvent(null); }}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-amber-600" />
+              Confirm Payment
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {pendingPaidEvent && (
+                <>
+                  You'll be charged{" "}
+                  <strong>${(pendingPaidEvent.price / 100).toFixed(2)}</strong> to your card on file
+                  for <strong>{pendingPaidEvent.title}</strong>.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bookPaidEventMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={bookPaidEventMutation.isPending}
+              onClick={() => pendingPaidEvent && bookPaidEventMutation.mutate(pendingPaidEvent.id)}
+            >
+              {bookPaidEventMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm &amp; Pay
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Payment Method Required Alert Dialog */}
       <AlertDialog

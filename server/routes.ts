@@ -6116,7 +6116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Member: book an event
+  // Member: book an event (free events only)
   app.post("/api/event-bookings", isAuthenticated, async (req, res) => {
     try {
       const { eventId } = req.body;
@@ -6125,6 +6125,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const event = await storage.getEventById(eventId);
       if (!event || !event.isActive) {
         return res.status(404).json({ message: "Event not found or no longer available" });
+      }
+
+      if (event.price && event.price > 0) {
+        return res.status(400).json({ message: "This event requires payment. Please use the paid booking flow." });
       }
 
       // Check capacity
@@ -6143,6 +6147,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(booking);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Member: pay and book a priced event
+  app.post("/api/event-bookings/pay", isAuthenticated, async (req, res) => {
+    try {
+      const { eventId } = req.body;
+      if (!eventId) return res.status(400).json({ message: "eventId is required" });
+
+      const event = await storage.getEventById(eventId);
+      if (!event || !event.isActive) {
+        return res.status(404).json({ message: "Event not found or no longer available" });
+      }
+      if (!event.price || event.price <= 0) {
+        return res.status(400).json({ message: "This event is free — use the standard booking endpoint." });
+      }
+
+      // Check capacity
+      const existingBookings = await storage.getEventBookingsByEventId(eventId);
+      if (existingBookings.length >= event.capacity) {
+        return res.status(400).json({ message: "This event is fully booked" });
+      }
+
+      // Check for duplicate booking
+      const alreadyBooked = await storage.getEventBookingByUserAndEvent(req.user!.id, eventId);
+      if (alreadyBooked && alreadyBooked.status === 'confirmed') {
+        return res.status(400).json({ message: "You have already booked this event" });
+      }
+
+      // Get user's default payment method
+      const user = req.user!;
+      const paymentMethods = await storage.getPaymentMethodsByUserId(user.id);
+      const defaultMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
+
+      if (!user.stripeCustomerId || !defaultMethod?.stripePaymentMethodId) {
+        return res.status(400).json({
+          message: "No payment method on file. Please add a card from your dashboard first.",
+          requiresPaymentMethod: true,
+        });
+      }
+
+      const freshStripe = createStripeClient();
+
+      // Charge the saved card off-session
+      const paymentIntent = await freshStripe.paymentIntents.create({
+        amount: event.price,
+        currency: 'usd',
+        customer: user.stripeCustomerId,
+        payment_method: defaultMethod.stripePaymentMethodId,
+        off_session: true,
+        confirm: true,
+        description: `Event booking: ${event.title} — ${event.date}`,
+        metadata: {
+          eventId: event.id.toString(),
+          userId: user.id.toString(),
+          eventTitle: event.title,
+          source: 'member_portal',
+        },
+      });
+
+      // Payment succeeded — create the booking
+      const booking = await storage.createEventBooking({
+        userId: user.id,
+        eventId,
+        status: 'confirmed',
+      });
+
+      res.json({
+        booking,
+        charged: true,
+        amountCharged: event.price,
+        paymentIntentId: paymentIntent.id,
+        message: `Booked! $${(event.price / 100).toFixed(2)} charged to your card on file.`,
+      });
+    } catch (error: any) {
+      console.error("Event paid booking error:", error);
+      if (error.code === 'card_declined') {
+        return res.status(402).json({ message: "Your card was declined. Please check your payment method." });
+      }
+      if (error.code === 'authentication_required') {
+        return res.status(402).json({ message: "Card requires authentication. Please update your payment method." });
+      }
+      res.status(500).json({ message: error.message || "Failed to complete booking" });
     }
   });
 

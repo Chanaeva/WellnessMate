@@ -2250,6 +2250,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEvent(id: number): Promise<void> {
+    await db.delete(eventBookings).where(eq(eventBookings.eventId, id));
     await db.delete(events).where(eq(events.id, id));
   }
 

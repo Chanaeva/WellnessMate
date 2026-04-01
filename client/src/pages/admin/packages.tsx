@@ -370,21 +370,23 @@ export default function PackagesManagement() {
 
   const handleTemplateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!templateFormData.name || !templateFormData.totalPunches || !templateFormData.pricePerPunch) {
+    if (!templateFormData.name || !templateFormData.totalPunches || !templateFormData.totalPrice) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (name, visits, and total price)",
         variant: "destructive",
       });
       return;
     }
 
-    const totalPrice = templateFormData.totalPrice || 
-      (templateFormData.totalPunches * templateFormData.pricePerPunch);
+    const totalPunches = templateFormData.totalPunches || 1;
+    const totalPrice = templateFormData.totalPrice;
+    const pricePerPunch = Math.round(totalPrice / totalPunches);
 
     templateMutation.mutate({
       ...templateFormData,
       totalPrice,
+      pricePerPunch,
       stockLimit: templateHasStockLimit ? (templateFormData.stockLimit ?? null) : null,
     } as InsertPunchCardTemplate);
   };
@@ -1002,39 +1004,25 @@ export default function PackagesManagement() {
                         value={templateFormData.totalPunches}
                         onChange={(e) => {
                           const punches = parseInt(e.target.value) || 0;
-                          setTemplateFormData(prev => ({
-                            ...prev, 
-                            totalPunches: punches,
-                            totalPrice: punches * (prev.pricePerPunch || 0)
-                          }));
+                          setTemplateFormData(prev => ({ ...prev, totalPunches: punches }));
                         }}
                         placeholder="10"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="price-per-punch">Price Per Visit *</Label>
-                      <PriceInput
-                        id="price-per-punch"
-                        value={templateFormData.pricePerPunch || 0}
-                        onChange={(cents) => {
-                          setTemplateFormData(prev => ({
-                            ...prev, 
-                            pricePerPunch: cents,
-                            totalPrice: (prev.totalPunches || 0) * cents
-                          }));
-                        }}
-                        placeholder="25.00"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="total-price">Total Price</Label>
+                      <Label htmlFor="total-price">Total Price *</Label>
                       <PriceInput
                         id="total-price"
                         value={templateFormData.totalPrice || 0}
                         onChange={(cents) => setTemplateFormData(prev => ({...prev, totalPrice: cents}))}
-                        placeholder="Auto-calculated"
+                        placeholder="150.00"
                       />
+                      {templateFormData.totalPunches > 0 && templateFormData.totalPrice > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ${((templateFormData.totalPrice / templateFormData.totalPunches) / 100).toFixed(2)} per visit
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="sort-order">Sort Order</Label>

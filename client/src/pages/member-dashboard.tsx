@@ -46,6 +46,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { FaqItem } from "@shared/schema";
 import MemberCard from "@/components/dashboard/member-card";
 import { Link } from "wouter";
 import {
@@ -178,6 +185,10 @@ export default function MemberDashboard() {
   // Fetch active notifications
   const { data: activeNotifications } = useQuery<Notification[]>({
     queryKey: ["/api/notifications/active"],
+  });
+
+  const { data: faqItems = [] } = useQuery<FaqItem[]>({
+    queryKey: ["/api/faq-items"],
   });
 
   // Fetch payment methods with automatic refetching
@@ -1502,6 +1513,32 @@ export default function MemberDashboard() {
                       <ArrowRight className="h-5 w-5 ml-2" />
                     </Button>
                   </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* FAQ */}
+            {faqItems.length > 0 && (
+              <Card className="wellness-card">
+                <CardHeader>
+                  <CardTitle className="text-lg font-heading text-foreground flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Frequently Asked Questions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Accordion type="single" collapsible className="w-full">
+                    {faqItems.map((item) => (
+                      <AccordionItem key={item.id} value={String(item.id)}>
+                        <AccordionTrigger className="text-sm font-medium text-left">
+                          {item.question}
+                        </AccordionTrigger>
+                        <AccordionContent className="text-sm text-muted-foreground whitespace-pre-line">
+                          {item.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
                 </CardContent>
               </Card>
             )}

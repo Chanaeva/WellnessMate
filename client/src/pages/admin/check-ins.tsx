@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Search, Download, UserPlus, Ticket, Minus, User } from "lucide-react";
+import { Search, Download, UserPlus, Ticket, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -36,36 +36,22 @@ export default function AdminCheckIns() {
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
   const [selectedPunchMember, setSelectedPunchMember] = useState<MemberSearchResult | null>(null);
   const [deductionReason, setDeductionReason] = useState("");
-  const [waiverSearchTerm, setWaiverSearchTerm] = useState("");
-  const [waiverFilterPeriod, setWaiverFilterPeriod] = useState("all");
-  const [waiverPage, setWaiverPage] = useState(1);
-  const [waiverPageSize] = useState(20);
   const { toast } = useToast();
 
-  const { data: checkInsData, isLoading } = useQuery<{data: any[]; total: number}>({
-    queryKey: ["/api/admin/check-ins", currentPage, pageSize],
-    staleTime: 2 * 60 * 1000,
+  // Unified check-ins (members + guests merged)
+  const unifiedParams = new URLSearchParams({
+    page: currentPage.toString(),
+    pageSize: pageSize.toString(),
+    period: filterPeriod,
+    ...(searchTerm ? { search: searchTerm } : {}),
   });
-
-  const { data: todayCheckIns } = useQuery<any[]>({
-    queryKey: ["/api/check-ins/today"],
+  const { data: unifiedData, isLoading } = useQuery<{ data: any[]; total: number }>({
+    queryKey: [`/api/admin/unified-check-ins?${unifiedParams}`],
     staleTime: 1 * 60 * 1000,
   });
 
-  // Guest waiver queries
-  const { data: guestWaiverAnalytics } = useQuery<{total: number; today: number; thisWeek: number; thisMonth: number}>({
-    queryKey: ["/api/admin/guest-waivers/analytics"],
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const waiverQueryParams = new URLSearchParams({
-    page: waiverPage.toString(),
-    pageSize: waiverPageSize.toString(),
-    period: waiverFilterPeriod,
-    ...(waiverSearchTerm ? { search: waiverSearchTerm } : {}),
-  });
-  const { data: paginatedWaivers, isLoading: isLoadingPaginatedWaivers } = useQuery<{data: any[]; total: number}>({
-    queryKey: [`/api/admin/guest-waivers/paginated?${waiverQueryParams}`],
+  const { data: todayCount } = useQuery<{ members: number; guests: number; total: number }>({
+    queryKey: ["/api/admin/unified-check-ins/today-count"],
     staleTime: 1 * 60 * 1000,
   });
 
@@ -109,6 +95,7 @@ export default function AdminCheckIns() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/check-ins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/check-ins/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/unified-check-ins"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
       queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
       setIsManualCheckInOpen(false);
@@ -151,31 +138,22 @@ export default function AdminCheckIns() {
     },
   });
 
-  const checkIns = checkInsData?.data || [];
-  const totalPages = Math.ceil((checkInsData?.total || 0) / pageSize);
-
-  const filteredCheckIns = checkIns.filter((checkIn: any) => {
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      checkIn.user?.username?.toLowerCase().includes(searchLower) ||
-      checkIn.user?.email?.toLowerCase().includes(searchLower) ||
-      checkIn.membershipId?.toLowerCase().includes(searchLower)
-    );
-  });
+  const entries = unifiedData?.data || [];
+  const totalPages = Math.ceil((unifiedData?.total || 0) / pageSize);
 
   const exportCheckIns = () => {
-    const headers = ["Date", "Time", "Member", "Email", "Membership ID", "Method"];
+    const headers = ["Date", "Time", "Type", "Name", "Email", "Phone", "Membership ID", "Method"];
     const csvData = [
       headers.join(","),
-      ...filteredCheckIns.map((checkIn: any) => [
-        format(new Date(checkIn.timestamp), "yyyy-MM-dd"),
-        format(new Date(checkIn.timestamp), "HH:mm:ss"),
-        checkIn.user?.username || "N/A",
-        checkIn.user?.email || "N/A",
-        checkIn.membershipId || "N/A",
-        checkIn.method || "qr"
+      ...entries.map((entry: any) => [
+        format(new Date(entry.ts), "yyyy-MM-dd"),
+        format(new Date(entry.ts), "HH:mm:ss"),
+        entry.entry_type === 'guest' ? 'Guest' : 'Member',
+        `${entry.first_name} ${entry.last_name}`.trim(),
+        entry.email || "N/A",
+        entry.phone_number || "N/A",
+        entry.membership_id || "N/A",
+        entry.method || "N/A",
       ].join(","))
     ].join("\n");
 
@@ -183,7 +161,7 @@ export default function AdminCheckIns() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `checkins-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.download = `visits-${format(new Date(), "yyyy-MM-dd")}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -210,52 +188,40 @@ export default function AdminCheckIns() {
           <p className="text-slate-600">Wolf Mother Wellness Check-in Management</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Today's Total</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600">
-                {todayCheckIns?.length || 0}
+                {todayCount?.total || 0}
               </div>
-              <p className="text-sm text-muted-foreground">check-ins today</p>
+              <p className="text-sm text-muted-foreground">visits today</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">QR Check-ins</CardTitle>
+              <CardTitle className="text-lg">Member Check-ins</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-600">
-                {todayCheckIns?.filter((c: any) => c.method === "qr").length || 0}
+                {todayCount?.members || 0}
               </div>
-              <p className="text-sm text-muted-foreground">self-service</p>
+              <p className="text-sm text-muted-foreground">members today</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Manual Check-ins</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-orange-600">
-                {todayCheckIns?.filter((c: any) => c.method === "manual").length || 0}
-              </div>
-              <p className="text-sm text-muted-foreground">staff assisted</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Guest Waivers</CardTitle>
+              <CardTitle className="text-lg">Guest Visits</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-purple-600">
-                {guestWaiverAnalytics?.today || 0}
+                {todayCount?.guests || 0}
               </div>
-              <p className="text-sm text-muted-foreground">waivers today</p>
+              <p className="text-sm text-muted-foreground">guest waivers today</p>
             </CardContent>
           </Card>
 
@@ -292,21 +258,22 @@ export default function AdminCheckIns() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Check-in History</CardTitle>
+            <CardTitle>Visit Log</CardTitle>
+            <p className="text-sm text-muted-foreground">Member check-ins and guest waiver visits combined</p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search by member name, email, or membership ID..."
+                  placeholder="Search by name or email..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="pl-10"
                 />
               </div>
-              
-              <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+
+              <Select value={filterPeriod} onValueChange={(v) => { setFilterPeriod(v); setCurrentPage(1); }}>
                 <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
@@ -329,59 +296,69 @@ export default function AdminCheckIns() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date & Time</TableHead>
-                    <TableHead>Member</TableHead>
+                    <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Membership ID</TableHead>
-                    <TableHead>Method</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Type</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8">
-                        Loading check-ins...
+                        Loading visits...
                       </TableCell>
                     </TableRow>
-                  ) : filteredCheckIns.length === 0 ? (
+                  ) : entries.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
-                        No check-ins found
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No visits found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredCheckIns.map((checkIn: any) => (
-                      <TableRow key={checkIn.id}>
+                    entries.map((entry: any, idx: number) => (
+                      <TableRow key={`${entry.entry_type}-${entry.id}-${idx}`}>
                         <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {format(new Date(checkIn.timestamp), "MMM dd, yyyy")}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {format(new Date(checkIn.timestamp), "h:mm a")}
-                            </div>
+                          <div className="font-medium">
+                            {format(new Date(entry.ts), "MMM dd, yyyy")}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {format(new Date(entry.ts), "h:mm a")}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            {checkIn.user?.firstName} {checkIn.user?.lastName || checkIn.user?.username || "Unknown"}
+                            {entry.first_name} {entry.last_name}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {checkIn.user?.email || "N/A"}
+                          {entry.email || "N/A"}
                         </TableCell>
                         <TableCell>
-                          <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                            {checkIn.membershipId?.startsWith('day-pass-') ? (
-                              <span className="text-amber-600">Day Pass</span>
-                            ) : (
-                              checkIn.membershipId || "N/A"
-                            )}
-                          </code>
+                          {entry.entry_type === 'guest' ? (
+                            <span className="text-sm text-muted-foreground">
+                              {entry.phone_number || "No phone"}
+                            </span>
+                          ) : (
+                            <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+                              {entry.membership_id?.startsWith('day-pass-') ? (
+                                <span className="text-amber-600">Day Pass</span>
+                              ) : (
+                                entry.membership_id || "N/A"
+                              )}
+                            </code>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={checkIn.method === "qr" ? "default" : "secondary"}>
-                            {checkIn.method === "qr" ? "QR Code" : "Manual"}
-                          </Badge>
+                          {entry.entry_type === 'guest' ? (
+                            <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
+                              Guest
+                            </Badge>
+                          ) : entry.method === 'manual' ? (
+                            <Badge variant="secondary">Manual</Badge>
+                          ) : (
+                            <Badge variant="default">QR Code</Badge>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -391,171 +368,25 @@ export default function AdminCheckIns() {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                
-                <span className="flex items-center px-4 text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Guest Waivers Section - Full History */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-purple-600" />
-                  Guest Waiver Log
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Walk-in guests who signed liability waivers
-                </p>
-              </div>
-              {guestWaiverAnalytics && (
-                <div className="flex gap-4 text-sm">
-                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.today}</div>
-                    <div className="text-muted-foreground text-xs">Today</div>
-                  </div>
-                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.thisWeek}</div>
-                    <div className="text-muted-foreground text-xs">This Week</div>
-                  </div>
-                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.thisMonth}</div>
-                    <div className="text-muted-foreground text-xs">This Month</div>
-                  </div>
-                  <div className="text-center px-3 py-1 bg-purple-50 rounded-lg">
-                    <div className="font-semibold text-purple-700">{guestWaiverAnalytics.total}</div>
-                    <div className="text-muted-foreground text-xs">All Time</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search by name, email, or phone..."
-                  value={waiverSearchTerm}
-                  onChange={(e) => {
-                    setWaiverSearchTerm(e.target.value);
-                    setWaiverPage(1);
-                  }}
-                  className="pl-10"
-                />
-              </div>
-              
-              <Select value={waiverFilterPeriod} onValueChange={(val) => { setWaiverFilterPeriod(val); setWaiverPage(1); }}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="all">All Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Guest Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Signature</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingPaginatedWaivers ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
-                        Loading guest waivers...
-                      </TableCell>
-                    </TableRow>
-                  ) : !paginatedWaivers?.data || paginatedWaivers.data.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No guest waivers found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginatedWaivers.data.map((waiver: any) => (
-                      <TableRow key={waiver.id}>
-                        <TableCell>
-                          <div className="font-medium">
-                            {format(new Date(waiver.waiverSignedAt), "MMM dd, yyyy")}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {format(new Date(waiver.waiverSignedAt), "h:mm a")}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">
-                            {waiver.firstName} {waiver.lastName}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {waiver.email}
-                        </TableCell>
-                        <TableCell>
-                          {waiver.phoneNumber || "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
-                            Signed
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-            {paginatedWaivers && paginatedWaivers.total > waiverPageSize && (
               <div className="flex items-center justify-between mt-4">
                 <p className="text-sm text-muted-foreground">
-                  Showing {((waiverPage - 1) * waiverPageSize) + 1} to {Math.min(waiverPage * waiverPageSize, paginatedWaivers.total)} of {paginatedWaivers.total} waivers
+                  Showing {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, unifiedData?.total || 0)} of {unifiedData?.total || 0} visits
                 </p>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => setWaiverPage(p => Math.max(1, p - 1))}
-                    disabled={waiverPage === 1}
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
                   >
                     Previous
                   </Button>
+                  <span className="flex items-center px-4 text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </span>
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => setWaiverPage(p => p + 1)}
-                    disabled={waiverPage >= Math.ceil(paginatedWaivers.total / waiverPageSize)}
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
                   >
                     Next
                   </Button>

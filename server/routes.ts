@@ -2326,6 +2326,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Unified check-ins (members + guests merged, paginated)
+  app.get("/api/admin/unified-check-ins", isAdminOrStaff, async (req, res) => {
+    try {
+      const page = Number(req.query.page) || 1;
+      const pageSize = Number(req.query.pageSize) || 20;
+      const period = req.query.period as string | undefined;
+      const search = req.query.search as string | undefined;
+      const result = await storage.getUnifiedCheckIns(page, pageSize, period, search);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Today's unified count (members + guests)
+  app.get("/api/admin/unified-check-ins/today-count", isAdminOrStaff, async (req, res) => {
+    try {
+      const count = await storage.getTodayUnifiedCount();
+      res.json(count);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Create a new membership
   app.post("/api/admin/memberships", isAdmin, async (req, res) => {
     try {

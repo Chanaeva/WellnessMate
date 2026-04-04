@@ -89,6 +89,8 @@ export interface IStorage {
   createCheckIn(checkIn: InsertCheckIn): Promise<CheckIn>;
   getAllCheckIns(page: number, limit: number): Promise<{data: any[], total: number, page: number, limit: number}>;
   getTodayCheckIns(): Promise<any[]>;
+  getUnifiedCheckIns(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: any[]; total: number }>;
+  getTodayUnifiedCount(): Promise<{ members: number; guests: number; total: number }>;
 
   // Payment methods
   getPaymentsByUserId(userId: number): Promise<Payment[]>;
@@ -657,6 +659,121 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(users, eq(checkIns.userId, users.id))
     .where(gte(checkIns.timestamp, today))
     .orderBy(desc(checkIns.timestamp));
+  }
+
+  async getUnifiedCheckIns(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: any[]; total: number }> {
+    let startDate: Date | null = null;
+    if (period && period !== 'all') {
+      const now = new Date();
+      switch (period) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - now.getDay());
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+      }
+    }
+    const searchLike = search && search.trim() ? `%${search.trim().toLowerCase()}%` : null;
+
+    const countQuery = sql`
+      WITH combined AS (
+        SELECT ci.timestamp AS ts,
+               COALESCE(u.first_name, '') AS first_name,
+               COALESCE(u.last_name, '') AS last_name,
+               COALESCE(u.email, '') AS email
+        FROM check_ins ci
+        LEFT JOIN users u ON ci.user_id = u.id
+        UNION ALL
+        SELECT gw.check_in_timestamp AS ts,
+               gw.first_name,
+               gw.last_name,
+               gw.email
+        FROM guest_waivers gw
+      )
+      SELECT COUNT(*)::int AS total FROM combined
+      WHERE (${startDate}::timestamptz IS NULL OR ts >= ${startDate}::timestamptz)
+        AND (${searchLike} IS NULL OR (
+          LOWER(first_name) LIKE ${searchLike}
+          OR LOWER(last_name) LIKE ${searchLike}
+          OR LOWER(email) LIKE ${searchLike}
+        ))
+    `;
+
+    const dataQuery = sql`
+      WITH combined AS (
+        SELECT
+          ci.id,
+          'member'::text AS entry_type,
+          ci.timestamp AS ts,
+          COALESCE(u.first_name, '') AS first_name,
+          COALESCE(u.last_name, '') AS last_name,
+          COALESCE(u.email, '') AS email,
+          NULL::text AS phone_number,
+          ci.membership_id,
+          CASE WHEN ci.location ILIKE '%Manual%' OR ci.location ILIKE '%Front Desk%' THEN 'manual' ELSE 'qr' END AS method
+        FROM check_ins ci
+        LEFT JOIN users u ON ci.user_id = u.id
+        UNION ALL
+        SELECT
+          gw.id,
+          'guest'::text AS entry_type,
+          gw.check_in_timestamp AS ts,
+          gw.first_name,
+          gw.last_name,
+          gw.email,
+          gw.phone_number,
+          NULL::text AS membership_id,
+          'guest'::text AS method
+        FROM guest_waivers gw
+      )
+      SELECT * FROM combined
+      WHERE (${startDate}::timestamptz IS NULL OR ts >= ${startDate}::timestamptz)
+        AND (${searchLike} IS NULL OR (
+          LOWER(first_name) LIKE ${searchLike}
+          OR LOWER(last_name) LIKE ${searchLike}
+          OR LOWER(email) LIKE ${searchLike}
+        ))
+      ORDER BY ts DESC
+      LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+    `;
+
+    const [countResult, dataResult] = await Promise.all([
+      db.execute(countQuery),
+      db.execute(dataQuery),
+    ]);
+
+    const total = (countResult.rows[0] as any)?.total ?? 0;
+    return { data: dataResult.rows as any[], total: Number(total) };
+  }
+
+  async getTodayUnifiedCount(): Promise<{ members: number; guests: number; total: number }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const result = await db.execute(sql`
+      SELECT
+        SUM(CASE WHEN entry_type = 'member' THEN 1 ELSE 0 END)::int AS members,
+        SUM(CASE WHEN entry_type = 'guest' THEN 1 ELSE 0 END)::int AS guests,
+        COUNT(*)::int AS total
+      FROM (
+        SELECT 'member' AS entry_type FROM check_ins WHERE timestamp >= ${today}::timestamptz
+        UNION ALL
+        SELECT 'guest' AS entry_type FROM guest_waivers WHERE check_in_timestamp >= ${today}::timestamptz
+      ) combined
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      members: Number(row?.members ?? 0),
+      guests: Number(row?.guests ?? 0),
+      total: Number(row?.total ?? 0),
+    };
   }
 
   async getPaymentsByUserId(userId: number): Promise<Payment[]> {

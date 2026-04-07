@@ -626,61 +626,92 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {membershipPlans?.filter((plan: MembershipPlan) => plan.isActive && plan.availableOnWebsite !== false).map((plan: MembershipPlan) => (
                   <Card
                     key={plan.id}
-                    className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
+                    className="overflow-hidden border-2 hover:border-primary/30 hover:shadow-xl transition-all duration-300"
                   >
-                    <CardContent className="p-8">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1">
-                          <h4 className="text-xl font-heading font-bold text-foreground mb-2">
+                    {/* Accent bar */}
+                    <div className={`h-1.5 w-full ${plan.planType === 'premium' ? 'bg-gradient-to-r from-violet-500 to-primary' : 'bg-gradient-to-r from-primary/60 to-primary'}`} />
+
+                    <CardContent className="p-5 sm:p-6">
+                      {/* Plan type + price row */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {plan.planType === 'premium' ? (
+                              <Badge className="bg-violet-100 text-violet-700 border border-violet-200 text-xs uppercase tracking-wide">
+                                <Crown className="h-3 w-3 mr-1" />
+                                Premium
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs uppercase tracking-wide">
+                                Membership
+                              </Badge>
+                            )}
+                          </div>
+                          <h4 className="text-lg sm:text-xl font-heading font-bold text-foreground leading-tight">
                             {plan.name}
                           </h4>
-                          <p className="text-muted-foreground font-body mb-3">
-                            {plan.description}
-                          </p>
-                          {formatAvailabilityDates(plan.availableFrom, plan.availableUntil) && (
-                            <Badge variant="outline" className="w-fit text-xs border-primary/30 bg-primary/5">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {formatAvailabilityDates(plan.availableFrom, plan.availableUntil)}
-                            </Badge>
-                          )}
                         </div>
-                        <div className="text-right ml-4">
-                          <div className="text-3xl font-bold text-primary">
+                        <div className="text-right shrink-0">
+                          <div className="text-3xl font-bold text-primary leading-none">
                             {formatPrice(plan.monthlyPrice)}
                           </div>
-                          <div className="text-sm text-muted-foreground font-body">
+                          <div className="text-xs text-muted-foreground font-body mt-0.5">
                             per month
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 mb-6">
-                        <Badge className="bg-primary/10 text-primary">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Unlimited Access
-                        </Badge>
-                        <Badge className="bg-primary/10 text-primary">
+                      {/* Description */}
+                      {plan.description && (
+                        <p className="text-sm text-muted-foreground font-body mb-4 leading-relaxed">
+                          {plan.description}
+                        </p>
+                      )}
+
+                      {/* Availability badge */}
+                      {formatAvailabilityDates(plan.availableFrom, plan.availableUntil) && (
+                        <div className="mb-4">
+                          <Badge variant="outline" className="text-xs border-primary/30 bg-primary/5">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {formatAvailabilityDates(plan.availableFrom, plan.availableUntil)}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Feature checklist */}
+                      {plan.features && plan.features.length > 0 && (
+                        <ul className="space-y-2 mb-4">
+                          {plan.features.map((feature: string, i: number) => (
+                            <li key={i} className="flex items-center gap-2 text-sm text-foreground">
+                              <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                              <span className="font-body">{feature.trim()}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {/* Standard benefit badges */}
+                      <div className="flex flex-wrap gap-1.5 mb-5">
+                        <Badge className="bg-primary/10 text-primary border-0 text-xs">
                           <Waves className="h-3 w-3 mr-1" />
                           All Thermal Facilities
                         </Badge>
-                        <Badge className="bg-primary/10 text-primary">
+                        <Badge className="bg-primary/10 text-primary border-0 text-xs">
                           <Shield className="h-3 w-3 mr-1" />
                           Cancel Anytime
                         </Badge>
                       </div>
 
-                      <div className="text-center">
-                        <Link href="/auth?tab=register">
-                          <Button className="w-full wellness-button-primary">
-                            <ArrowRight className="h-4 w-4 mr-2" />
-                            Get Started
-                          </Button>
-                        </Link>
-                      </div>
+                      <Link href="/auth?tab=register">
+                        <Button className="w-full wellness-button-primary">
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Get Started
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 ))}
@@ -699,60 +730,86 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {dayPasses?.filter((dayPass: any) => dayPass.isActive && dayPass.availableOnWebsite !== false).map((dayPass: any, index: number) => (
                   <Card
                     key={index}
-                    className="wellness-card hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/20"
+                    className="overflow-hidden border-2 hover:border-primary/30 hover:shadow-xl transition-all duration-300"
                   >
-                    <CardContent className="p-8">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h4 className="text-xl font-heading font-bold text-foreground mb-2">
+                    {/* Accent bar */}
+                    <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 to-amber-500/70" />
+
+                    <CardContent className="p-5 sm:p-6">
+                      {/* Badge row + price */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          {/* badgeText from DB, or auto badge for value packages */}
+                          {(dayPass.badgeText || dayPass.totalPunches >= 10) && (
+                            <div className="mb-1.5">
+                              {dayPass.badgeText ? (
+                                <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold">
+                                  <Star className="h-3 w-3 mr-1" />
+                                  {dayPass.badgeText}
+                                </Badge>
+                              ) : dayPass.totalPunches >= 20 ? (
+                                <Badge className="bg-green-100 text-green-800 border border-green-200 text-xs font-semibold">
+                                  <Heart className="h-3 w-3 mr-1" />
+                                  Best Value
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  Popular
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          <h4 className="text-lg sm:text-xl font-heading font-bold text-foreground leading-tight">
                             {dayPass.name}
                           </h4>
-                          <p className="text-muted-foreground font-body">
-                            {dayPass.totalPunches} individual day passes
-                          </p>
                         </div>
-                        <div className="text-right">
-                          <div className="text-3xl font-bold text-primary">
+                        <div className="text-right shrink-0">
+                          <div className="text-3xl font-bold text-primary leading-none">
                             {formatPrice(dayPass.totalPrice)}
                           </div>
-                          <div className="text-sm text-muted-foreground font-body">
-                            {formatPrice(dayPass.pricePerPunch)} per visit
+                          <div className="text-xs text-muted-foreground font-body mt-0.5">
+                            {formatPrice(dayPass.pricePerPunch)} / visit
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 mb-6">
-                        <Badge className="bg-secondary/80 text-secondary-foreground">
+                      {/* Description */}
+                      {dayPass.description && (
+                        <p className="text-sm text-muted-foreground font-body mb-4 leading-relaxed">
+                          {dayPass.description}
+                        </p>
+                      )}
+
+                      {/* Badges */}
+                      <div className="flex flex-wrap gap-1.5 mb-5">
+                        <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
                           <Clock className="h-3 w-3 mr-1" />
-                          {dayPass.totalPunches} Visits
+                          {dayPass.totalPunches} {dayPass.totalPunches === 1 ? 'Visit' : 'Visits'}
                         </Badge>
-                        <Badge className="bg-secondary/80 text-secondary-foreground">
+                        <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
                           <Sparkles className="h-3 w-3 mr-1" />
                           No Expiration
                         </Badge>
-                        {dayPass.totalPunches >= 10 && (
-                          <Badge className="bg-green-100 text-green-800">
-                            <Heart className="h-3 w-3 mr-1" />
-                            Best Value
-                          </Badge>
-                        )}
+                        <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
+                          <Waves className="h-3 w-3 mr-1" />
+                          All Facilities
+                        </Badge>
                       </div>
 
-                      <div className="text-center">
-                        <Link href="/auth?tab=register">
-                          <Button
-                            variant="outline"
-                            className="w-full border-primary text-primary hover:bg-primary hover:text-white"
-                          >
-                            <ArrowRight className="h-4 w-4 mr-2" />
-                            Purchase Package
-                          </Button>
-                        </Link>
-                      </div>
+                      <Link href="/auth?tab=register">
+                        <Button
+                          variant="outline"
+                          className="w-full border-primary text-primary hover:bg-primary hover:text-white transition-colors"
+                        >
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Purchase Package
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 ))}

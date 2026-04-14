@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar, Pencil, Trash2, UserPlus, ClipboardList, BellRing, Sparkles, Plus, X, ChevronDown, ChevronUp, DollarSign, AlertTriangle } from "lucide-react";
+import { Sun, Moon, Users, Clock, Save, Loader2, Ticket, Calendar, Pencil, Trash2, UserPlus, ClipboardList, BellRing, Sparkles, Plus, X, ChevronDown, ChevronUp, DollarSign, AlertTriangle, Lock } from "lucide-react";
 
 export default function AdminSessions() {
   const { toast } = useToast();
@@ -180,7 +180,7 @@ export default function AdminSessions() {
   // Events state
   type EventBookingUser = { id: number; userId: number; firstName: string | null; lastName: string | null; email: string; createdAt: string };
   type EventWithCount = Event & { bookedCount: number; bookings: EventBookingUser[] };
-  const blankEventForm = { title: '', description: '', date: todayLocal, startTime: '', endTime: '', capacity: 20, priceDollars: '', isActive: true };
+  const blankEventForm = { title: '', description: '', date: todayLocal, startTime: '', endTime: '', capacity: 20, priceDollars: '', isActive: true, membersOnly: false };
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithCount | null>(null);
   const [eventFormData, setEventFormData] = useState(blankEventForm);
@@ -200,7 +200,7 @@ export default function AdminSessions() {
     const price = priceDollars && parseFloat(priceDollars) > 0
       ? Math.round(parseFloat(priceDollars) * 100)
       : null;
-    return { ...rest, price };
+    return { ...rest, price, membersOnly: rest.membersOnly };
   };
 
   const createEventMutation = useMutation({
@@ -264,6 +264,7 @@ export default function AdminSessions() {
       capacity: event.capacity,
       priceDollars: event.price && event.price > 0 ? (event.price / 100).toFixed(2) : '',
       isActive: event.isActive,
+      membersOnly: (event as any).membersOnly ?? false,
     });
     setShowAddEventForm(false);
   };
@@ -1071,6 +1072,21 @@ export default function AdminSessions() {
                   />
                   <Label className="text-sm">Visible to members (active)</Label>
                 </div>
+                <div className="sm:col-span-2 flex items-center gap-2">
+                  <Switch
+                    checked={eventFormData.membersOnly}
+                    onCheckedChange={v => setEventFormData(p => ({ ...p, membersOnly: v }))}
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Label className="text-sm">Monthly members only</Label>
+                  </div>
+                </div>
+                {eventFormData.membersOnly && (
+                  <p className="sm:col-span-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    Only members with an active monthly membership will be able to book this event. Day pass holders and guests will be blocked.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -1131,6 +1147,12 @@ export default function AdminSessions() {
                           {event.price && event.price > 0 && (
                             <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50">
                               ${(event.price / 100).toFixed(2)}
+                            </Badge>
+                          )}
+                          {(event as any).membersOnly && (
+                            <Badge className="text-xs bg-purple-100 text-purple-700 border border-purple-200">
+                              <Lock className="h-2.5 w-2.5 mr-1" />
+                              Members Only
                             </Badge>
                           )}
                           {!event.isActive && <Badge variant="secondary" className="text-xs">Hidden</Badge>}

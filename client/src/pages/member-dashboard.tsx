@@ -922,8 +922,8 @@ export default function MemberDashboard() {
               </Card>
             )}
 
-            {/* Special Events */}
-            {upcomingEvents.length > 0 && (
+            {/* Special Events — filter out members-only events for non-members */}
+            {upcomingEvents.filter(e => !(e as any).membersOnly || membership?.status === 'active').length > 0 && (
               <Card className="wellness-card">
                 <CardHeader>
                   <CardTitle className="text-lg font-heading text-foreground flex items-center gap-2">
@@ -932,7 +932,9 @@ export default function MemberDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {upcomingEvents.map(event => {
+                  {upcomingEvents
+                    .filter(e => !(e as any).membersOnly || membership?.status === 'active')
+                    .map(event => {
                     const myBooking = myEventBookings.find(b => b.eventId === event.id && b.status === 'confirmed');
                     const isBooked = !!myBooking;
                     const isPriced = event.price && event.price > 0;

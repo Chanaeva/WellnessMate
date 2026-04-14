@@ -906,6 +906,7 @@ export const events = pgTable("events", {
   capacity: integer("capacity").notNull().default(20),
   price: integer("price"), // price in cents; null or 0 = free
   isActive: boolean("is_active").notNull().default(true),
+  membersOnly: boolean("members_only").notNull().default(false), // restrict to active monthly members
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

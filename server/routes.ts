@@ -6155,6 +6155,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This event requires payment. Please use the paid booking flow." });
       }
 
+      // Enforce members-only restriction
+      if (event.membersOnly) {
+        const membership = await storage.getMembershipByUserId(req.user!.id);
+        if (!membership || membership.status !== 'active') {
+          return res.status(403).json({ message: "This event is for monthly members only. Please sign up for a membership to book." });
+        }
+      }
+
       // Check capacity
       const existingBookings = await storage.getEventBookingsByEventId(eventId);
       if (existingBookings.length >= event.capacity) {
@@ -6186,6 +6194,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!event.price || event.price <= 0) {
         return res.status(400).json({ message: "This event is free — use the standard booking endpoint." });
+      }
+
+      // Enforce members-only restriction
+      if (event.membersOnly) {
+        const membership = await storage.getMembershipByUserId(req.user!.id);
+        if (!membership || membership.status !== 'active') {
+          return res.status(403).json({ message: "This event is for monthly members only. Please sign up for a membership to book." });
+        }
       }
 
       // Check capacity

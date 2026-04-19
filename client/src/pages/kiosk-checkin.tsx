@@ -59,6 +59,8 @@ interface CheckInResponse {
     }>;
   };
   message: string;
+  checkInType?: string;
+  guestName?: string;
 }
 
 // Stripe setup - fetch the public key from the server to support test/live key switching
@@ -92,7 +94,7 @@ const guestWaiverSchema = z.object({
 type GuestWaiverFormData = z.infer<typeof guestWaiverSchema>;
 
 interface GuestWaiverFormProps {
-  onSuccess: () => void;
+  onSuccess: (guestName: string) => void;
   onCancel: () => void;
 }
 
@@ -116,12 +118,8 @@ function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
       const response = await apiRequest("POST", "/api/kiosk/guest-waiver", data);
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Welcome!",
-        description: "Your waiver has been signed. Enjoy your visit!",
-      });
-      onSuccess();
+    onSuccess: (_data, variables) => {
+      onSuccess(variables.firstName);
     },
     onError: (error: Error) => {
       toast({
@@ -508,7 +506,7 @@ export default function KioskCheckIn() {
               {scannerMode === 'waiting' && 'Ready to Check In'}
               {scannerMode === 'manual-entry' && 'Member Search'}
               {scannerMode === 'confirmation' && 'Choose Check-In Method'}
-              {scannerMode === 'success' && 'Welcome Back!'}
+              {scannerMode === 'success' && (scanResult?.checkInType === 'guest-waiver' ? 'Checked In!' : 'Welcome Back!')}
               {scannerMode === 'error' && 'Check-In Issue'}
               {scannerMode === 'new-purchase' && 'New Purchase'}
               {scannerMode === 'guest-waiver' && 'Guest Check-In'}
@@ -929,45 +927,62 @@ export default function KioskCheckIn() {
             {/* Success State */}
             {scannerMode === 'success' && scanResult?.success && (
               <div className="text-center space-y-6">
-                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                  <h3 className="text-2xl font-bold text-green-800 mb-2">
-                    Welcome back, {scanResult.member?.firstName}!
-                  </h3>
-                  <div className="flex items-center justify-center mb-4">
-                    <Sparkles className="h-6 w-6 text-green-600 mr-2" />
-                    <span className="text-lg text-green-700">Enjoy your session</span>
-                    <Sparkles className="h-6 w-6 text-green-600 ml-2" />
-                  </div>
-                  
-                  {scanResult.member?.membershipType && (
-                    <Badge className="bg-green-100 text-green-800 border-green-300 text-base px-4 py-1 mb-4">
-                      {scanResult.member.membershipType} Check-in
-                    </Badge>
-                  )}
-
-                  {/* Show day pass info if used */}
-                  {scanResult.dayPassInfo?.used && (
-                    <div className="bg-white rounded-lg p-4 border border-green-200 mt-4">
-                      <div className="flex items-center justify-center mb-2">
-                        <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                        <span className="font-semibold text-green-800">Day Pass Used</span>
-                      </div>
-                      <div className="text-lg font-bold text-green-700 mb-2">
-                        {scanResult.dayPassInfo.totalRemaining} days remaining
-                      </div>
-                      <div className="space-y-1 text-sm text-green-600">
-                        {scanResult.dayPassInfo.packages.map(pkg => (
-                          <div key={pkg.id} className="flex justify-between">
-                            <span>{pkg.name}</span>
-                            <span>{pkg.remaining}/{pkg.total} left</span>
-                          </div>
-                        ))}
-                      </div>
+                {scanResult.checkInType === 'guest-waiver' ? (
+                  /* Guest check-in success */
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                    <h3 className="text-2xl font-bold text-green-800 mb-2">
+                      Welcome, {scanResult.guestName}!
+                    </h3>
+                    <div className="flex items-center justify-center mb-4">
+                      <Sparkles className="h-6 w-6 text-green-600 mr-2" />
+                      <span className="text-lg text-green-700">You're checked in</span>
+                      <Sparkles className="h-6 w-6 text-green-600 ml-2" />
                     </div>
-                  )}
+                    <Badge className="bg-green-100 text-green-800 border-green-300 text-base px-4 py-1">
+                      Guest Visit
+                    </Badge>
+                  </div>
+                ) : (
+                  /* Member check-in success */
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                    <h3 className="text-2xl font-bold text-green-800 mb-2">
+                      Welcome back, {scanResult.member?.firstName}!
+                    </h3>
+                    <div className="flex items-center justify-center mb-4">
+                      <Sparkles className="h-6 w-6 text-green-600 mr-2" />
+                      <span className="text-lg text-green-700">Enjoy your session</span>
+                      <Sparkles className="h-6 w-6 text-green-600 ml-2" />
+                    </div>
 
-                </div>
-                
+                    {scanResult.member?.membershipType && (
+                      <Badge className="bg-green-100 text-green-800 border-green-300 text-base px-4 py-1 mb-4">
+                        {scanResult.member.membershipType} Check-in
+                      </Badge>
+                    )}
+
+                    {/* Show day pass info if used */}
+                    {scanResult.dayPassInfo?.used && (
+                      <div className="bg-white rounded-lg p-4 border border-green-200 mt-4">
+                        <div className="flex items-center justify-center mb-2">
+                          <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                          <span className="font-semibold text-green-800">Day Pass Used</span>
+                        </div>
+                        <div className="text-lg font-bold text-green-700 mb-2">
+                          {scanResult.dayPassInfo.totalRemaining} days remaining
+                        </div>
+                        <div className="space-y-1 text-sm text-green-600">
+                          {scanResult.dayPassInfo.packages.map(pkg => (
+                            <div key={pkg.id} className="flex justify-between">
+                              <span>{pkg.name}</span>
+                              <span>{pkg.remaining}/{pkg.total} left</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-center text-sm text-muted-foreground">
                   <Clock className="h-4 w-4 mr-2" />
                   <span>Checked in at {new Date().toLocaleTimeString()}</span>
@@ -982,12 +997,13 @@ export default function KioskCheckIn() {
             {/* Guest Waiver State */}
             {scannerMode === 'guest-waiver' && (
               <GuestWaiverForm 
-                onSuccess={() => {
+                onSuccess={(guestName) => {
                   setScannerMode('success');
                   setScanResult({
                     success: true,
-                    message: 'Guest waiver signed successfully! Welcome to Wolf Mother Wellness.',
-                    checkInType: 'guest-waiver'
+                    message: `Welcome, ${guestName}! You're all checked in.`,
+                    checkInType: 'guest-waiver',
+                    guestName,
                   });
                 }}
                 onCancel={resetToWaiting}

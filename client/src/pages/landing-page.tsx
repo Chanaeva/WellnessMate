@@ -35,8 +35,6 @@ import {
   Star,
   AlertCircle,
   X,
-  Sun,
-  Moon,
 } from "lucide-react";
 
 // Gallery Carousel Component
@@ -1019,81 +1017,6 @@ export default function LandingPage() {
                   </>
                 )}
               </p>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <Clock className="h-8 w-8 text-primary mb-3" />
-              <h3 className="font-heading font-semibold text-foreground mb-2">
-                Session Times
-              </h3>
-              <div className="text-muted-foreground font-body text-sm w-full max-w-sm">
-                {sessionConfigs && sessionConfigs.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Member Sessions */}
-                    <div className="space-y-2">
-                      <p className="text-xs text-center font-medium text-primary">Member Sessions</p>
-                      {sessionConfigs.filter(s => s.isEnabled).map((session) => (
-                        <div key={session.id} className="flex items-center justify-center gap-2">
-                          {session.sessionType === 'morning' ? (
-                            <Sun className="h-4 w-4 text-amber-500" />
-                          ) : (
-                            <Moon className="h-4 w-4 text-indigo-500" />
-                          )}
-                          <span className="capitalize font-medium">{session.sessionType}:</span>
-                          <span>{session.startTime} - {session.endTime}</span>
-                        </div>
-                      ))}
-                      <p className="text-xs text-center text-muted-foreground">
-                        (Booking required)
-                      </p>
-                    </div>
-                    
-                    {/* Day Pass Hours */}
-                    {dayPassHoursConfig && dayPassHoursConfig.isEnabled && (
-                      <div className="space-y-2 pt-2 border-t border-muted-foreground/20">
-                        <p className="text-xs text-center font-medium text-green-600">Day Pass Hours</p>
-                        <div className="flex items-center justify-center gap-2">
-                          <Clock className="h-4 w-4 text-green-500" />
-                          <span>{dayPassHoursConfig.startTime} - {dayPassHoursConfig.endTime}</span>
-                        </div>
-                        <p className="text-xs text-center text-muted-foreground">
-                          (No booking required)
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : groupedHours.length > 0 ? (
-                  <div className="space-y-4">
-                    {groupedHours.map((group, idx) => (
-                      <div key={idx} className="border-b border-muted-foreground/20 pb-3 last:border-0">
-                        <div className="font-semibold text-foreground text-center mb-2">{group.days}</div>
-                        {group.isClosed ? (
-                          <div className="text-center italic text-muted-foreground">Closed</div>
-                        ) : (
-                          <div className="flex flex-col sm:flex-row sm:justify-center gap-2 text-xs">
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="inline-block px-2 py-0.5 rounded bg-primary/10 text-primary font-medium">Members</span>
-                              <span>{group.memberHours}</span>
-                            </div>
-                            <div className="flex items-center justify-center gap-1">
-                              <span className="inline-block px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium">Day Pass</span>
-                              <span className={group.dayPassHours === 'Not available' ? 'italic text-muted-foreground' : ''}>
-                                {group.dayPassHours}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center">
-                    Members: {footerSettings?.hoursOfOperation || '6:00 AM - 10:00 PM'}
-                    <br />
-                    Day Pass: {footerSettings?.hoursDayPass || '9:00 AM - 10:00 PM'}
-                  </p>
-                )}
-              </div>
             </div>
 
             <div className="flex flex-col items-center">

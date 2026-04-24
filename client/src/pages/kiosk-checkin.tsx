@@ -93,6 +93,15 @@ const guestWaiverSchema = z.object({
 
 type GuestWaiverFormData = z.infer<typeof guestWaiverSchema>;
 
+interface WaiverQuestion {
+  id: number;
+  question: string;
+  description: string | null;
+  isRequired: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 interface GuestWaiverFormProps {
   onSuccess: (guestName: string) => void;
   onCancel: () => void;
@@ -101,6 +110,12 @@ interface GuestWaiverFormProps {
 function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
   const { toast } = useToast();
   const [showWaiverText, setShowWaiverText] = useState(false);
+  const [questionAnswers, setQuestionAnswers] = useState<Record<number, boolean>>({});
+
+  const { data: waiverQuestions = [] } = useQuery<WaiverQuestion[]>({
+    queryKey: ["/api/waiver-questions"],
+    staleTime: 5 * 60 * 1000,
+  });
   
   const form = useForm<GuestWaiverFormData>({
     resolver: zodResolver(guestWaiverSchema),
@@ -115,7 +130,11 @@ function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
 
   const guestWaiverMutation = useMutation({
     mutationFn: async (data: GuestWaiverFormData) => {
-      const response = await apiRequest("POST", "/api/kiosk/guest-waiver", data);
+      const answers = waiverQuestions.map(q => ({
+        questionId: q.id,
+        answer: questionAnswers[q.id] ?? false,
+      }));
+      const response = await apiRequest("POST", "/api/kiosk/guest-waiver", { ...data, answers });
       return response.json();
     },
     onSuccess: (_data, variables) => {
@@ -131,6 +150,16 @@ function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
   });
 
   const onSubmit = (data: GuestWaiverFormData) => {
+    // Validate required questions
+    const unansweredRequired = waiverQuestions.filter(q => q.isRequired && !questionAnswers[q.id]);
+    if (unansweredRequired.length > 0) {
+      toast({
+        title: "Required Questions",
+        description: `Please answer all required questions before continuing.`,
+        variant: "destructive",
+      });
+      return;
+    }
     guestWaiverMutation.mutate(data);
   };
 
@@ -218,6 +247,33 @@ function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
               </FormItem>
             )}
           />
+
+          {/* Dynamic waiver questions */}
+          {waiverQuestions.length > 0 && (
+            <div className="border rounded-xl p-4 bg-blue-50 border-blue-200 space-y-3">
+              <h4 className="font-semibold text-blue-800">Quick Questions</h4>
+              {waiverQuestions.map(q => (
+                <div key={q.id} className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    id={`wq-${q.id}`}
+                    checked={questionAnswers[q.id] ?? false}
+                    onChange={e => setQuestionAnswers(prev => ({ ...prev, [q.id]: e.target.checked }))}
+                    className="h-5 w-5 mt-0.5 rounded border-blue-400 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="leading-none">
+                    <label htmlFor={`wq-${q.id}`} className="text-blue-900 font-medium cursor-pointer text-base">
+                      {q.question}
+                      {q.isRequired && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    {q.description && (
+                      <p className="text-sm text-blue-600 mt-0.5">{q.description}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Waiver Agreement Section */}
           <div className="border rounded-xl p-4 bg-amber-50 border-amber-200">

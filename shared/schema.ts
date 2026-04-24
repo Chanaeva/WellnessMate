@@ -782,6 +782,36 @@ export const insertGuestWaiverSchema = createInsertSchema(guestWaivers).omit({
 export type GuestWaiver = typeof guestWaivers.$inferSelect;
 export type InsertGuestWaiver = z.infer<typeof insertGuestWaiverSchema>;
 
+// Waiver questions - configurable checkboxes shown on the guest waiver form
+export const waiverQuestions = pgTable("waiver_questions", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  description: text("description"),
+  isRequired: boolean("is_required").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWaiverQuestionSchema = createInsertSchema(waiverQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+export type WaiverQuestion = typeof waiverQuestions.$inferSelect;
+export type InsertWaiverQuestion = z.infer<typeof insertWaiverQuestionSchema>;
+
+// Guest waiver answers - records which questions were checked for each guest visit
+export const guestWaiverAnswers = pgTable("guest_waiver_answers", {
+  id: serial("id").primaryKey(),
+  guestWaiverId: integer("guest_waiver_id").notNull().references(() => guestWaivers.id, { onDelete: "cascade" }),
+  questionId: integer("question_id").notNull().references(() => waiverQuestions.id, { onDelete: "cascade" }),
+  answer: boolean("answer").notNull().default(false),
+});
+
+export const insertGuestWaiverAnswerSchema = createInsertSchema(guestWaiverAnswers).omit({ id: true });
+export type GuestWaiverAnswer = typeof guestWaiverAnswers.$inferSelect;
+export type InsertGuestWaiverAnswer = z.infer<typeof insertGuestWaiverAnswerSchema>;
+
 // Site settings table - for configurable site-wide settings
 export const siteSettings = pgTable("site_settings", {
   id: serial("id").primaryKey(),

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { User, Membership, CheckIn, insertUserSchema } from "@shared/schema";
+import { User, Membership, insertUserSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,12 +84,9 @@ export default function AdminDashboard() {
     },
   });
 
-  const { data: checkIns = [] } = useQuery<CheckIn[]>({
-    queryKey: ["/api/check-ins/today"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/check-ins/today");
-      return res.json();
-    },
+  const { data: recentVisits } = useQuery<{ data: any[]; total: number }>({
+    queryKey: ["/api/admin/unified-check-ins?page=1&pageSize=5&period=today"],
+    staleTime: 60 * 1000,
   });
 
   const { data: analytics = {} } = useQuery({
@@ -280,25 +277,28 @@ export default function AdminDashboard() {
                   <CardTitle>Recent Check-ins</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {checkIns.length > 0 ? (
+                  {recentVisits && recentVisits.data.length > 0 ? (
                     <div className="space-y-3">
-                      {checkIns.slice(0, 5).map((checkIn: any) => (
-                        <div key={checkIn.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      {recentVisits.data.slice(0, 5).map((entry: any, idx: number) => (
+                        <div key={`${entry.entry_type}-${entry.id}-${idx}`} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                           <div>
                             <p className="font-medium">
-                              {checkIn.user?.firstName && checkIn.user?.lastName 
-                                ? `${checkIn.user.firstName} ${checkIn.user.lastName}`
-                                : checkIn.user?.email || `Member #${checkIn.userId}`}
+                              {entry.first_name} {entry.last_name}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {checkIn.timestamp ? format(new Date(checkIn.timestamp), "h:mm a") : "N/A"}
-                              {checkIn.location && ` • ${checkIn.location}`}
+                              {entry.ts ? format(new Date(entry.ts), "h:mm a") : "N/A"}
                             </p>
                           </div>
-                          <Badge variant="default">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Completed
-                          </Badge>
+                          {entry.entry_type === "guest" ? (
+                            <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
+                              Guest
+                            </Badge>
+                          ) : (
+                            <Badge variant="default">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Member
+                            </Badge>
+                          )}
                         </div>
                       ))}
                     </div>

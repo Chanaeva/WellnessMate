@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Search, Download, UserPlus, Ticket, Minus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Search, Download, UserPlus, Ticket, Minus, Plus, Trash2, Edit2, CheckSquare, ChevronDown, ChevronUp, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +25,24 @@ interface MemberSearchResult {
   dayPassesRemaining: number;
 }
 
+interface WaiverQuestion {
+  id: number;
+  question: string;
+  description: string | null;
+  isRequired: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+interface GuestWaiverAnswer {
+  id: number;
+  guestWaiverId: number;
+  questionId: number;
+  answer: boolean;
+  question: WaiverQuestion;
+}
+
 export default function AdminCheckIns() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,6 +55,16 @@ export default function AdminCheckIns() {
   const [selectedMember, setSelectedMember] = useState<MemberSearchResult | null>(null);
   const [selectedPunchMember, setSelectedPunchMember] = useState<MemberSearchResult | null>(null);
   const [deductionReason, setDeductionReason] = useState("");
+
+  // Guest detail dialog
+  const [selectedGuestEntry, setSelectedGuestEntry] = useState<any | null>(null);
+
+  // Waiver questions panel
+  const [showQuestionsPanel, setShowQuestionsPanel] = useState(false);
+  const [newQuestion, setNewQuestion] = useState({ question: "", description: "", isRequired: false });
+  const [editingQuestion, setEditingQuestion] = useState<WaiverQuestion | null>(null);
+  const [editForm, setEditForm] = useState({ question: "", description: "", isRequired: false });
+
   const { toast } = useToast();
 
   // Unified check-ins (members + guests merged)
@@ -55,13 +84,31 @@ export default function AdminCheckIns() {
     staleTime: 1 * 60 * 1000,
   });
 
+  // Waiver questions
+  const { data: waiverQuestions = [], isLoading: isLoadingQuestions } = useQuery<WaiverQuestion[]>({
+    queryKey: ["/api/admin/waiver-questions"],
+    staleTime: 30 * 1000,
+  });
+
+  // Guest waiver answers (fetched when a guest row is clicked)
+  const { data: guestAnswers = [], isLoading: isLoadingAnswers } = useQuery<GuestWaiverAnswer[]>({
+    queryKey: ["/api/admin/guest-waivers", selectedGuestEntry?.id, "answers"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/guest-waivers/${selectedGuestEntry.id}/answers`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load answers");
+      return res.json();
+    },
+    enabled: !!selectedGuestEntry && selectedGuestEntry.entry_type === "guest",
+    staleTime: 0,
+  });
+
   const { data: memberSearchResults, isLoading: isSearching } = useQuery({
     queryKey: ["/api/admin/member-search", memberSearchTerm],
     queryFn: async () => {
       const res = await fetch(`/api/admin/member-search?q=${encodeURIComponent(memberSearchTerm)}`, {
-        credentials: 'include',
+        credentials: "include",
       });
-      if (!res.ok) throw new Error('Search failed');
+      if (!res.ok) throw new Error("Search failed");
       return await res.json();
     },
     enabled: memberSearchTerm.length >= 2,
@@ -72,13 +119,55 @@ export default function AdminCheckIns() {
     queryKey: ["/api/admin/member-search", punchSearchTerm],
     queryFn: async () => {
       const res = await fetch(`/api/admin/member-search?q=${encodeURIComponent(punchSearchTerm)}`, {
-        credentials: 'include',
+        credentials: "include",
       });
-      if (!res.ok) throw new Error('Search failed');
+      if (!res.ok) throw new Error("Search failed");
       return await res.json();
     },
     enabled: punchSearchTerm.length >= 2,
     staleTime: 0,
+  });
+
+  // Waiver question mutations
+  const createQuestionMutation = useMutation({
+    mutationFn: async (data: { question: string; description?: string; isRequired: boolean }) => {
+      const res = await apiRequest("POST", "/api/admin/waiver-questions", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/waiver-questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/waiver-questions"] });
+      setNewQuestion({ question: "", description: "", isRequired: false });
+      toast({ title: "Question added" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateQuestionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<WaiverQuestion> }) => {
+      const res = await apiRequest("PATCH", `/api/admin/waiver-questions/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/waiver-questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/waiver-questions"] });
+      setEditingQuestion(null);
+      toast({ title: "Question updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteQuestionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/waiver-questions/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/waiver-questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/waiver-questions"] });
+      toast({ title: "Question deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const manualCheckInMutation = useMutation({
@@ -89,7 +178,7 @@ export default function AdminCheckIns() {
     onSuccess: (data) => {
       toast({
         title: "Check-in Successful",
-        description: data.dayPassUsed 
+        description: data.dayPassUsed
           ? `${selectedMember?.firstName} checked in using day pass. ${data.remainingPasses} passes remaining.`
           : `${selectedMember?.firstName} checked in successfully.`,
       });
@@ -148,7 +237,7 @@ export default function AdminCheckIns() {
       ...entries.map((entry: any) => [
         format(new Date(entry.ts), "yyyy-MM-dd"),
         format(new Date(entry.ts), "HH:mm:ss"),
-        entry.entry_type === 'guest' ? 'Guest' : 'Member',
+        entry.entry_type === "guest" ? "Guest" : "Member",
         `${entry.first_name} ${entry.last_name}`.trim(),
         entry.email || "N/A",
         entry.phone_number || "N/A",
@@ -178,6 +267,11 @@ export default function AdminCheckIns() {
     if (selectedPunchMember) {
       punchDeductionMutation.mutate({ userId: selectedPunchMember.id, reason: deductionReason });
     }
+  };
+
+  const startEdit = (q: WaiverQuestion) => {
+    setEditingQuestion(q);
+    setEditForm({ question: q.question, description: q.description ?? "", isRequired: q.isRequired });
   };
 
   return (
@@ -230,7 +324,7 @@ export default function AdminCheckIns() {
               <CardTitle className="text-lg text-emerald-800">Manual Check-in</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button 
+              <Button
                 onClick={() => setIsManualCheckInOpen(true)}
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
               >
@@ -245,7 +339,7 @@ export default function AdminCheckIns() {
               <CardTitle className="text-lg text-amber-800">Punch Day Pass</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button 
+              <Button
                 onClick={() => setIsPunchDeductionOpen(true)}
                 className="w-full bg-amber-600 hover:bg-amber-700"
               >
@@ -256,10 +350,156 @@ export default function AdminCheckIns() {
           </Card>
         </div>
 
+        {/* Waiver Questions Management Panel */}
+        <Card>
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => setShowQuestionsPanel(v => !v)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="h-5 w-5 text-blue-600" />
+                <CardTitle>Guest Waiver Questions</CardTitle>
+                <Badge variant="secondary">{waiverQuestions.length} questions</Badge>
+              </div>
+              {showQuestionsPanel ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Configurable checkboxes shown on the guest check-in waiver form
+            </p>
+          </CardHeader>
+
+          {showQuestionsPanel && (
+            <CardContent className="space-y-4">
+              {/* Existing questions */}
+              {isLoadingQuestions ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Loading questions...</p>
+              ) : waiverQuestions.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No questions yet. Add one below.</p>
+              ) : (
+                <div className="space-y-2">
+                  {waiverQuestions.map(q => (
+                    <div key={q.id} className="border rounded-lg p-3 bg-white">
+                      {editingQuestion?.id === q.id ? (
+                        <div className="space-y-3">
+                          <Input
+                            value={editForm.question}
+                            onChange={e => setEditForm(f => ({ ...f, question: e.target.value }))}
+                            placeholder="Question text"
+                          />
+                          <Input
+                            value={editForm.description}
+                            onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                            placeholder="Description (optional)"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={editForm.isRequired}
+                              onCheckedChange={v => setEditForm(f => ({ ...f, isRequired: v }))}
+                            />
+                            <span className="text-sm">Required</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updateQuestionMutation.mutate({
+                                id: q.id,
+                                data: { question: editForm.question, description: editForm.description || null, isRequired: editForm.isRequired },
+                              })}
+                              disabled={updateQuestionMutation.isPending}
+                            >
+                              <Check className="h-3 w-3 mr-1" /> Save
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingQuestion(null)}>
+                              <X className="h-3 w-3 mr-1" /> Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm">{q.question}</span>
+                              {q.isRequired && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                              {!q.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                            </div>
+                            {q.description && <p className="text-xs text-muted-foreground mt-0.5">{q.description}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Switch
+                              checked={q.isActive}
+                              onCheckedChange={v => updateQuestionMutation.mutate({ id: q.id, data: { isActive: v } })}
+                            />
+                            <Button size="icon" variant="ghost" onClick={() => startEdit(q)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-red-500 hover:text-red-700"
+                              onClick={() => {
+                                if (confirm("Delete this question? Historical answers will also be removed.")) {
+                                  deleteQuestionMutation.mutate(q.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new question form */}
+              <div className="border rounded-lg p-4 bg-blue-50 border-blue-200 space-y-3">
+                <h4 className="font-semibold text-blue-800 text-sm">Add New Question</h4>
+                <Input
+                  value={newQuestion.question}
+                  onChange={e => setNewQuestion(q => ({ ...q, question: e.target.value }))}
+                  placeholder="e.g., Visiting from Gravity Bear Climbing Gym?"
+                  className="bg-white"
+                />
+                <Input
+                  value={newQuestion.description}
+                  onChange={e => setNewQuestion(q => ({ ...q, description: e.target.value }))}
+                  placeholder="Optional description or sub-text"
+                  className="bg-white"
+                />
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={newQuestion.isRequired}
+                    onCheckedChange={v => setNewQuestion(q => ({ ...q, isRequired: v }))}
+                  />
+                  <span className="text-sm text-blue-800">Mark as required</span>
+                </div>
+                <Button
+                  onClick={() => {
+                    if (!newQuestion.question.trim()) return;
+                    createQuestionMutation.mutate({
+                      question: newQuestion.question.trim(),
+                      description: newQuestion.description.trim() || undefined,
+                      isRequired: newQuestion.isRequired,
+                    });
+                  }}
+                  disabled={!newQuestion.question.trim() || createQuestionMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {createQuestionMutation.isPending ? "Adding..." : "Add Question"}
+                </Button>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Visit Log */}
         <Card>
           <CardHeader>
             <CardTitle>Visit Log</CardTitle>
-            <p className="text-sm text-muted-foreground">Member check-ins and guest waiver visits combined</p>
+            <p className="text-sm text-muted-foreground">Member check-ins and guest waiver visits combined. Click any guest row to view their waiver answers.</p>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -317,7 +557,13 @@ export default function AdminCheckIns() {
                     </TableRow>
                   ) : (
                     entries.map((entry: any, idx: number) => (
-                      <TableRow key={`${entry.entry_type}-${entry.id}-${idx}`}>
+                      <TableRow
+                        key={`${entry.entry_type}-${entry.id}-${idx}`}
+                        className={entry.entry_type === "guest" ? "cursor-pointer hover:bg-purple-50" : ""}
+                        onClick={() => {
+                          if (entry.entry_type === "guest") setSelectedGuestEntry(entry);
+                        }}
+                      >
                         <TableCell>
                           <div className="font-medium">
                             {format(new Date(entry.ts), "MMM dd, yyyy")}
@@ -335,13 +581,13 @@ export default function AdminCheckIns() {
                           {entry.email || "N/A"}
                         </TableCell>
                         <TableCell>
-                          {entry.entry_type === 'guest' ? (
+                          {entry.entry_type === "guest" ? (
                             <span className="text-sm text-muted-foreground">
                               {entry.phone_number || "No phone"}
                             </span>
                           ) : (
                             <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {entry.membership_id?.startsWith('day-pass-') ? (
+                              {entry.membership_id?.startsWith("day-pass-") ? (
                                 <span className="text-amber-600">Day Pass</span>
                               ) : (
                                 entry.membership_id || "N/A"
@@ -350,11 +596,11 @@ export default function AdminCheckIns() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {entry.entry_type === 'guest' ? (
+                          {entry.entry_type === "guest" ? (
                             <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
                               Guest
                             </Badge>
-                          ) : entry.method === 'manual' ? (
+                          ) : entry.method === "manual" ? (
                             <Badge variant="secondary">Manual</Badge>
                           ) : (
                             <Badge variant="default">QR Code</Badge>
@@ -397,6 +643,65 @@ export default function AdminCheckIns() {
         </Card>
       </div>
 
+      {/* Guest Detail Dialog */}
+      <Dialog open={!!selectedGuestEntry} onOpenChange={open => { if (!open) setSelectedGuestEntry(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">Guest</Badge>
+              {selectedGuestEntry?.first_name} {selectedGuestEntry?.last_name}
+            </DialogTitle>
+            <DialogDescription>
+              Checked in {selectedGuestEntry ? format(new Date(selectedGuestEntry.ts), "MMMM d, yyyy 'at' h:mm a") : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground font-medium">Email</p>
+                <p>{selectedGuestEntry?.email || "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium">Phone</p>
+                <p>{selectedGuestEntry?.phone_number || "—"}</p>
+              </div>
+            </div>
+
+            {/* Waiver question answers */}
+            <div>
+              <p className="font-semibold text-sm mb-2">Waiver Questions</p>
+              {isLoadingAnswers ? (
+                <p className="text-sm text-muted-foreground">Loading answers...</p>
+              ) : guestAnswers.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No questions were on the form at this time.</p>
+              ) : (
+                <div className="space-y-2">
+                  {guestAnswers.map(a => (
+                    <div key={a.id} className="flex items-start gap-2 text-sm">
+                      <div className={`mt-0.5 shrink-0 h-5 w-5 rounded flex items-center justify-center ${a.answer ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                        {a.answer ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                      </div>
+                      <div>
+                        <span className="font-medium">{a.question.question}</span>
+                        {a.question.description && (
+                          <p className="text-xs text-muted-foreground">{a.question.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedGuestEntry(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Check-in Dialog */}
       <Dialog open={isManualCheckInOpen} onOpenChange={setIsManualCheckInOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -440,7 +745,7 @@ export default function AdminCheckIns() {
                         <div className="text-sm text-muted-foreground">{member.email}</div>
                       </div>
                       <div className="text-right">
-                        {member.membershipStatus === 'active' && (
+                        {member.membershipStatus === "active" && (
                           <Badge className="bg-green-100 text-green-800">Active Member</Badge>
                         )}
                         {member.dayPassesRemaining > 0 && (
@@ -449,7 +754,7 @@ export default function AdminCheckIns() {
                             {member.dayPassesRemaining} passes
                           </Badge>
                         )}
-                        {member.membershipStatus !== 'active' && member.dayPassesRemaining === 0 && (
+                        {member.membershipStatus !== "active" && member.dayPassesRemaining === 0 && (
                           <Badge variant="secondary">No access</Badge>
                         )}
                       </div>
@@ -478,8 +783,8 @@ export default function AdminCheckIns() {
                 </div>
 
                 <div className="space-y-2">
-                  {selectedMember.membershipStatus === 'active' && (
-                    <Button 
+                  {selectedMember.membershipStatus === "active" && (
+                    <Button
                       className="w-full bg-green-600 hover:bg-green-700"
                       onClick={() => handleCheckIn(false)}
                       disabled={manualCheckInMutation.isPending}
@@ -489,19 +794,19 @@ export default function AdminCheckIns() {
                   )}
 
                   {selectedMember.dayPassesRemaining > 0 && (
-                    <Button 
+                    <Button
                       className="w-full bg-amber-600 hover:bg-amber-700"
                       onClick={() => handleCheckIn(true)}
                       disabled={manualCheckInMutation.isPending}
                     >
                       <Ticket className="h-4 w-4 mr-2" />
-                      {manualCheckInMutation.isPending 
-                        ? "Checking in..." 
+                      {manualCheckInMutation.isPending
+                        ? "Checking in..."
                         : `Check In (Use Day Pass - ${selectedMember.dayPassesRemaining} remaining)`}
                     </Button>
                   )}
 
-                  {selectedMember.membershipStatus !== 'active' && selectedMember.dayPassesRemaining === 0 && (
+                  {selectedMember.membershipStatus !== "active" && selectedMember.dayPassesRemaining === 0 && (
                     <div className="text-center py-2 text-red-600">
                       This member has no active membership or day passes
                     </div>
@@ -523,6 +828,7 @@ export default function AdminCheckIns() {
         </DialogContent>
       </Dialog>
 
+      {/* Punch Deduction Dialog */}
       <Dialog open={isPunchDeductionOpen} onOpenChange={setIsPunchDeductionOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -616,14 +922,14 @@ export default function AdminCheckIns() {
                     />
                   </div>
 
-                  <Button 
+                  <Button
                     className="w-full bg-amber-600 hover:bg-amber-700"
                     onClick={handlePunchDeduction}
                     disabled={punchDeductionMutation.isPending}
                   >
                     <Minus className="h-4 w-4 mr-2" />
-                    {punchDeductionMutation.isPending 
-                      ? "Deducting..." 
+                    {punchDeductionMutation.isPending
+                      ? "Deducting..."
                       : "Deduct 1 Punch"}
                   </Button>
                 </div>

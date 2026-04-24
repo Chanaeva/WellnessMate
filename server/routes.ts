@@ -1648,15 +1648,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: z.string().min(1, "Last name is required"),
         waiverAgreed: z.boolean().refine(val => val === true, "Waiver must be agreed to"),
         notes: z.string().optional(),
+        answers: z.array(z.object({ questionId: z.number(), answer: z.boolean() })).optional(),
       });
       
       const validatedData = waiverSchema.parse(req.body);
+      const { answers, ...waiverData } = validatedData;
       
       // Store email in lowercase for consistency
       const waiver = await storage.createGuestWaiver({
-        ...validatedData,
-        email: validatedData.email.toLowerCase(),
+        ...waiverData,
+        email: waiverData.email.toLowerCase(),
       });
+
+      // Save answers to waiver questions if any were provided
+      if (answers && answers.length > 0) {
+        await storage.createGuestWaiverAnswers(
+          answers.map(a => ({ guestWaiverId: waiver.id, questionId: a.questionId, answer: a.answer }))
+        );
+      }
       
       console.log(`Guest waiver signed: ${waiver.firstName} ${waiver.lastName} (${waiver.email})`);
       
@@ -1671,6 +1680,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Guest waiver error:", error);
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  // Public: active waiver questions for kiosk form
+  app.get("/api/waiver-questions", async (req, res) => {
+    try {
+      const questions = await storage.getActiveWaiverQuestions();
+      res.json(questions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -1732,6 +1751,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(waivers);
     } catch (error: any) {
       console.error("Error searching guest waivers:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: get guest waiver answers
+  app.get("/api/admin/guest-waivers/:id/answers", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const answers = await storage.getGuestWaiverAnswers(id);
+      res.json(answers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: waiver question CRUD
+  app.get("/api/admin/waiver-questions", isAdminOrStaff, async (req, res) => {
+    try {
+      const questions = await storage.getAllWaiverQuestions();
+      res.json(questions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/waiver-questions", isAdmin, async (req, res) => {
+    try {
+      const schema = z.object({
+        question: z.string().min(1),
+        description: z.string().optional(),
+        isRequired: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+        sortOrder: z.number().optional(),
+      });
+      const data = schema.parse(req.body);
+      const q = await storage.createWaiverQuestion(data);
+      res.json(q);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: error.errors });
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/admin/waiver-questions/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const schema = z.object({
+        question: z.string().min(1).optional(),
+        description: z.string().optional().nullable(),
+        isRequired: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+        sortOrder: z.number().optional(),
+      });
+      const data = schema.parse(req.body);
+      const q = await storage.updateWaiverQuestion(id, data);
+      res.json(q);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "Validation error", errors: error.errors });
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/waiver-questions/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteWaiverQuestion(id);
+      res.json({ success: true });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

@@ -24,6 +24,8 @@ import {
   sessionBookings, type SessionBooking, type InsertSessionBooking,
   dayPassHours, type DayPassHours,
   guestWaivers, type GuestWaiver, type InsertGuestWaiver,
+  waiverQuestions, type WaiverQuestion, type InsertWaiverQuestion,
+  guestWaiverAnswers, type GuestWaiverAnswer,
   siteSettings, type SiteSetting, type InsertSiteSetting,
   treatmentTypeEnum,
   giftCards, type GiftCard, type InsertGiftCard,
@@ -237,6 +239,15 @@ export interface IStorage {
   getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }>;
   getPaginatedGuestWaivers(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: GuestWaiver[]; total: number }>;
   
+  // Waiver question methods
+  getActiveWaiverQuestions(): Promise<WaiverQuestion[]>;
+  getAllWaiverQuestions(): Promise<WaiverQuestion[]>;
+  createWaiverQuestion(q: InsertWaiverQuestion): Promise<WaiverQuestion>;
+  updateWaiverQuestion(id: number, data: Partial<InsertWaiverQuestion>): Promise<WaiverQuestion>;
+  deleteWaiverQuestion(id: number): Promise<void>;
+  createGuestWaiverAnswers(answers: { guestWaiverId: number; questionId: number; answer: boolean }[]): Promise<void>;
+  getGuestWaiverAnswers(guestWaiverId: number): Promise<(GuestWaiverAnswer & { question: WaiverQuestion })[]>;
+
   // Site settings methods
   getSiteSetting(key: string): Promise<SiteSetting | undefined>;
   getAllSiteSettings(): Promise<SiteSetting[]>;
@@ -2169,6 +2180,54 @@ export class DatabaseStorage implements IStorage {
       .offset((page - 1) * pageSize);
 
     return { data, total: Number(countResult?.count || 0) };
+  }
+
+  // Waiver question methods
+  async getActiveWaiverQuestions(): Promise<WaiverQuestion[]> {
+    return await db
+      .select()
+      .from(waiverQuestions)
+      .where(eq(waiverQuestions.isActive, true))
+      .orderBy(waiverQuestions.sortOrder, waiverQuestions.id);
+  }
+
+  async getAllWaiverQuestions(): Promise<WaiverQuestion[]> {
+    return await db
+      .select()
+      .from(waiverQuestions)
+      .orderBy(waiverQuestions.sortOrder, waiverQuestions.id);
+  }
+
+  async createWaiverQuestion(q: InsertWaiverQuestion): Promise<WaiverQuestion> {
+    const [created] = await db.insert(waiverQuestions).values(q).returning();
+    return created;
+  }
+
+  async updateWaiverQuestion(id: number, data: Partial<InsertWaiverQuestion>): Promise<WaiverQuestion> {
+    const [updated] = await db
+      .update(waiverQuestions)
+      .set(data)
+      .where(eq(waiverQuestions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWaiverQuestion(id: number): Promise<void> {
+    await db.delete(waiverQuestions).where(eq(waiverQuestions.id, id));
+  }
+
+  async createGuestWaiverAnswers(answers: { guestWaiverId: number; questionId: number; answer: boolean }[]): Promise<void> {
+    if (answers.length === 0) return;
+    await db.insert(guestWaiverAnswers).values(answers);
+  }
+
+  async getGuestWaiverAnswers(guestWaiverId: number): Promise<(GuestWaiverAnswer & { question: WaiverQuestion })[]> {
+    const rows = await db
+      .select()
+      .from(guestWaiverAnswers)
+      .innerJoin(waiverQuestions, eq(guestWaiverAnswers.questionId, waiverQuestions.id))
+      .where(eq(guestWaiverAnswers.guestWaiverId, guestWaiverId));
+    return rows.map(r => ({ ...r.guest_waiver_answers, question: r.waiver_questions }));
   }
 
   // Site settings methods

@@ -691,6 +691,15 @@ export class DatabaseStorage implements IStorage {
       }
     }
     const searchLike = search && search.trim() ? `%${search.trim().toLowerCase()}%` : null;
+    const offset = (page - 1) * pageSize;
+
+    // Build date and search filter fragments conditionally to avoid null parameter casting issues
+    const dateFilter = startDate
+      ? sql`AND ts >= ${startDate}::timestamptz`
+      : sql``;
+    const searchFilter = searchLike
+      ? sql`AND (LOWER(first_name) LIKE ${searchLike} OR LOWER(last_name) LIKE ${searchLike} OR LOWER(email) LIKE ${searchLike})`
+      : sql``;
 
     const countQuery = sql`
       WITH combined AS (
@@ -708,12 +717,7 @@ export class DatabaseStorage implements IStorage {
         FROM guest_waivers gw
       )
       SELECT COUNT(*)::int AS total FROM combined
-      WHERE (${startDate}::timestamptz IS NULL OR ts >= ${startDate}::timestamptz)
-        AND (${searchLike} IS NULL OR (
-          LOWER(first_name) LIKE ${searchLike}
-          OR LOWER(last_name) LIKE ${searchLike}
-          OR LOWER(email) LIKE ${searchLike}
-        ))
+      WHERE 1=1 ${dateFilter} ${searchFilter}
     `;
 
     const dataQuery = sql`
@@ -744,14 +748,9 @@ export class DatabaseStorage implements IStorage {
         FROM guest_waivers gw
       )
       SELECT * FROM combined
-      WHERE (${startDate}::timestamptz IS NULL OR ts >= ${startDate}::timestamptz)
-        AND (${searchLike} IS NULL OR (
-          LOWER(first_name) LIKE ${searchLike}
-          OR LOWER(last_name) LIKE ${searchLike}
-          OR LOWER(email) LIKE ${searchLike}
-        ))
+      WHERE 1=1 ${dateFilter} ${searchFilter}
       ORDER BY ts DESC
-      LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+      LIMIT ${pageSize} OFFSET ${offset}
     `;
 
     const [countResult, dataResult] = await Promise.all([

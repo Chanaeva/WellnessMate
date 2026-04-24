@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { pool } from "./db";
 
 const app = express();
 app.use(express.json());
@@ -36,7 +37,36 @@ app.use((req, res, next) => {
   next();
 });
 
+async function runStartupMigrations() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS waiver_questions (
+        id SERIAL PRIMARY KEY,
+        question TEXT NOT NULL,
+        description TEXT,
+        is_required BOOLEAN NOT NULL DEFAULT FALSE,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS guest_waiver_answers (
+        id SERIAL PRIMARY KEY,
+        guest_waiver_id INTEGER NOT NULL REFERENCES guest_waivers(id) ON DELETE CASCADE,
+        question_id INTEGER NOT NULL REFERENCES waiver_questions(id) ON DELETE CASCADE,
+        answer BOOLEAN NOT NULL DEFAULT FALSE
+      );
+    `);
+    log("Startup migrations completed");
+  } catch (err: any) {
+    log(`Startup migration warning: ${err.message}`);
+  } finally {
+    client.release();
+  }
+}
+
 (async () => {
+  await runStartupMigrations();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

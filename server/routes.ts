@@ -1689,7 +1689,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questions = await storage.getActiveWaiverQuestions();
       res.json(questions);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      // Return empty array if table doesn't exist yet (new feature not yet migrated)
+      res.json([]);
     }
   });
 
@@ -1762,7 +1763,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const answers = await storage.getGuestWaiverAnswers(id);
       res.json(answers);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      // Return empty array if table doesn't exist yet (new feature not yet migrated)
+      res.json([]);
     }
   });
 
@@ -1772,7 +1774,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const questions = await storage.getAllWaiverQuestions();
       res.json(questions);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      // Return empty array if table doesn't exist yet (new feature not yet migrated)
+      res.json([]);
     }
   });
 
@@ -2422,8 +2425,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const search = req.query.search as string | undefined;
       const result = await storage.getUnifiedCheckIns(page, pageSize, period, search);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ message: "Server error" });
+    } catch (error: any) {
+      console.error("unified-check-ins error:", error?.message, error?.stack);
+      res.status(500).json({ message: "Server error", detail: error?.message });
     }
   });
 

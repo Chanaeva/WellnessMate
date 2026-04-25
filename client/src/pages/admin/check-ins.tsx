@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Switch } from "@/components/ui/switch";
 import { Search, Download, UserPlus, Ticket, Minus, Plus, Trash2, Edit2, CheckSquare, ChevronDown, ChevronUp, Check, X } from "lucide-react";
 import { format } from "date-fns";
+import { formatTimeCST, formatDateCST, formatDateTimeCST, formatISODateCST, formatTime24CST } from "@/lib/timezone";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -235,8 +236,8 @@ export default function AdminCheckIns() {
     const csvData = [
       headers.join(","),
       ...entries.map((entry: any) => [
-        format(new Date(entry.ts), "yyyy-MM-dd"),
-        format(new Date(entry.ts), "HH:mm:ss"),
+        formatISODateCST(entry.ts),
+        formatTime24CST(entry.ts),
         entry.entry_type === "guest" ? "Guest" : "Member",
         `${entry.first_name} ${entry.last_name}`.trim(),
         entry.email || "N/A",
@@ -566,10 +567,10 @@ export default function AdminCheckIns() {
                       >
                         <TableCell>
                           <div className="font-medium">
-                            {format(new Date(entry.ts), "MMM dd, yyyy")}
+                            {formatDateCST(entry.ts)}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {format(new Date(entry.ts), "h:mm a")}
+                            {formatTimeCST(entry.ts)}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -652,7 +653,7 @@ export default function AdminCheckIns() {
               {selectedGuestEntry?.first_name} {selectedGuestEntry?.last_name}
             </DialogTitle>
             <DialogDescription>
-              Checked in {selectedGuestEntry ? format(new Date(selectedGuestEntry.ts), "MMMM d, yyyy 'at' h:mm a") : ""}
+              Checked in {selectedGuestEntry ? formatDateTimeCST(selectedGuestEntry.ts) : ""}
             </DialogDescription>
           </DialogHeader>
 

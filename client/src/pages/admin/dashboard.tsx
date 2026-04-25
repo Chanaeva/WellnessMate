@@ -40,6 +40,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { formatTimeCST } from "@/lib/timezone";
 import Header from "@/components/layout/header";
 import { Link } from "wouter";
 import PackagesManagement from "./packages";
@@ -286,7 +287,7 @@ export default function AdminDashboard() {
                               {entry.first_name} {entry.last_name}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {entry.ts ? format(new Date(entry.ts), "h:mm a") : "N/A"}
+                              {entry.ts ? formatTimeCST(entry.ts) : "N/A"}
                             </p>
                           </div>
                           {entry.entry_type === "guest" ? (

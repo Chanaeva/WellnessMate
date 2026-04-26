@@ -144,11 +144,82 @@ function FaqForm({
   );
 }
 
+// Reusable section panel for editing landing page content
+function SectionContentEditor({
+  sectionKey,
+  displayName,
+  description,
+  fields,
+  existingContent,
+  onSave,
+  isSaving,
+}: {
+  sectionKey: string;
+  displayName: string;
+  description: string;
+  fields: { key: string; label: string; hint?: string; multiline?: boolean }[];
+  existingContent: LandingPageContent[];
+  onSave: (section: string, values: Record<string, string>) => void;
+  isSaving: boolean;
+}) {
+  const getVal = (key: string) =>
+    existingContent.find(c => c.section === sectionKey && c.key === key)?.value ?? "";
+
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map(f => [f.key, getVal(f.key)]))
+  );
+
+  useEffect(() => {
+    setValues(Object.fromEntries(fields.map(f => [f.key, getVal(f.key)])));
+  }, [existingContent]);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">{displayName}</CardTitle>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {fields.map(field => (
+          <div key={field.key} className="space-y-1.5">
+            <Label htmlFor={`${sectionKey}-${field.key}`} className="text-sm font-medium">{field.label}</Label>
+            {field.hint && <p className="text-xs text-muted-foreground">{field.hint}</p>}
+            {field.multiline ? (
+              <Textarea
+                id={`${sectionKey}-${field.key}`}
+                value={values[field.key] ?? ""}
+                onChange={e => setValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                rows={3}
+                className="resize-y"
+              />
+            ) : (
+              <Input
+                id={`${sectionKey}-${field.key}`}
+                value={values[field.key] ?? ""}
+                onChange={e => setValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+              />
+            )}
+          </div>
+        ))}
+        <Button
+          onClick={() => onSave(sectionKey, values)}
+          disabled={isSaving}
+          className="w-full"
+          size="sm"
+        >
+          {isSaving ? "Saving..." : `Save ${displayName}`}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function LandingPageManagement() {
   const { toast } = useToast();
   const [editingContent, setEditingContent] = useState<LandingPageContent | null>(null);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [editingFaq, setEditingFaq] = useState<FaqItem | null>(null);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [isContentDialogOpen, setIsContentDialogOpen] = useState(false);
   const [isPromotionDialogOpen, setIsPromotionDialogOpen] = useState(false);
   const [isFaqDialogOpen, setIsFaqDialogOpen] = useState(false);
@@ -425,6 +496,39 @@ export default function LandingPageManagement() {
       });
     },
   });
+
+  // Save all fields in a section (upsert each key)
+  const saveSectionMutation = useMutation({
+    mutationFn: async ({ section, values }: { section: string; values: Record<string, string> }) => {
+      const saves = Object.entries(values).map(async ([key, value]) => {
+        const existing = landingPageContent.find(c => c.section === section && c.key === key);
+        if (existing) {
+          return apiRequest("PUT", `/api/admin/landing-content/${existing.id}`, { section, key, value, isActive: true });
+        } else {
+          return apiRequest("POST", "/api/admin/landing-content", { section, key, value, isActive: true });
+        }
+      });
+      await Promise.all(saves);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/landing-content"] });
+      // Invalidate all public landing content caches
+      ["hero", "features", "benefits", "memberships", "gallery", "faq", "cta", "footer"].forEach(s => {
+        queryClient.invalidateQueries({ queryKey: [`/api/landing-content/${s}`] });
+      });
+      setSavingSection(null);
+      toast({ title: "Saved", description: "Content updated successfully" });
+    },
+    onError: () => {
+      setSavingSection(null);
+      toast({ title: "Error", description: "Failed to save content", variant: "destructive" });
+    },
+  });
+
+  const handleSaveSection = (section: string, values: Record<string, string>) => {
+    setSavingSection(section);
+    saveSectionMutation.mutate({ section, values });
+  };
 
   // Promotion mutations
   const createPromotionMutation = useMutation({
@@ -773,14 +877,169 @@ export default function LandingPageManagement() {
         {/* Page Content Tab */}
         <TabsContent value="content" className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Page Content Sections</h3>
-            <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleNewContent}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Content Section
-                </Button>
-              </DialogTrigger>
+            <div>
+              <h3 className="text-lg font-semibold">Page Content Sections</h3>
+              <p className="text-sm text-muted-foreground">Edit all text visible on the public landing page. Changes are reflected immediately after saving.</p>
+            </div>
+            <Button variant="outline" onClick={() => window.open("/", "_blank")} size="sm">
+              <Eye className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+          </div>
+
+          {isContentLoading ? (
+            <div className="text-center py-12 text-muted-foreground">Loading content...</div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Hero */}
+              <SectionContentEditor
+                sectionKey="hero"
+                displayName="Hero Section"
+                description="The top banner — first thing visitors see."
+                fields={[
+                  { key: "title", label: "Main Headline", hint: "Large heading at the top" },
+                  { key: "subtitle", label: "Subheadline", hint: "Smaller text below the headline" },
+                  { key: "badgeText", label: "Badge Text", hint: "Small badge above the headline" },
+                  { key: "description", label: "Description Paragraph", hint: "Body text below the badge", multiline: true },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "hero"}
+              />
+
+              {/* Memberships Section */}
+              <SectionContentEditor
+                sectionKey="memberships"
+                displayName="Memberships & Day Passes Section"
+                description="The pricing section with membership plans and day passes."
+                fields={[
+                  { key: "title", label: "Section Heading", hint: 'e.g. "Choose your path to wellness."' },
+                  { key: "subtitle", label: "Section Subtext", multiline: true },
+                  { key: "membershipColumnTitle", label: "Memberships Column Title", hint: 'e.g. "Monthly Memberships"' },
+                  { key: "membershipColumnSubtitle", label: "Memberships Column Subtext" },
+                  { key: "dayPassColumnTitle", label: "Day Passes Column Title", hint: 'e.g. "Day Pass Packages"' },
+                  { key: "dayPassColumnSubtitle", label: "Day Passes Column Subtext" },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "memberships"}
+              />
+
+              {/* Gallery */}
+              <SectionContentEditor
+                sectionKey="gallery"
+                displayName="Gallery Section"
+                description="The photo carousel section."
+                fields={[
+                  { key: "title", label: "Section Heading", hint: 'e.g. "Our Wellness Space"' },
+                  { key: "subtitle", label: "Section Subtext", multiline: true },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "gallery"}
+              />
+
+              {/* Features */}
+              <SectionContentEditor
+                sectionKey="features"
+                displayName="Core Experience (Features)"
+                description="The feature cards grid section."
+                fields={[
+                  { key: "sectionTitle", label: "Section Heading", hint: 'e.g. "Core Experience"' },
+                  { key: "feature1Title", label: "Feature 1 Title" },
+                  { key: "feature1Description", label: "Feature 1 Description", multiline: true },
+                  { key: "feature2Title", label: "Feature 2 Title" },
+                  { key: "feature2Description", label: "Feature 2 Description", multiline: true },
+                  { key: "feature3Title", label: "Feature 3 Title" },
+                  { key: "feature3Description", label: "Feature 3 Description", multiline: true },
+                  { key: "feature4Title", label: "Feature 4 Title" },
+                  { key: "feature4Description", label: "Feature 4 Description", multiline: true },
+                  { key: "feature5Title", label: "Feature 5 Title" },
+                  { key: "feature5Description", label: "Feature 5 Description", multiline: true },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "features"}
+              />
+
+              {/* Benefits */}
+              <SectionContentEditor
+                sectionKey="benefits"
+                displayName="Benefits Section"
+                description="'Why Choose Wolf Mother Wellness' card grid."
+                fields={[
+                  { key: "sectionTitle", label: "Section Heading", hint: 'e.g. "Why Choose Wolf Mother Wellness"' },
+                  { key: "benefit1Title", label: "Benefit 1 Title" },
+                  { key: "benefit1Description", label: "Benefit 1 Description", multiline: true },
+                  { key: "benefit2Title", label: "Benefit 2 Title" },
+                  { key: "benefit2Description", label: "Benefit 2 Description", multiline: true },
+                  { key: "benefit3Title", label: "Benefit 3 Title" },
+                  { key: "benefit3Description", label: "Benefit 3 Description", multiline: true },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "benefits"}
+              />
+
+              {/* FAQ Heading */}
+              <SectionContentEditor
+                sectionKey="faq"
+                displayName="FAQ Section"
+                description="Heading above the frequently asked questions accordion. (FAQ items are managed in the FAQ tab.)"
+                fields={[
+                  { key: "title", label: "Section Heading", hint: 'e.g. "Frequently Asked Questions"' },
+                  { key: "subtitle", label: "Section Subtext" },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "faq"}
+              />
+
+              {/* Call to Action */}
+              <SectionContentEditor
+                sectionKey="cta"
+                displayName="Call to Action Section"
+                description="The full-width colored banner near the bottom."
+                fields={[
+                  { key: "title", label: "Heading", hint: 'e.g. "Ready to get started?"' },
+                  { key: "subtitle", label: "Subtext", multiline: true },
+                  { key: "primaryButtonText", label: "Primary Button Text", hint: 'e.g. "Start Your Journey"' },
+                  { key: "secondaryButtonText", label: "Secondary Button Text", hint: 'e.g. "Log In to View Plans"' },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "cta"}
+              />
+
+              {/* Footer */}
+              <SectionContentEditor
+                sectionKey="footer"
+                displayName="Footer Tagline"
+                description="The tagline shown in the footer copyright line."
+                fields={[
+                  { key: "tagline", label: "Footer Tagline", hint: 'e.g. "Where legends are born and wellness thrives."' },
+                ]}
+                existingContent={landingPageContent}
+                onSave={handleSaveSection}
+                isSaving={savingSection === "footer"}
+              />
+            </div>
+          )}
+
+          {/* Advanced: raw content editor (collapsible) */}
+          <details className="border rounded-lg">
+            <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground select-none">
+              Advanced: Raw Content Editor
+            </summary>
+            <div className="px-4 pb-4 pt-2 space-y-4">
+              <div className="flex justify-end">
+                <Dialog open={isContentDialogOpen} onOpenChange={setIsContentDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" onClick={handleNewContent}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Content Block
+                    </Button>
+                  </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>
@@ -1002,6 +1261,8 @@ export default function LandingPageManagement() {
               </div>
             )}
           </div>
+            </div>
+          </details>
         </TabsContent>
 
         {/* Promotions Tab */}

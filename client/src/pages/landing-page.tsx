@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 
 // Gallery Carousel Component
-function GalleryCarousel({ images }: { images: GalleryImage[] }) {
+function GalleryCarousel({ images, title, subtitle }: { images: GalleryImage[]; title?: string; subtitle?: string }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: "center" });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(0);
@@ -77,10 +77,10 @@ function GalleryCarousel({ images }: { images: GalleryImage[] }) {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
-            Our Wellness Space
+            {title || "Our Wellness Space"}
           </h2>
           <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
-            Step inside Wolf Mother Wellness and discover a sanctuary designed for relaxation and rejuvenation.
+            {subtitle || "Step inside Wolf Mother Wellness and discover a sanctuary designed for relaxation and rejuvenation."}
           </p>
         </div>
 
@@ -203,6 +203,7 @@ export default function LandingPage() {
         addressLine2: data.find((s: any) => s.key === 'addressLine2')?.value || '',
         copyrightYear: data.find((s: any) => s.key === 'copyrightYear')?.value || '2025',
         instagramHandle: data.find((s: any) => s.key === 'instagramHandle')?.value || 'wolfmothertulsa',
+        tagline: data.find((s: any) => s.key === 'tagline')?.value || '',
       };
     },
   });
@@ -329,29 +330,16 @@ export default function LandingPage() {
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/landing-content/features");
       const data = await res.json();
-      
-      return [
-        {
-          title: data.find((s: any) => s.key === 'feature1Title')?.value || '',
-          description: data.find((s: any) => s.key === 'feature1Description')?.value || '',
-        },
-        {
-          title: data.find((s: any) => s.key === 'feature2Title')?.value || '',
-          description: data.find((s: any) => s.key === 'feature2Description')?.value || '',
-        },
-        {
-          title: data.find((s: any) => s.key === 'feature3Title')?.value || '',
-          description: data.find((s: any) => s.key === 'feature3Description')?.value || '',
-        },
-        {
-          title: data.find((s: any) => s.key === 'feature4Title')?.value || '',
-          description: data.find((s: any) => s.key === 'feature4Description')?.value || '',
-        },
-        {
-          title: data.find((s: any) => s.key === 'feature5Title')?.value || '',
-          description: data.find((s: any) => s.key === 'feature5Description')?.value || '',
-        },
-      ].filter(f => f.title);
+      return {
+        sectionTitle: data.find((s: any) => s.key === 'sectionTitle')?.value || '',
+        items: [
+          { title: data.find((s: any) => s.key === 'feature1Title')?.value || '', description: data.find((s: any) => s.key === 'feature1Description')?.value || '' },
+          { title: data.find((s: any) => s.key === 'feature2Title')?.value || '', description: data.find((s: any) => s.key === 'feature2Description')?.value || '' },
+          { title: data.find((s: any) => s.key === 'feature3Title')?.value || '', description: data.find((s: any) => s.key === 'feature3Description')?.value || '' },
+          { title: data.find((s: any) => s.key === 'feature4Title')?.value || '', description: data.find((s: any) => s.key === 'feature4Description')?.value || '' },
+          { title: data.find((s: any) => s.key === 'feature5Title')?.value || '', description: data.find((s: any) => s.key === 'feature5Description')?.value || '' },
+        ].filter(f => f.title),
+      };
     },
   });
 
@@ -361,21 +349,72 @@ export default function LandingPage() {
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/landing-content/benefits");
       const data = await res.json();
-      
-      return [
-        {
-          title: data.find((s: any) => s.key === 'benefit1Title')?.value || '',
-          description: data.find((s: any) => s.key === 'benefit1Description')?.value || '',
-        },
-        {
-          title: data.find((s: any) => s.key === 'benefit2Title')?.value || '',
-          description: data.find((s: any) => s.key === 'benefit2Description')?.value || '',
-        },
-        {
-          title: data.find((s: any) => s.key === 'benefit3Title')?.value || '',
-          description: data.find((s: any) => s.key === 'benefit3Description')?.value || '',
-        },
-      ];
+      return {
+        sectionTitle: data.find((s: any) => s.key === 'sectionTitle')?.value || '',
+        items: [
+          { title: data.find((s: any) => s.key === 'benefit1Title')?.value || '', description: data.find((s: any) => s.key === 'benefit1Description')?.value || '' },
+          { title: data.find((s: any) => s.key === 'benefit2Title')?.value || '', description: data.find((s: any) => s.key === 'benefit2Description')?.value || '' },
+          { title: data.find((s: any) => s.key === 'benefit3Title')?.value || '', description: data.find((s: any) => s.key === 'benefit3Description')?.value || '' },
+        ],
+      };
+    },
+  });
+
+  // Fetch memberships section content
+  const { data: membershipsContent } = useQuery({
+    queryKey: ["/api/landing-content/memberships"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/memberships");
+      const data = await res.json();
+      return {
+        title: data.find((s: any) => s.key === 'title')?.value || '',
+        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || '',
+        membershipColumnTitle: data.find((s: any) => s.key === 'membershipColumnTitle')?.value || '',
+        membershipColumnSubtitle: data.find((s: any) => s.key === 'membershipColumnSubtitle')?.value || '',
+        dayPassColumnTitle: data.find((s: any) => s.key === 'dayPassColumnTitle')?.value || '',
+        dayPassColumnSubtitle: data.find((s: any) => s.key === 'dayPassColumnSubtitle')?.value || '',
+      };
+    },
+  });
+
+  // Fetch gallery section content
+  const { data: galleryContent } = useQuery({
+    queryKey: ["/api/landing-content/gallery"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/gallery");
+      const data = await res.json();
+      return {
+        title: data.find((s: any) => s.key === 'title')?.value || '',
+        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || '',
+      };
+    },
+  });
+
+  // Fetch FAQ section heading content
+  const { data: faqSectionContent } = useQuery({
+    queryKey: ["/api/landing-content/faq"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/faq");
+      const data = await res.json();
+      return {
+        title: data.find((s: any) => s.key === 'title')?.value || '',
+        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || '',
+      };
+    },
+  });
+
+  // Fetch CTA section content
+  const { data: ctaContent } = useQuery({
+    queryKey: ["/api/landing-content/cta"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/landing-content/cta");
+      const data = await res.json();
+      return {
+        title: data.find((s: any) => s.key === 'title')?.value || '',
+        subtitle: data.find((s: any) => s.key === 'subtitle')?.value || '',
+        primaryButtonText: data.find((s: any) => s.key === 'primaryButtonText')?.value || '',
+        secondaryButtonText: data.find((s: any) => s.key === 'secondaryButtonText')?.value || '',
+      };
     },
   });
 
@@ -604,10 +643,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-heading font-bold text-foreground mb-4">
-              Choose your path to wellness.
+              {membershipsContent?.title || "Choose your path to wellness."}
             </h2>
             <p className="text-xl text-muted-foreground font-body max-w-2xl mx-auto">
-              Choose a membership or day pass to start your thermal wellness experience. Come relax with us.
+              {membershipsContent?.subtitle || "Choose a membership or day pass to start your thermal wellness experience. Come relax with us."}
             </p>
           </div>
 
@@ -617,10 +656,10 @@ export default function LandingPage() {
               <div className="text-center mb-8">
                 <Crown className="h-12 w-12 text-primary mx-auto mb-4" />
                 <h3 className="text-2xl font-heading font-bold text-foreground mb-2">
-                  Monthly Memberships
+                  {membershipsContent?.membershipColumnTitle || "Monthly Memberships"}
                 </h3>
                 <p className="text-muted-foreground font-body">
-                  Access to all amenities, including special events.
+                  {membershipsContent?.membershipColumnSubtitle || "Access to all amenities, including special events."}
                 </p>
               </div>
 
@@ -721,10 +760,10 @@ export default function LandingPage() {
               <div className="text-center mb-8">
                 <Calendar className="h-12 w-12 text-primary mx-auto mb-4" />
                 <h3 className="text-2xl font-heading font-bold text-foreground mb-2">
-                  Day Pass Packages
+                  {membershipsContent?.dayPassColumnTitle || "Day Pass Packages"}
                 </h3>
                 <p className="text-muted-foreground font-body">
-                  Perfect for trying our facilities or occasional visits
+                  {membershipsContent?.dayPassColumnSubtitle || "Perfect for trying our facilities or occasional visits"}
                 </p>
               </div>
 
@@ -819,12 +858,12 @@ export default function LandingPage() {
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-3xl p-8 lg:p-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-heading font-bold text-foreground mb-4">
-                Why Choose Wolf Mother Wellness
+                {benefitsContent?.sectionTitle || "Why Choose Wolf Mother Wellness"}
               </h3>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
-              {benefitsContent?.map((benefit, index) => (
+              {benefitsContent?.items?.map((benefit, index) => (
                 <div key={index} className="text-center">
                   <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                     {benefitIcons[index]}
@@ -844,7 +883,11 @@ export default function LandingPage() {
 
       {/* Gallery Carousel Section */}
       {galleryImages && galleryImages.length > 0 && (
-        <GalleryCarousel images={galleryImages} />
+        <GalleryCarousel
+          images={galleryImages}
+          title={galleryContent?.title}
+          subtitle={galleryContent?.subtitle}
+        />
       )}
 
       {/* Promotions Carousel */}
@@ -892,11 +935,11 @@ export default function LandingPage() {
       <section className="py-16 px-4 bg-muted/30">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-heading font-bold text-center mb-12 text-foreground">
-            Core Experience
+            {featuresContent?.sectionTitle || "Core Experience"}
           </h2>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featuresContent?.map((feature, index) => (
+            {featuresContent?.items?.map((feature, index) => (
               <Card
                 key={index}
                 className="text-center border-0 shadow-sm hover:shadow-md transition-shadow duration-300 bg-background"
@@ -922,10 +965,10 @@ export default function LandingPage() {
           <div className="max-w-3xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-heading font-bold text-foreground mb-4">
-                Frequently Asked Questions
+                {faqSectionContent?.title || "Frequently Asked Questions"}
               </h2>
               <p className="text-xl text-muted-foreground font-body">
-                Everything you need to know about Wolf Mother Wellness
+                {faqSectionContent?.subtitle || "Everything you need to know about Wolf Mother Wellness"}
               </p>
             </div>
 
@@ -962,10 +1005,10 @@ export default function LandingPage() {
       <section className="py-20 px-4 bg-primary text-white">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-heading font-bold mb-6">
-            Ready to get started?
+            {ctaContent?.title || "Ready to get started?"}
           </h2>
           <p className="text-xl mb-8 text-white/90 font-body">
-            Choose a plan and begin your wellness experience.
+            {ctaContent?.subtitle || "Choose a plan and begin your wellness experience."}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
@@ -975,7 +1018,7 @@ export default function LandingPage() {
                 className="bg-white text-neutral-900 hover:bg-gray-100 px-10 py-6 text-xl font-bold shadow-2xl border-3 border-white hover:shadow-3xl transform hover:scale-105 transition-all duration-300"
               >
                 <CheckCircle className="h-6 w-6 mr-3" />
-                Start Your Journey
+                {ctaContent?.primaryButtonText || "Start Your Journey"}
               </Button>
             </Link>
 
@@ -985,7 +1028,7 @@ export default function LandingPage() {
                 size="lg"
                 className="border-4 border-white text-white bg-transparent hover:bg-white hover:text-neutral-900 px-10 py-6 text-xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
               >
-                Log In to View Plans
+                {ctaContent?.secondaryButtonText || "Log In to View Plans"}
               </Button>
             </Link>
           </div>
@@ -1050,8 +1093,7 @@ export default function LandingPage() {
 
           <div className="text-center pt-6 border-t border-muted-foreground/20">
             <p className="text-muted-foreground font-body text-sm">
-              © {footerSettings?.copyrightYear } 
-Wolf Mother Wellness. Where legends are born and wellness thrives.
+              © {footerSettings?.copyrightYear} Wolf Mother Wellness.{footerSettings?.tagline ? ` ${footerSettings.tagline}` : " Where legends are born and wellness thrives."}
             </p>
           </div>
         </div>

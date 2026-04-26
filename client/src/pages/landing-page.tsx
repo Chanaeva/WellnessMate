@@ -35,7 +35,39 @@ import {
   Star,
   AlertCircle,
   X,
+  Flame,
+  Zap,
+  Leaf,
+  Activity,
+  Droplets,
+  Sun,
+  Wind,
+  LucideIcon,
 } from "lucide-react";
+
+const HERO_ICON_MAP: Record<string, LucideIcon> = {
+  Waves,
+  Crown,
+  Heart,
+  Users,
+  Calendar,
+  Sparkles,
+  Shield,
+  Star,
+  Flame,
+  Zap,
+  Leaf,
+  Activity,
+  Droplets,
+  Sun,
+  Wind,
+  Clock,
+};
+
+function HeroSubFeatureIcon({ name }: { name: string }) {
+  const IconComponent = HERO_ICON_MAP[name] ?? Sparkles;
+  return <IconComponent className="h-8 w-8 text-primary" />;
+}
 
 // Gallery Carousel Component
 function GalleryCarousel({ images, title, subtitle }: { images: GalleryImage[]; title?: string; subtitle?: string }) {
@@ -320,6 +352,15 @@ export default function LandingPage() {
         subtitle: data.find((s: any) => s.key === 'subtitle')?.value || '',
         description: data.find((s: any) => s.key === 'description')?.value || '',
         badgeText: data.find((s: any) => s.key === 'badgeText')?.value || '',
+        subFeature1Icon: data.find((s: any) => s.key === 'subFeature1Icon')?.value ?? 'Waves',
+        subFeature1Title: data.find((s: any) => s.key === 'subFeature1Title')?.value ?? 'Thermal Facilities',
+        subFeature1Description: data.find((s: any) => s.key === 'subFeature1Description')?.value ?? 'Access to sauna, hot tubs, cold plunge and more',
+        subFeature2Icon: data.find((s: any) => s.key === 'subFeature2Icon')?.value ?? 'Heart',
+        subFeature2Title: data.find((s: any) => s.key === 'subFeature2Title')?.value ?? 'Wellness Guides',
+        subFeature2Description: data.find((s: any) => s.key === 'subFeature2Description')?.value ?? 'Expert guidance for thermal therapy',
+        subFeature3Icon: data.find((s: any) => s.key === 'subFeature3Icon')?.value ?? 'Users',
+        subFeature3Title: data.find((s: any) => s.key === 'subFeature3Title')?.value ?? 'Flexible Plans',
+        subFeature3Description: data.find((s: any) => s.key === 'subFeature3Description')?.value ?? 'Choose a plan that fits your needs',
       };
     },
   });
@@ -635,6 +676,30 @@ export default function LandingPage() {
               </Button>
             </Link>
           </div>
+
+          {/* Hero Sub-Feature Cards */}
+          {heroContent && (heroContent.subFeature1Title || heroContent.subFeature2Title || heroContent.subFeature3Title) && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-14 max-w-3xl mx-auto">
+              {[
+                { icon: heroContent.subFeature1Icon, title: heroContent.subFeature1Title, description: heroContent.subFeature1Description },
+                { icon: heroContent.subFeature2Icon, title: heroContent.subFeature2Title, description: heroContent.subFeature2Description },
+                { icon: heroContent.subFeature3Icon, title: heroContent.subFeature3Title, description: heroContent.subFeature3Description },
+              ].filter(f => f.title).map((feature, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-col items-center gap-3 rounded-2xl border border-primary/15 bg-white/70 backdrop-blur-sm shadow-sm px-5 py-6 text-center hover:shadow-md hover:border-primary/30 transition-all duration-200"
+                >
+                  <div className="rounded-full bg-primary/10 p-3">
+                    <HeroSubFeatureIcon name={feature.icon} />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-semibold text-foreground text-sm leading-tight mb-1">{feature.title}</h3>
+                    <p className="text-xs text-muted-foreground font-body leading-relaxed">{feature.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

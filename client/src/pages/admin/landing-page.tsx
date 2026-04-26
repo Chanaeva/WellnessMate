@@ -28,7 +28,21 @@ import {
   Building2,
   Copyright,
   Instagram,
-  Image
+  Image,
+  Waves,
+  Crown,
+  Heart,
+  Users,
+  Sparkles,
+  Shield,
+  Flame,
+  Zap,
+  Leaf,
+  Activity,
+  Droplets,
+  Sun,
+  Wind,
+  LucideIcon,
 } from "lucide-react";
 import AdminGallery from "./gallery";
 import { useToast } from "@/hooks/use-toast";
@@ -208,6 +222,135 @@ function SectionContentEditor({
           size="sm"
         >
           {isSaving ? "Saving..." : `Save ${displayName}`}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+const HERO_ICON_OPTIONS: { value: string; label: string; Icon: LucideIcon }[] = [
+  { value: "Waves", label: "Waves", Icon: Waves },
+  { value: "Flame", label: "Flame", Icon: Flame },
+  { value: "Heart", label: "Heart", Icon: Heart },
+  { value: "Sparkles", label: "Sparkles", Icon: Sparkles },
+  { value: "Users", label: "Users", Icon: Users },
+  { value: "Calendar", label: "Calendar", Icon: Calendar },
+  { value: "Shield", label: "Shield", Icon: Shield },
+  { value: "Star", label: "Star", Icon: Star },
+  { value: "Crown", label: "Crown", Icon: Crown },
+  { value: "Clock", label: "Clock", Icon: Clock },
+  { value: "Zap", label: "Zap", Icon: Zap },
+  { value: "Leaf", label: "Leaf", Icon: Leaf },
+  { value: "Activity", label: "Activity", Icon: Activity },
+  { value: "Droplets", label: "Droplets", Icon: Droplets },
+  { value: "Sun", label: "Sun", Icon: Sun },
+  { value: "Wind", label: "Wind", Icon: Wind },
+];
+
+function HeroSubFeaturesEditor({
+  existingContent,
+  onSave,
+  isSaving,
+}: {
+  existingContent: LandingPageContent[];
+  onSave: (section: string, values: Record<string, string>) => void;
+  isSaving: boolean;
+}) {
+  const getVal = (key: string) =>
+    existingContent.find(c => c.section === "hero" && c.key === key)?.value ?? "";
+
+  const defaultValues = () => ({
+    subFeature1Icon: getVal("subFeature1Icon") || "Waves",
+    subFeature1Title: getVal("subFeature1Title") || "Thermal Facilities",
+    subFeature1Description: getVal("subFeature1Description") || "Access to sauna, hot tubs, cold plunge and more",
+    subFeature2Icon: getVal("subFeature2Icon") || "Heart",
+    subFeature2Title: getVal("subFeature2Title") || "Wellness Guides",
+    subFeature2Description: getVal("subFeature2Description") || "Expert guidance for thermal therapy",
+    subFeature3Icon: getVal("subFeature3Icon") || "Users",
+    subFeature3Title: getVal("subFeature3Title") || "Flexible Plans",
+    subFeature3Description: getVal("subFeature3Description") || "Choose a plan that fits your needs",
+  });
+
+  const [values, setValues] = useState<Record<string, string>>(defaultValues);
+
+  useEffect(() => {
+    setValues(defaultValues());
+  }, [existingContent]);
+
+  const set = (key: string, val: string) => setValues(prev => ({ ...prev, [key]: val }));
+
+  const renderCard = (num: 1 | 2 | 3) => {
+    const iconKey = `subFeature${num}Icon` as const;
+    const titleKey = `subFeature${num}Title` as const;
+    const descKey = `subFeature${num}Description` as const;
+    const CurrentIcon = HERO_ICON_OPTIONS.find(o => o.value === values[iconKey])?.Icon ?? Sparkles;
+
+    return (
+      <div key={num} className="border rounded-lg p-4 space-y-3 bg-muted/20">
+        <div className="flex items-center gap-2 mb-1">
+          <CurrentIcon className="h-5 w-5 text-primary" />
+          <span className="text-sm font-semibold text-foreground">Card {num}</span>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Icon</Label>
+          <Select value={values[iconKey]} onValueChange={val => set(iconKey, val)}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {HERO_ICON_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <span className="flex items-center gap-2">
+                    <opt.Icon className="h-4 w-4" />
+                    {opt.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Title</Label>
+          <Input
+            value={values[titleKey]}
+            onChange={e => set(titleKey, e.target.value)}
+            className="h-8 text-sm"
+            placeholder={`Card ${num} title`}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Description</Label>
+          <Textarea
+            value={values[descKey]}
+            onChange={e => set(descKey, e.target.value)}
+            rows={2}
+            className="text-sm resize-none"
+            placeholder={`Card ${num} description`}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Hero Sub-Feature Cards</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Three icon cards displayed below the hero headline on the landing page.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          {([1, 2, 3] as const).map(num => renderCard(num))}
+        </div>
+        <Button
+          onClick={() => onSave("hero", values)}
+          disabled={isSaving}
+          className="w-full"
+          size="sm"
+        >
+          {isSaving ? "Saving..." : "Save Sub-Feature Cards"}
         </Button>
       </CardContent>
     </Card>
@@ -906,6 +1049,15 @@ export default function LandingPageManagement() {
                 onSave={handleSaveSection}
                 isSaving={savingSection === "hero"}
               />
+
+              {/* Hero Sub-Feature Cards — spans full width */}
+              <div className="md:col-span-2">
+                <HeroSubFeaturesEditor
+                  existingContent={landingPageContent}
+                  onSave={handleSaveSection}
+                  isSaving={savingSection === "hero"}
+                />
+              </div>
 
               {/* Memberships Section */}
               <SectionContentEditor

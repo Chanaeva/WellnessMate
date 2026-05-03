@@ -168,6 +168,17 @@ const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
   console.log('📋 Subscription updated:', subscription.id, 'Status:', subscription.status);
   
   try {
+    // 'incomplete' and 'incomplete_expired' are transient states that occur while
+    // the first invoice payment is still being collected. We must NOT write these
+    // back to the DB because:
+    //   (a) finalize-order may have already activated the membership, and
+    //   (b) the subscription will move to 'active' moments later once payment confirms.
+    // Updating here would silently downgrade an active membership to inactive.
+    if (subscription.status === 'incomplete' || subscription.status === 'incomplete_expired') {
+      console.log('⏭️  Skipping webhook update for transient subscription status:', subscription.status, subscription.id);
+      return;
+    }
+
     const membership = await resolveMembershipForSubscription(subscription);
     if (!membership) return;
     
@@ -179,6 +190,20 @@ const handleSubscriptionUpdated = async (subscription: Stripe.Subscription) => {
       membershipStatus = 'expired';
     } else if (subscription.status === 'past_due') {
       membershipStatus = 'frozen';
+    }
+
+    // Never downgrade an already-active membership via webhook — only terminal
+    // Stripe statuses (canceled, unpaid, past_due) should override active.
+    if (membership.status === 'active' && membershipStatus === 'inactive') {
+      console.log('⏭️  Skipping webhook downgrade: membership already active, Stripe status is', subscription.status);
+      // Still update the subscription ID and end date without touching status
+      const currentPeriodEnd = (subscription as any).current_period_end;
+      await storage.updateMembership(membership.membershipId, {
+        stripeSubscriptionId: subscription.id,
+        endDate: currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0] : undefined,
+        autoRenew: !subscription.cancel_at_period_end,
+      });
+      return;
     }
     
     // Update membership with Stripe subscription data

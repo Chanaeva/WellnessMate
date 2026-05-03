@@ -96,6 +96,7 @@ export interface IStorage {
 
   // Payment methods
   getPaymentsByUserId(userId: number): Promise<Payment[]>;
+  getPaymentByStripePaymentIntentId(stripePaymentIntentId: string): Promise<Payment | undefined>;
   createPayment(payment: InsertPayment): Promise<Payment>;
 
   // Stripe customer and payment method management
@@ -788,6 +789,15 @@ export class DatabaseStorage implements IStorage {
 
   async getPaymentsByUserId(userId: number): Promise<Payment[]> {
     return await db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.transactionDate));
+  }
+
+  async getPaymentByStripePaymentIntentId(stripePaymentIntentId: string): Promise<Payment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.stripePaymentIntentId, stripePaymentIntentId))
+      .limit(1);
+    return payment || undefined;
   }
 
   async createPayment(insertPayment: InsertPayment): Promise<Payment> {

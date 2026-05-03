@@ -17,6 +17,15 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
   console.log('✅ Payment succeeded:', paymentIntent.id);
   
   try {
+    // Deduplication guard: finalize-order and confirm-member-creation both record
+    // payments with richer descriptions immediately after the purchase. If a record
+    // already exists for this PaymentIntent ID we skip creating a duplicate here.
+    const existing = await storage.getPaymentByStripePaymentIntentId(paymentIntent.id);
+    if (existing) {
+      console.log('⏭️  Payment already recorded by application flow, skipping webhook duplicate:', paymentIntent.id);
+      return;
+    }
+
     // Find the user by customer ID
     const customerId = paymentIntent.customer as string;
     if (!customerId) {
@@ -30,18 +39,19 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
       return;
     }
     
-    // Record successful payment
+    // Record successful payment (only reached when finalize-order hasn't run yet,
+    // e.g. if the client crashed before calling it)
     await storage.createPayment({
       userId: user.id,
-      amount: paymentIntent.amount / 100, // Convert from cents
+      amount: paymentIntent.amount / 100,
       status: 'successful',
-      description: `Payment ${paymentIntent.id}`,
+      description: paymentIntent.description || `Payment ${paymentIntent.id}`,
       method: 'credit_card',
       stripePaymentIntentId: paymentIntent.id,
       stripePaymentMethodId: paymentIntent.payment_method as string,
     });
     
-    console.log('💳 Payment recorded for user:', user.email);
+    console.log('💳 Payment recorded via webhook fallback for user:', user.email);
   } catch (error) {
     console.error('❌ Error handling payment success:', error);
   }

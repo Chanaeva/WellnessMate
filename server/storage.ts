@@ -116,6 +116,7 @@ export interface IStorage {
 
   // Punch card template methods
   getAllPunchCardTemplates(): Promise<PunchCardTemplate[]>;
+  getPunchCardTemplateById(id: number): Promise<PunchCardTemplate | undefined>;
   createPunchCardTemplate(template: InsertPunchCardTemplate): Promise<PunchCardTemplate>;
   updatePunchCardTemplate(id: number, template: Partial<PunchCardTemplate>): Promise<PunchCardTemplate>;
   deletePunchCardTemplate(id: number): Promise<void>;
@@ -1107,6 +1108,11 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPunchCardTemplates(): Promise<PunchCardTemplate[]> {
     return await db.select().from(punchCardTemplates).orderBy(punchCardTemplates.sortOrder, punchCardTemplates.totalPunches);
+  }
+
+  async getPunchCardTemplateById(id: number): Promise<PunchCardTemplate | undefined> {
+    const [template] = await db.select().from(punchCardTemplates).where(eq(punchCardTemplates.id, id));
+    return template || undefined;
   }
 
   async createPunchCardTemplate(template: InsertPunchCardTemplate): Promise<PunchCardTemplate> {

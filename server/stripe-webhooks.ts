@@ -1,7 +1,9 @@
 import type { Express, Request, Response } from "express";
 import { stripe, STRIPE_WEBHOOK_CONFIG } from "./stripe-config";
 import { storage } from "./storage";
+import { hashPassword } from "./auth";
 import Stripe from "stripe";
+import { randomBytes } from "crypto";
 
 // Raw body parser for webhook signature verification
 export const stripeWebhookMiddleware = (req: Request, res: Response, next: any) => {
@@ -26,7 +28,106 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
       return;
     }
 
-    // Find the user by customer ID
+    const meta = paymentIntent.metadata || {};
+
+    // ─── KIOSK DAY PASS GHOST PAYMENT RECOVERY ──────────────────────────────
+    // When confirm-member-creation never reaches the server (network drop, kiosk
+    // crash, etc.) the card is charged but no user account or punch card exists.
+    // The webhook is our safety net: if the PI has kiosk member metadata AND no
+    // payment record has been written yet, we auto-create the account here.
+    if (meta.memberEmail && meta.packageType === 'daypass') {
+      console.log('🚨 Webhook recovery: kiosk day pass with no payment record — auto-creating member account for', meta.memberEmail);
+
+      // Find or create the user
+      let user = await storage.getUserByEmail(meta.memberEmail);
+      
+      if (!user) {
+        // Generate a random temporary password — the member can claim the account
+        // via the /claim-account SMS flow to set their own password.
+        const tempPassword = await hashPassword(randomBytes(16).toString('hex'));
+        
+        // Build a unique username from email prefix
+        const emailPrefix = meta.memberEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        let username = emailPrefix;
+        let suffix = 1;
+        while (await storage.getUserByUsername(username)) {
+          username = `${emailPrefix}${suffix++}`;
+        }
+
+        user = await storage.createUser({
+          username,
+          password: tempPassword,
+          email: meta.memberEmail,
+          firstName: meta.memberFirstName || 'Unknown',
+          lastName: meta.memberLastName || 'Unknown',
+          phoneNumber: meta.memberPhone || null,
+          role: 'member',
+          membershipAgreementCompleted: false,
+        });
+
+        // Link the Stripe customer to this new user
+        const customerId = paymentIntent.customer as string;
+        if (customerId) {
+          await storage.updateUserStripeCustomerId(user.id, customerId);
+        }
+
+        console.log('👤 Webhook recovery: created user', user.email, 'id', user.id);
+      } else {
+        console.log('👤 Webhook recovery: found existing user', user.email, 'id', user.id);
+      }
+
+      // Create the punch card(s) — quantity defaults to 1
+      const templateId = meta.packageId ? parseInt(meta.packageId) : null;
+      const quantity = meta.quantity ? Math.min(Math.max(parseInt(meta.quantity), 1), 10) : 1;
+
+      let template = templateId ? await storage.getPunchCardTemplateById(templateId) : null;
+      const totalPunches = template?.totalPunches ?? 5;
+      const pricePerPunch = template ? Math.round(template.totalPrice / template.totalPunches) : Math.round(paymentIntent.amount / quantity / totalPunches);
+      const unitPrice = template?.totalPrice ?? Math.round(paymentIntent.amount / quantity);
+
+      for (let i = 0; i < quantity; i++) {
+        await storage.createPunchCard({
+          userId: user.id,
+          templateId: templateId || undefined,
+          name: meta.packageName || template?.name || 'Day Pass Package',
+          totalPunches,
+          remainingPunches: totalPunches,
+          pricePerPunch,
+          totalPrice: unitPrice,
+          status: 'active',
+        });
+      }
+
+      console.log(`🎫 Webhook recovery: created ${quantity} punch card(s) for user ${user.email}`);
+
+      // Record the payment
+      await storage.createPayment({
+        userId: user.id,
+        amount: paymentIntent.amount,
+        status: 'successful',
+        description: `${meta.packageName || 'Day Pass'}${quantity > 1 ? ` × ${quantity}` : ''} - Webhook Recovery (kiosk confirm-member-creation did not reach server)`,
+        method: 'credit_card',
+        stripePaymentIntentId: paymentIntent.id,
+        stripePaymentMethodId: paymentIntent.payment_method as string,
+      });
+
+      console.log('💳 Webhook recovery complete — user, punch card(s), and payment record created for', meta.memberEmail);
+      return;
+    }
+
+    // ─── KIOSK MEMBERSHIP GHOST PAYMENT ALERT ───────────────────────────────
+    // Membership recovery requires creating a subscription and is complex.
+    // Log a critical alert so staff can manually investigate via Stripe Dashboard.
+    if (meta.memberEmail && meta.packageType === 'membership' && meta.isSubscription === 'true') {
+      console.error('🚨 CRITICAL: Kiosk membership payment succeeded but confirm-member-creation never recorded a payment!');
+      console.error('🚨 PI:', paymentIntent.id, '| Member:', meta.memberEmail, '| Package:', meta.packageName);
+      console.error('🚨 Staff action required: manually create this member account via the admin dashboard.');
+      // Still fall through to record the payment against any existing user
+    }
+
+    // ─── GENERIC FALLBACK ────────────────────────────────────────────────────
+    // For all other PaymentIntents (cart purchases, etc.) where finalize-order
+    // didn't run, record a basic payment record so the charge is not invisible.
     const customerId = paymentIntent.customer as string;
     if (!customerId) {
       console.warn('⚠️  Payment intent without customer ID:', paymentIntent.id);
@@ -39,11 +140,9 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
       return;
     }
     
-    // Record successful payment (only reached when finalize-order hasn't run yet,
-    // e.g. if the client crashed before calling it)
     await storage.createPayment({
       userId: user.id,
-      amount: paymentIntent.amount / 100,
+      amount: paymentIntent.amount,
       status: 'successful',
       description: paymentIntent.description || `Payment ${paymentIntent.id}`,
       method: 'credit_card',

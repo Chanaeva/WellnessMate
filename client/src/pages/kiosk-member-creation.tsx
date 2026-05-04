@@ -1017,40 +1017,58 @@ function PaymentForm({
         throw new Error('Payment processing timed out. The charge may still complete — please check before retrying.');
       }
 
-      // Step 4: Confirm member creation
+      // Step 4: Confirm member creation — retry up to 3 times so a brief
+      // network hiccup after payment succeeds doesn't leave the member orphaned.
       setReaderMessage('Payment successful! Creating your account...');
-      
-      const confirmResponse = await apiRequest(
-        "POST",
-        "/api/kiosk/confirm-member-creation",
-        {
-          paymentIntentId,
-          subscriptionId,
-          customerId,
-          isSubscription,
-          stripePriceId,
-          memberData: {
-            ...memberData,
-            useDayPassToday: memberData.packageType === 'daypass' ? useDayPassToday : undefined,
-          },
-          packageData: {
-            ...packageData,
-            finalPrice,
-            originalPrice,
-          },
-          agreementData,
-          discountData: discountData ? {
-            type: discountData.type,
-            value: discountData.value,
-            reason: discountData.reason,
-            amountCents: discountAmountCents,
-          } : null,
-          existingMemberId,
-          additionalMembers: packageData.additionalMembers || [],
-        },
-      );
 
-      if (confirmResponse.ok) {
+      const confirmPayload = {
+        paymentIntentId,
+        subscriptionId,
+        customerId,
+        isSubscription,
+        stripePriceId,
+        memberData: {
+          ...memberData,
+          useDayPassToday: memberData.packageType === 'daypass' ? useDayPassToday : undefined,
+        },
+        packageData: {
+          ...packageData,
+          finalPrice,
+          originalPrice,
+        },
+        agreementData,
+        discountData: discountData ? {
+          type: discountData.type,
+          value: discountData.value,
+          reason: discountData.reason,
+          amountCents: discountAmountCents,
+        } : null,
+        existingMemberId,
+        additionalMembers: packageData.additionalMembers || [],
+      };
+
+      let confirmResponse: Response | null = null;
+      const maxConfirmRetries = 3;
+      for (let attempt = 1; attempt <= maxConfirmRetries; attempt++) {
+        try {
+          if (attempt > 1) {
+            setReaderMessage(`Creating your account... (attempt ${attempt})`);
+            await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
+          }
+          confirmResponse = await apiRequest("POST", "/api/kiosk/confirm-member-creation", confirmPayload);
+          break; // success — exit retry loop
+        } catch (fetchErr: any) {
+          console.warn(`[Card Reader] confirm-member-creation attempt ${attempt} failed:`, fetchErr);
+          if (attempt === maxConfirmRetries) {
+            throw new Error(
+              'Your payment was processed successfully, but we had trouble finishing your account setup. ' +
+              'Please let a staff member know — your membership will be activated shortly.'
+            );
+          }
+        }
+      }
+
+      if (confirmResponse && confirmResponse.ok) {
         const additionalCount = packageData.additionalMembers?.length || 0;
         toast({
           title: "Payment Successful",
@@ -1059,7 +1077,7 @@ function PaymentForm({
             : `Welcome, ${memberData.firstName}! Your account has been created.`,
         });
         onSuccess();
-      } else {
+      } else if (confirmResponse) {
         const errorData = await confirmResponse.json();
         throw new Error(errorData.message || 'Failed to create member account');
       }

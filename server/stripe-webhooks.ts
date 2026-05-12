@@ -251,24 +251,38 @@ const handleCheckoutSessionExpired = async (session: Stripe.Checkout.Session) =>
 };
 
 // Resolve a membership from a subscription — matches by stripeSubscriptionId first,
-// then falls back to the user's primary membership if it has no subscription ID yet.
+// then falls back to the user's primary membership when the subscription is new or replacing
+// an old one (i.e., the existing membership is expired/inactive or has no subscription yet).
 const resolveMembershipForSubscription = async (subscription: Stripe.Subscription) => {
   // Primary lookup: find the exact membership with this subscription ID
   const bySubId = await storage.getMembershipByStripeSubscriptionId(subscription.id);
   if (bySubId) return bySubId;
 
-  // Fallback: look up by customer → user, only accept if the membership has no subscription
-  // attached yet (so we don't overwrite a different subscription's membership)
+  // Fallback: look up by customer → user
   const customerId = subscription.customer as string;
   if (!customerId) return null;
   const user = await storage.getUserByCustomerId(customerId);
   if (!user) return null;
   const membership = await storage.getMembershipByUserId(user.id);
-  if (membership && !membership.stripeSubscriptionId) return membership;
 
-  if (!bySubId) {
-    console.warn(`⚠️  No membership found for subscription ${subscription.id} (customer ${customerId})`);
+  if (membership) {
+    // Accept the membership if it has no subscription ID yet (new subscription)
+    if (!membership.stripeSubscriptionId) {
+      console.log(`🔗 Linking new subscription ${subscription.id} to membership ${membership.membershipId} for ${user.email}`);
+      return membership;
+    }
+
+    // Also accept if the stored subscription ID is different but the membership is
+    // expired or inactive — this means the new subscription is replacing an old one.
+    // We do NOT replace an active membership that already has a different subscription
+    // (that would be overwriting a legitimately active subscription with an unrelated one).
+    if (membership.status === 'expired' || membership.status === 'inactive') {
+      console.log(`🔄 Replacing old subscription on ${membership.status} membership ${membership.membershipId} for ${user.email} (old: ${membership.stripeSubscriptionId} → new: ${subscription.id})`);
+      return membership;
+    }
   }
+
+  console.warn(`⚠️  No membership found for subscription ${subscription.id} (customer ${customerId}${membership ? `, existing membership is active with sub ${membership.stripeSubscriptionId}` : ''})`);
   return null;
 };
 
@@ -379,17 +393,22 @@ const handleInvoicePaymentSucceeded = async (invoice: Stripe.Invoice) => {
     
     console.log('💳 Invoice payment recorded for user:', user.email);
     
-    // If this is a subscription renewal, update the membership end date
+    // If this is a subscription renewal, update the membership end date.
+    // Look up by subscription ID first (exact match), then fall back to the user's
+    // primary membership so new or replaced subscriptions are handled correctly.
     if (subscriptionId) {
-      const membership = await storage.getMembershipByUserId(user.id);
-      if (membership && membership.stripeSubscriptionId === subscriptionId) {
+      const membership =
+        (await storage.getMembershipByStripeSubscriptionId(subscriptionId)) ||
+        (await storage.getMembershipByUserId(user.id));
+      if (membership) {
         const periodEnd = (invoice.lines.data[0] as any)?.period?.end;
         if (periodEnd) {
           await storage.updateMembership(membership.membershipId, {
             status: 'active',
+            stripeSubscriptionId: subscriptionId,
             endDate: new Date(periodEnd * 1000).toISOString().split('T')[0],
           });
-          console.log('📅 Membership renewed until:', new Date(periodEnd * 1000));
+          console.log('📅 Membership renewed until:', new Date(periodEnd * 1000), 'for', user.email);
         }
       }
     }

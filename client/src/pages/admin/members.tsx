@@ -563,9 +563,12 @@ export default function AdminMembers() {
     onSuccess: (data) => {
       setSyncResults(data);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+      const parts = [`Checked ${data.checked} memberships, updated ${data.updated}.`];
+      if (data.newlyLinked > 0) parts.push(`${data.newlyLinked} new subscription${data.newlyLinked > 1 ? 's' : ''} linked.`);
+      if (data.errors > 0) parts.push(`${data.errors} errors.`);
       toast({
         title: "Sync Complete",
-        description: `Checked ${data.checked} memberships, updated ${data.updated}.${data.errors > 0 ? ` ${data.errors} errors.` : ''}`,
+        description: parts.join(' '),
       });
     },
     onError: (error: any) => {
@@ -2059,14 +2062,14 @@ export default function AdminMembers() {
           <DialogHeader>
             <DialogTitle>Sync Memberships with Stripe</DialogTitle>
             <DialogDescription>
-              This checks every membership that has a Stripe subscription ID against the live Stripe status and corrects any mismatches — useful for fixing memberships that got out of sync due to missed webhooks or manual changes.
+              Reconciles membership statuses against live Stripe data and links any new subscriptions created directly in Stripe that aren't reflected in the app yet.
             </DialogDescription>
           </DialogHeader>
 
           {!syncResults ? (
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
-                Memberships <strong>without</strong> a Stripe subscription ID (manually managed or manually activated) will be skipped.
+                This runs two passes: first it corrects status mismatches for memberships already linked to a subscription, then it scans each member's Stripe customer for any active subscriptions not yet linked to the app.
               </p>
               <Button
                 onClick={() => syncStripeMutation.mutate()}
@@ -2088,7 +2091,7 @@ export default function AdminMembers() {
             </div>
           ) : (
             <div className="space-y-4 py-2">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="text-center p-3 bg-muted rounded-lg">
                   <p className="text-2xl font-bold">{syncResults.checked}</p>
                   <p className="text-xs text-muted-foreground">Checked</p>
@@ -2097,16 +2100,35 @@ export default function AdminMembers() {
                   <p className="text-2xl font-bold text-blue-600">{syncResults.updated}</p>
                   <p className="text-xs text-muted-foreground">Updated</p>
                 </div>
+                <div className={`text-center p-3 rounded-lg ${syncResults.newlyLinked > 0 ? 'bg-purple-50 dark:bg-purple-950/30' : 'bg-muted'}`}>
+                  <p className={`text-2xl font-bold ${syncResults.newlyLinked > 0 ? 'text-purple-600' : ''}`}>{syncResults.newlyLinked ?? 0}</p>
+                  <p className="text-xs text-muted-foreground">Linked</p>
+                </div>
                 <div className={`text-center p-3 rounded-lg ${syncResults.errors > 0 ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
                   <p className={`text-2xl font-bold ${syncResults.errors > 0 ? 'text-red-600' : 'text-green-600'}`}>{syncResults.errors}</p>
                   <p className="text-xs text-muted-foreground">Errors</p>
                 </div>
               </div>
 
-              {syncResults.results.filter(r => r.action !== 'ok').length > 0 && (
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                  <p className="text-sm font-medium">Changes made:</p>
-                  {syncResults.results.filter(r => r.action !== 'ok').map((r, i) => (
+              {(syncResults.newlyLinkedDetails ?? []).length > 0 && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  <p className="text-sm font-medium text-purple-700 dark:text-purple-400">New subscriptions linked from Stripe:</p>
+                  {(syncResults.newlyLinkedDetails ?? []).map((r: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-purple-500 mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="font-medium truncate block">{r.email}</span>
+                        <span className="text-muted-foreground">Linked {r.subscriptionId} → {r.newStatus}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {syncResults.results.filter((r: any) => r.action !== 'ok').length > 0 && (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  <p className="text-sm font-medium">Status corrections:</p>
+                  {syncResults.results.filter((r: any) => r.action !== 'ok').map((r: any, i: number) => (
                     <div key={i} className="flex items-start gap-2 text-xs p-2 bg-muted/50 rounded">
                       <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
                       <div className="min-w-0">
@@ -2118,7 +2140,7 @@ export default function AdminMembers() {
                 </div>
               )}
 
-              {syncResults.errors === 0 && syncResults.updated === 0 && (
+              {syncResults.errors === 0 && syncResults.updated === 0 && (syncResults.newlyLinked ?? 0) === 0 && (
                 <p className="text-sm text-center text-green-600 font-medium">All memberships are in sync with Stripe.</p>
               )}
 

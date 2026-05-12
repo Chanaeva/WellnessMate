@@ -1975,10 +1975,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('[Stripe Sync] Starting membership sync...');
 
-      // Get all memberships that have a Stripe subscription ID
       const allMembers = await storage.getAllMembers();
       const results: { membershipId: string; email: string; oldStatus: string; newStatus: string; action: string }[] = [];
       const errors: { membershipId: string; email: string; error: string }[] = [];
+      const newlyLinked: { email: string; subscriptionId: string; newStatus: string }[] = [];
 
       const mapStripeStatus = (stripeStatus: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
         if (stripeStatus === 'active' || stripeStatus === 'trialing') return 'active';
@@ -1987,14 +1987,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return 'inactive';
       };
 
+      // ── Pass 1: Reconcile memberships that already have a subscription ID ──────
       for (const member of allMembers) {
         if (!member.membership) continue;
         const { membership } = member;
 
-        if (!membership.stripeSubscriptionId) {
-          // No subscription ID — skip (manually managed membership)
-          continue;
-        }
+        if (!membership.stripeSubscriptionId) continue;
 
         try {
           const subscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
@@ -2056,12 +2054,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // ── Pass 2: Find active Stripe subscriptions not yet linked to any membership ──
+      // For each member who has a stripeCustomerId, list their active Stripe subscriptions.
+      // If any subscription isn't already linked to a membership in the DB, link it now.
+      console.log('[Stripe Sync] Starting bidirectional pass — scanning Stripe subscriptions...');
+      for (const member of allMembers) {
+        if (!(member as any).stripeCustomerId) continue;
+        const { membership } = member;
+        if (!membership) continue;
+
+        try {
+          const activeSubs = await stripe.subscriptions.list({
+            customer: (member as any).stripeCustomerId,
+            status: 'active',
+            limit: 10,
+          });
+
+          for (const sub of activeSubs.data) {
+            // Skip if this subscription is already linked to some membership in the DB
+            const existingLink = await storage.getMembershipByStripeSubscriptionId(sub.id);
+            if (existingLink) continue;
+
+            // This active subscription in Stripe has no matching DB membership row —
+            // link it to this member's membership record.
+            const correctStatus = mapStripeStatus(sub.status);
+            const currentPeriodEnd = (sub as any).current_period_end;
+            const newEndDate = currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0] : undefined;
+
+            await storage.updateMembership(membership.membershipId, {
+              status: correctStatus,
+              stripeSubscriptionId: sub.id,
+              endDate: newEndDate || membership.endDate,
+              autoRenew: !sub.cancel_at_period_end,
+            });
+
+            newlyLinked.push({ email: member.email, subscriptionId: sub.id, newStatus: correctStatus });
+            console.log(`[Stripe Sync] Newly linked subscription ${sub.id} → membership ${membership.membershipId} for ${member.email}`);
+          }
+        } catch (err: any) {
+          errors.push({ membershipId: membership?.membershipId || 'unknown', email: member.email, error: err.message });
+          console.error(`[Stripe Sync] Error in bidirectional pass for ${member.email}:`, err.message);
+        }
+      }
+
       const updated = results.filter(r => r.action !== 'ok').length;
-      console.log(`[Stripe Sync] Complete. Checked ${results.length}, updated ${updated}, errors ${errors.length}`);
+      console.log(`[Stripe Sync] Complete. Checked ${results.length}, updated ${updated}, newly linked ${newlyLinked.length}, errors ${errors.length}`);
 
       res.json({
         checked: results.length,
         updated,
+        newlyLinked: newlyLinked.length,
+        newlyLinkedDetails: newlyLinked,
         errors: errors.length,
         results,
         errorDetails: errors,

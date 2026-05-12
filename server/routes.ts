@@ -2065,7 +2065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         try {
           const activeSubs = await stripe.subscriptions.list({
-            customer: (member as any).stripeCustomerId,
+            customer: member.stripeCustomerId,
             status: 'active',
             limit: 10,
           });
@@ -2078,7 +2078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // This active subscription in Stripe has no matching DB membership row —
             // link it to this member's membership record.
             const correctStatus = mapStripeStatus(sub.status);
-            const currentPeriodEnd = (sub as any).current_period_end;
+            const currentPeriodEnd = sub.current_period_end;
             const newEndDate = currentPeriodEnd ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0] : undefined;
 
             await storage.updateMembership(membership.membershipId, {

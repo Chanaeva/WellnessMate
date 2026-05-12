@@ -2054,28 +2054,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // ── Pass 2: Find active Stripe subscriptions not yet linked to any membership ──
-      // For each member who has a stripeCustomerId, list their active Stripe subscriptions.
-      // If any subscription isn't already linked to a membership in the DB, link it now.
+      // ── Pass 2: Find active/trialing Stripe subscriptions not yet linked to any membership ──
+      // For each member who has a stripeCustomerId, list their active and trialing Stripe
+      // subscriptions. If any subscription isn't already linked to a membership in the DB,
+      // link it now. Guard: only link the first unlinked sub per membership to avoid
+      // overwriting the same row multiple times when a customer has multiple active subs.
       console.log('[Stripe Sync] Starting bidirectional pass — scanning Stripe subscriptions...');
+      const linkedMembershipIds = new Set<string>();
       for (const member of allMembers) {
         if (!member.stripeCustomerId) continue;
         const { membership } = member;
         if (!membership) continue;
 
         try {
-          const activeSubs = await stripe.subscriptions.list({
+          // Fetch active and trialing subscriptions in a single call (status: 'all' with
+          // client-side filtering avoids two round-trips while staying within rate limits).
+          const allSubs = await stripe.subscriptions.list({
             customer: member.stripeCustomerId,
-            status: 'active',
-            limit: 10,
+            status: 'all',
+            limit: 20,
           });
 
-          for (const sub of activeSubs.data) {
+          const linkableSubs = allSubs.data.filter(
+            s => s.status === 'active' || s.status === 'trialing'
+          );
+
+          for (const sub of linkableSubs) {
             // Skip if this subscription is already linked to some membership in the DB
             const existingLink = await storage.getMembershipByStripeSubscriptionId(sub.id);
             if (existingLink) continue;
 
-            // This active subscription in Stripe has no matching DB membership row —
+            // Guard: only link once per membership per sync run — if a customer somehow
+            // has multiple unlinked active subs, link the first and skip the rest to
+            // avoid overwriting the same row repeatedly.
+            if (linkedMembershipIds.has(membership.membershipId)) {
+              console.warn(`[Stripe Sync] Skipping additional unlinked sub ${sub.id} for ${member.email} — membership ${membership.membershipId} already linked in this run`);
+              continue;
+            }
+
+            // This active/trialing subscription in Stripe has no matching DB membership row —
             // link it to this member's membership record.
             const correctStatus = mapStripeStatus(sub.status);
             const currentPeriodEnd = sub.current_period_end;
@@ -2088,6 +2105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               autoRenew: !sub.cancel_at_period_end,
             });
 
+            linkedMembershipIds.add(membership.membershipId);
             newlyLinked.push({ email: member.email, subscriptionId: sub.id, newStatus: correctStatus });
             console.log(`[Stripe Sync] Newly linked subscription ${sub.id} → membership ${membership.membershipId} for ${member.email}`);
           }

@@ -251,8 +251,8 @@ const handleCheckoutSessionExpired = async (session: Stripe.Checkout.Session) =>
 };
 
 // Resolve a membership from a subscription — matches by stripeSubscriptionId first,
-// then falls back to the user's primary membership when the subscription is new or replacing
-// an old one (i.e., the existing membership is expired/inactive or has no subscription yet).
+// then falls back to the user's primary membership when the subscription is new or
+// replacing an old one (expired app status, or old Stripe sub is already canceled).
 const resolveMembershipForSubscription = async (subscription: Stripe.Subscription) => {
   // Primary lookup: find the exact membership with this subscription ID
   const bySubId = await storage.getMembershipByStripeSubscriptionId(subscription.id);
@@ -266,19 +266,40 @@ const resolveMembershipForSubscription = async (subscription: Stripe.Subscriptio
   const membership = await storage.getMembershipByUserId(user.id);
 
   if (membership) {
-    // Accept the membership if it has no subscription ID yet (new subscription)
+    // Case 1: membership has no subscription ID yet — new subscription, link it directly.
     if (!membership.stripeSubscriptionId) {
       console.log(`🔗 Linking new subscription ${subscription.id} to membership ${membership.membershipId} for ${user.email}`);
       return membership;
     }
 
-    // Also accept if the stored subscription ID is different but the membership is
-    // expired or inactive — this means the new subscription is replacing an old one.
-    // We do NOT replace an active membership that already has a different subscription
-    // (that would be overwriting a legitimately active subscription with an unrelated one).
+    // Case 2: membership is expired/inactive in the app — the new subscription is replacing
+    // an old one. Safe to link regardless of what the old sub ID was.
     if (membership.status === 'expired' || membership.status === 'inactive') {
       console.log(`🔄 Replacing old subscription on ${membership.status} membership ${membership.membershipId} for ${user.email} (old: ${membership.stripeSubscriptionId} → new: ${subscription.id})`);
       return membership;
+    }
+
+    // Case 3: membership appears active in the app but has a DIFFERENT subscription ID.
+    // The app status may be stale (missed webhook). Check live Stripe status of the
+    // old subscription — if it's canceled/unpaid/missing, the new sub is a replacement.
+    if (membership.stripeSubscriptionId !== subscription.id) {
+      try {
+        const oldSub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+        const oldSubTerminated = ['canceled', 'unpaid', 'incomplete_expired'].includes(oldSub.status);
+        if (oldSubTerminated) {
+          console.log(`🔄 Old subscription ${membership.stripeSubscriptionId} is ${oldSub.status} in Stripe — replacing with ${subscription.id} for ${user.email}`);
+          return membership;
+        }
+        // Old sub is still active in Stripe — two concurrent subscriptions; don't overwrite.
+        console.warn(`⚠️  Member ${user.email} has two active Stripe subscriptions (${membership.stripeSubscriptionId} and ${subscription.id}) — skipping auto-link to avoid overwrite`);
+      } catch (err: any) {
+        if (err?.statusCode === 404 || err?.code === 'resource_missing') {
+          // Old subscription no longer exists in Stripe — safe to replace
+          console.log(`🔄 Old subscription ${membership.stripeSubscriptionId} not found in Stripe — replacing with ${subscription.id} for ${user.email}`);
+          return membership;
+        }
+        console.warn(`⚠️  Could not verify old subscription ${membership.stripeSubscriptionId} for ${user.email}:`, err.message);
+      }
     }
   }
 

@@ -2059,7 +2059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If any subscription isn't already linked to a membership in the DB, link it now.
       console.log('[Stripe Sync] Starting bidirectional pass — scanning Stripe subscriptions...');
       for (const member of allMembers) {
-        if (!(member as any).stripeCustomerId) continue;
+        if (!member.stripeCustomerId) continue;
         const { membership } = member;
         if (!membership) continue;
 

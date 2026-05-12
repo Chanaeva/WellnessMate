@@ -146,7 +146,19 @@ export default function AdminMembers() {
   const [isCreateMembershipOpen, setIsCreateMembershipOpen] = useState(false);
   const [selectedPlanType, setSelectedPlanType] = useState<string>("");
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
-  const [syncResults, setSyncResults] = useState<null | { checked: number; updated: number; errors: number; results: any[]; errorDetails: any[] }>(null);
+  type SyncResultRow = { membershipId: string; email: string; oldStatus: string; newStatus: string; action: string };
+  type SyncLinkedRow = { email: string; subscriptionId: string; newStatus: string };
+  type SyncErrorRow = { membershipId: string; email: string; error: string };
+  type SyncResults = {
+    checked: number;
+    updated: number;
+    newlyLinked: number;
+    newlyLinkedDetails: SyncLinkedRow[];
+    errors: number;
+    results: SyncResultRow[];
+    errorDetails: SyncErrorRow[];
+  };
+  const [syncResults, setSyncResults] = useState<SyncResults | null>(null);
   const itemsPerPage = 10;
 
   // Form for adding new member
@@ -2110,10 +2122,10 @@ export default function AdminMembers() {
                 </div>
               </div>
 
-              {(syncResults.newlyLinkedDetails ?? []).length > 0 && (
+              {syncResults.newlyLinkedDetails.length > 0 && (
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   <p className="text-sm font-medium text-purple-700 dark:text-purple-400">New subscriptions linked from Stripe:</p>
-                  {(syncResults.newlyLinkedDetails ?? []).map((r: any, i: number) => (
+                  {syncResults.newlyLinkedDetails.map((r, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs p-2 bg-purple-50 dark:bg-purple-950/20 rounded">
                       <CheckCircle2 className="h-3.5 w-3.5 text-purple-500 mt-0.5 shrink-0" />
                       <div className="min-w-0">
@@ -2125,10 +2137,10 @@ export default function AdminMembers() {
                 </div>
               )}
 
-              {syncResults.results.filter((r: any) => r.action !== 'ok').length > 0 && (
+              {syncResults.results.filter(r => r.action !== 'ok').length > 0 && (
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   <p className="text-sm font-medium">Status corrections:</p>
-                  {syncResults.results.filter((r: any) => r.action !== 'ok').map((r: any, i: number) => (
+                  {syncResults.results.filter(r => r.action !== 'ok').map((r, i) => (
                     <div key={i} className="flex items-start gap-2 text-xs p-2 bg-muted/50 rounded">
                       <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
                       <div className="min-w-0">

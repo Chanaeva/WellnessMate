@@ -146,6 +146,12 @@ export default function AdminMembers() {
   const [isCreateMembershipOpen, setIsCreateMembershipOpen] = useState(false);
   const [selectedPlanType, setSelectedPlanType] = useState<string>("");
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [linkStripeInput, setLinkStripeInput] = useState("");
+  const [linkStripeStatus, setLinkStripeStatus] = useState<{ type: "success" | "warning" | "error"; message: string; emailMismatch?: boolean; stripeCustomerId?: string; stripeEmail?: string } | null>(null);
+  const [linkStripeMode, setLinkStripeMode] = useState<"id" | "email">("id");
+  const [linkStripeEmailSearch, setLinkStripeEmailSearch] = useState("");
+  const [linkStripeSearchResults, setLinkStripeSearchResults] = useState<{ id: string; email: string; name: string | null; created: number }[]>([]);
+  const [linkStripeSearching, setLinkStripeSearching] = useState(false);
   type SyncResultRow = { membershipId: string; email: string; oldStatus: string; newStatus: string; action: string };
   type SyncLinkedRow = { email: string; subscriptionId: string; newStatus: string };
   type SyncErrorRow = { membershipId: string; email: string; error: string };
@@ -341,6 +347,40 @@ export default function AdminMembers() {
     },
   });
 
+  // Link Stripe customer mutation
+  const linkStripeCustomerMutation = useMutation({
+    mutationFn: async ({ memberId, stripeCustomerId, force }: { memberId: number; stripeCustomerId: string; force?: boolean }) => {
+      const res = await apiRequest("POST", `/api/admin/members/${memberId}/link-stripe-customer`, { stripeCustomerId, force });
+      const data = await res.json();
+      if (!res.ok) throw data;
+      return data;
+    },
+    onSuccess: (data) => {
+      setLinkStripeStatus({
+        type: "success",
+        message: data.message,
+      });
+      // Update selectedMember so "Currently linked" reflects the new ID immediately
+      if (data.stripeCustomerId) {
+        setSelectedMember((prev) => prev ? { ...prev, stripeCustomerId: data.stripeCustomerId } : prev);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+    },
+    onError: (error: any) => {
+      if (error?.emailMismatch) {
+        setLinkStripeStatus({
+          type: "error",
+          message: error.message,
+          emailMismatch: true,
+          stripeCustomerId: error.stripeCustomerId,
+          stripeEmail: error.stripeEmail,
+        });
+      } else {
+        setLinkStripeStatus({ type: "error", message: error.message || "Failed to link Stripe customer" });
+      }
+    },
+  });
+
   // Archive member mutation (preserves all historical data)
   const archiveMemberMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -396,6 +436,11 @@ export default function AdminMembers() {
       membershipStartDate: member.membership?.startDate || "",
       membershipEndDate: member.membership?.endDate || "",
     });
+    setLinkStripeInput("");
+    setLinkStripeStatus(null);
+    setLinkStripeMode("id");
+    setLinkStripeEmailSearch("");
+    setLinkStripeSearchResults([]);
     setIsEditMemberOpen(true);
   };
 
@@ -1762,6 +1807,189 @@ export default function AdminMembers() {
                     )}
                   />
                 </div>
+              </div>
+
+              <Separator />
+
+              {/* Link Stripe Customer Section */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-gray-500" />
+                  Link Stripe Customer
+                </h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Connect this member to a Stripe customer account to enable subscription sync. Linking takes effect immediately — no need to save.
+                  {selectedMember?.stripeCustomerId && (
+                    <span className="block mt-1 font-medium text-green-700">
+                      Currently linked: <span className="font-mono">{selectedMember.stripeCustomerId}</span>
+                    </span>
+                  )}
+                </p>
+
+                {/* Mode toggle */}
+                <div className="flex gap-1 mb-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={linkStripeMode === "id" ? "default" : "outline"}
+                    className="text-xs h-7 px-3"
+                    onClick={() => { setLinkStripeMode("id"); setLinkStripeStatus(null); setLinkStripeSearchResults([]); }}
+                  >
+                    Paste Customer ID
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={linkStripeMode === "email" ? "default" : "outline"}
+                    className="text-xs h-7 px-3"
+                    onClick={() => { setLinkStripeMode("email"); setLinkStripeStatus(null); setLinkStripeInput(""); }}
+                  >
+                    Search by Email
+                  </Button>
+                </div>
+
+                {linkStripeMode === "id" ? (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="cus_xxxxxxxxxxxxxxxx"
+                      value={linkStripeInput}
+                      onChange={(e) => {
+                        setLinkStripeInput(e.target.value);
+                        setLinkStripeStatus(null);
+                      }}
+                      className="font-mono text-sm"
+                      data-testid="input-link-stripe-customer"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!linkStripeInput.trim() || linkStripeCustomerMutation.isPending}
+                      onClick={() => {
+                        if (selectedMember) {
+                          linkStripeCustomerMutation.mutate({
+                            memberId: selectedMember.id,
+                            stripeCustomerId: linkStripeInput.trim(),
+                          });
+                        }
+                      }}
+                      data-testid="button-link-stripe-customer"
+                    >
+                      {linkStripeCustomerMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Link2 className="h-4 w-4" />
+                      )}
+                      <span className="ml-1">Link</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="Search Stripe by email address..."
+                        value={linkStripeEmailSearch}
+                        onChange={(e) => {
+                          setLinkStripeEmailSearch(e.target.value);
+                          setLinkStripeSearchResults([]);
+                          setLinkStripeStatus(null);
+                        }}
+                        data-testid="input-link-stripe-email-search"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={linkStripeEmailSearch.trim().length < 3 || linkStripeSearching}
+                        onClick={async () => {
+                          setLinkStripeSearching(true);
+                          setLinkStripeSearchResults([]);
+                          setLinkStripeStatus(null);
+                          try {
+                            const res = await fetch(`/api/admin/stripe/customers/search?email=${encodeURIComponent(linkStripeEmailSearch.trim())}`);
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.message);
+                            setLinkStripeSearchResults(data.results || []);
+                            if ((data.results || []).length === 0) {
+                              setLinkStripeStatus({ type: "error", message: "No Stripe customers found with that email." });
+                            }
+                          } catch (err: any) {
+                            setLinkStripeStatus({ type: "error", message: err.message || "Search failed" });
+                          } finally {
+                            setLinkStripeSearching(false);
+                          }
+                        }}
+                        data-testid="button-link-stripe-email-search"
+                      >
+                        {linkStripeSearching ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                        <span className="ml-1">Search</span>
+                      </Button>
+                    </div>
+                    {linkStripeSearchResults.length > 0 && (
+                      <div className="border rounded-md divide-y max-h-40 overflow-y-auto">
+                        {linkStripeSearchResults.map((customer) => (
+                          <button
+                            key={customer.id}
+                            type="button"
+                            className="w-full flex items-center justify-between px-3 py-2 text-left text-xs hover:bg-gray-50 transition-colors"
+                            onClick={() => {
+                              setLinkStripeInput(customer.id);
+                              setLinkStripeMode("id");
+                              setLinkStripeSearchResults([]);
+                              setLinkStripeStatus(null);
+                            }}
+                          >
+                            <span className="flex flex-col">
+                              <span className="font-medium">{customer.email}</span>
+                              {customer.name && <span className="text-gray-500">{customer.name}</span>}
+                            </span>
+                            <span className="font-mono text-gray-400 ml-2">{customer.id}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {linkStripeStatus && (
+                  <div
+                    className={`mt-2 text-xs flex items-start gap-1.5 rounded-md px-3 py-2 ${
+                      linkStripeStatus.type === "success"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {linkStripeStatus.type === "success" ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      {linkStripeStatus.message}
+                      {linkStripeStatus.emailMismatch && linkStripeStatus.stripeCustomerId && (
+                        <div className="mt-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="h-6 text-xs px-2"
+                            disabled={linkStripeCustomerMutation.isPending}
+                            onClick={() => {
+                              if (selectedMember && linkStripeStatus.stripeCustomerId) {
+                                linkStripeCustomerMutation.mutate({
+                                  memberId: selectedMember.id,
+                                  stripeCustomerId: linkStripeStatus.stripeCustomerId,
+                                  force: true,
+                                });
+                              }
+                            }}
+                          >
+                            Link anyway (override email mismatch)
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <DialogFooter>

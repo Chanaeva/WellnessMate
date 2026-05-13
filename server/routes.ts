@@ -2133,6 +2133,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Link a Stripe customer ID to a member (Admin only)
+  app.post("/api/admin/members/:id/link-stripe-customer", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const { stripeCustomerId } = req.body;
+
+      if (!stripeCustomerId || typeof stripeCustomerId !== 'string') {
+        return res.status(400).json({ message: "stripeCustomerId is required" });
+      }
+
+      const trimmed = stripeCustomerId.trim();
+      if (!trimmed.startsWith('cus_')) {
+        return res.status(400).json({ message: "Invalid Stripe customer ID — must start with 'cus_'" });
+      }
+
+      // Fetch the member record
+      const member = await storage.getUser(memberId);
+      if (!member) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+
+      // Check if this customer ID is already linked to a different user
+      const existingOwner = await storage.getUserByCustomerId(trimmed);
+      if (existingOwner && existingOwner.id !== memberId) {
+        return res.status(409).json({
+          message: `This Stripe customer ID is already linked to another member: ${existingOwner.email}`,
+        });
+      }
+
+      // Validate the customer exists in Stripe and email matches
+      let stripeCustomer: any;
+      try {
+        stripeCustomer = await stripe.customers.retrieve(trimmed);
+      } catch (err: any) {
+        return res.status(400).json({ message: "Stripe customer not found — please verify the ID is correct" });
+      }
+
+      if (stripeCustomer.deleted) {
+        return res.status(400).json({ message: "This Stripe customer has been deleted" });
+      }
+
+      // Error if emails don't match (unless admin explicitly forces override)
+      const stripeEmail = stripeCustomer.email?.toLowerCase();
+      const memberEmail = member.email?.toLowerCase();
+      const emailMismatch = stripeEmail && memberEmail && stripeEmail !== memberEmail;
+      const { force } = req.body;
+
+      if (emailMismatch && !force) {
+        return res.status(400).json({
+          message: `Stripe customer email (${stripeCustomer.email}) does not match member email (${member.email}). Verify you have the right customer, or confirm to link anyway.`,
+          emailMismatch: true,
+          stripeEmail: stripeCustomer.email,
+          stripeCustomerId: trimmed,
+        });
+      }
+
+      await storage.updateUserStripeCustomerId(memberId, trimmed);
+
+      res.json({
+        success: true,
+        stripeCustomerId: trimmed,
+        stripeEmail: stripeCustomer.email,
+        emailMismatch: !!emailMismatch,
+        message: emailMismatch
+          ? `Linked with email override. Stripe email (${stripeCustomer.email}) differs from member email (${member.email}).`
+          : "Stripe customer linked successfully.",
+      });
+    } catch (error: any) {
+      console.error('[Link Stripe Customer] Error:', error);
+      res.status(500).json({ message: error.message || "Failed to link Stripe customer" });
+    }
+  });
+
+  // Search Stripe customers by email (Admin only)
+  app.get("/api/admin/stripe/customers/search", isAdmin, async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      if (!email || email.trim().length < 3) {
+        return res.status(400).json({ message: "Please provide at least 3 characters to search" });
+      }
+      const customers = await stripe.customers.list({ email: email.trim(), limit: 10 });
+      const results = customers.data
+        .filter((c: any) => !c.deleted)
+        .map((c: any) => ({
+          id: c.id,
+          email: c.email,
+          name: c.name,
+          created: c.created,
+        }));
+      res.json({ results });
+    } catch (error: any) {
+      console.error('[Stripe Customer Search] Error:', error);
+      res.status(500).json({ message: error.message || "Failed to search Stripe customers" });
+    }
+  });
+
   // Update member details (Admin only)
   app.put("/api/admin/members/:id", isAdmin, async (req, res) => {
     try {

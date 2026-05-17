@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Clock, Users, Ticket, Search, RefreshCw, Calendar, AlertCircle, PlusCircle } from "lucide-react";
+import { Clock, Users, Ticket, Search, RefreshCw, Calendar, AlertCircle, PlusCircle, MinusCircle } from "lucide-react";
 import { format } from "date-fns";
 
 type PunchCardWithUser = PunchCard & { user?: User };
@@ -28,6 +28,10 @@ export default function AdminDayPasses() {
     card: null
   });
   const [daysToAdd, setDaysToAdd] = useState(1);
+  const [deductDialog, setDeductDialog] = useState<{ open: boolean; card: PunchCardWithUser | null }>({
+    open: false,
+    card: null
+  });
 
   const { data: activePunchCards = [], isLoading: cardsLoading, refetch: refetchCards } = useQuery<PunchCardWithUser[]>({
     queryKey: ["/api/admin/active-punch-cards"],
@@ -94,6 +98,24 @@ export default function AdminDayPasses() {
       toast({ title: "Success", description: `Added ${daysToAdd} day(s) to the day pass` });
       setAddDaysDialog({ open: false, card: null });
       setDaysToAdd(1);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deductPunchMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await apiRequest("POST", "/api/admin/manual-punch-deduction", { userId });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+      toast({
+        title: "Punch Deducted",
+        description: `1 punch deducted. ${data.remainingPunches} remaining.`,
+      });
+      setDeductDialog({ open: false, card: null });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -241,17 +263,29 @@ export default function AdminDayPasses() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setAddDaysDialog({ open: true, card });
-                                setDaysToAdd(1);
-                              }}
-                            >
-                              <PlusCircle className="h-4 w-4 mr-1" />
-                              Add Days
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setAddDaysDialog({ open: true, card });
+                                  setDaysToAdd(1);
+                                }}
+                              >
+                                <PlusCircle className="h-4 w-4 mr-1" />
+                                Add Days
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                disabled={card.remainingPunches <= 0}
+                                onClick={() => setDeductDialog({ open: true, card })}
+                              >
+                                <MinusCircle className="h-4 w-4 mr-1" />
+                                Deduct
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -302,6 +336,37 @@ export default function AdminDayPasses() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={deductDialog.open} onOpenChange={(open) => setDeductDialog({ open, card: open ? deductDialog.card : null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deduct a Punch</DialogTitle>
+            <DialogDescription>
+              This will remove 1 punch from{" "}
+              <strong>{deductDialog.card?.user?.firstName} {deductDialog.card?.user?.lastName}</strong>'s
+              day pass. They currently have{" "}
+              <strong>{deductDialog.card?.remainingPunches}</strong> punch{deductDialog.card?.remainingPunches !== 1 ? "es" : ""} remaining.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeductDialog({ open: false, card: null })}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deductDialog.card?.user?.id) {
+                  deductPunchMutation.mutate(deductDialog.card.user.id);
+                }
+              }}
+              disabled={deductPunchMutation.isPending}
+            >
+              {deductPunchMutation.isPending ? "Deducting..." : "Deduct 1 Punch"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addDaysDialog.open} onOpenChange={(open) => setAddDaysDialog({ open, card: open ? addDaysDialog.card : null })}>
         <DialogContent>

@@ -4,6 +4,10 @@ import { storage } from "./storage";
 import { hashPassword } from "./auth";
 import Stripe from "stripe";
 import { randomBytes } from "crypto";
+import { sendPaymentFailedMemberEmail, sendPaymentFailedAdminEmail } from "./email";
+
+const ADMIN_ALERT_EMAIL = 'info@wolfmothertulsa.com';
+const APP_BASE_URL = process.env.APP_BASE_URL || 'https://wolfmotherwellness.replit.app';
 
 // Raw body parser for webhook signature verification
 export const stripeWebhookMiddleware = (req: Request, res: Response, next: any) => {
@@ -449,25 +453,51 @@ const handleInvoicePaymentFailed = async (invoice: Stripe.Invoice) => {
     const user = await storage.getUserByCustomerId(customerId);
     if (!user) return;
     
-    // Record the failed payment
+    // Fix: amount_due is already in cents — divide by 100 for dollar storage
     const paymentIntentId = (invoice as any).payment_intent as string;
     await storage.createPayment({
       userId: user.id,
-      amount: invoice.amount_due,
+      amount: invoice.amount_due / 100,
       status: 'failed',
       description: `Failed subscription payment - Invoice ${invoice.number || invoice.id}`,
       method: 'credit_card',
       stripePaymentIntentId: paymentIntentId,
     });
-    
-    // Optionally freeze the membership after payment failure
+
+    // Do NOT freeze the membership here — Stripe retries automatically and
+    // customer.subscription.updated (status: past_due) will freeze it only
+    // after Stripe's retry schedule is exhausted. Freezing on the first
+    // attempt would penalize members for transient card declines.
+    console.log('⚠️ Failed invoice recorded for user:', user.email, '— membership left active pending Stripe retries');
+
+    // Look up the membership to get the plan name for the email
     const membership = await storage.getMembershipByUserId(user.id);
-    if (membership) {
-      await storage.updateMembership(membership.membershipId, {
-        status: 'frozen',
-      });
-      console.log('⚠️ Membership frozen due to payment failure for user:', user.email);
-    }
+    const planName = membership?.planType
+      ? membership.planType.charAt(0).toUpperCase() + membership.planType.slice(1)
+      : 'Wellness';
+    const attemptCount = (invoice as any).attempt_count ?? 1;
+    const invoiceLabel = invoice.number || invoice.id;
+
+    // Notify the member so they can update their payment method
+    await sendPaymentFailedMemberEmail(
+      user.email,
+      user.firstName || 'Member',
+      planName,
+      invoice.amount_due,
+      invoiceLabel,
+      `${APP_BASE_URL}/dashboard`
+    );
+
+    // Alert admin staff
+    await sendPaymentFailedAdminEmail(
+      ADMIN_ALERT_EMAIL,
+      `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+      user.email,
+      planName,
+      invoice.amount_due,
+      invoiceLabel,
+      attemptCount
+    );
   } catch (error) {
     console.error('❌ Error handling failed invoice:', error);
   }

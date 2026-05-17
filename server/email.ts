@@ -156,6 +156,121 @@ export async function sendWaitlistNotificationEmail(
   }
 }
 
+export async function sendPaymentFailedMemberEmail(
+  toEmail: string,
+  firstName: string,
+  planName: string,
+  amountDue: number,
+  invoiceNumber: string,
+  portalUrl: string
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+    const amountDisplay = `$${(amountDue / 100).toFixed(2)}`;
+
+    const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: toEmail,
+      subject: 'Wolf Mother Wellness — Action Required: Payment Failed',
+      text: `Hi ${firstName},\n\nWe were unable to process your renewal payment of ${amountDisplay} for your ${planName} membership (Invoice ${invoiceNumber}).\n\nTo keep your membership active, please update your payment method by logging in to your member portal. Stripe will automatically retry the charge — if payment continues to fail your membership will be paused.\n\nLog in at: ${portalUrl}\n\nIf you have any questions, reply to this email or contact us directly.\n\nBest regards,\nWolf Mother Wellness Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4a5d4a;">Wolf Mother Wellness</h2>
+          <p>Hi ${firstName},</p>
+          <p>We were unable to process your renewal payment for your <strong>${planName}</strong> membership.</p>
+          <div style="background-color: #fff3cd; border-left: 4px solid #e6a817; padding: 16px 20px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0 0 8px 0; font-weight: bold; color: #856404;">Payment Failed</p>
+            <p style="margin: 0; color: #533f03;">Amount due: <strong>${amountDisplay}</strong> &nbsp;|&nbsp; Invoice: ${invoiceNumber}</p>
+          </div>
+          <p>Stripe will automatically retry the charge. To avoid any interruption to your membership, please log in and update your payment method:</p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${portalUrl}" style="background-color: #4a5d4a; color: white; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Update Payment Method</a>
+          </div>
+          <p style="color: #666; font-size: 14px;">If you have any questions, reply to this email or contact us directly.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #999; font-size: 12px;">Best regards,<br>Wolf Mother Wellness Team</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(msg);
+    console.log(`Payment failed member email sent to ${toEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Payment failed member email error:', error);
+    return false;
+  }
+}
+
+export async function sendPaymentFailedAdminEmail(
+  adminEmail: string,
+  memberName: string,
+  memberEmail: string,
+  planName: string,
+  amountDue: number,
+  invoiceNumber: string,
+  attemptCount: number
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+    const amountDisplay = `$${(amountDue / 100).toFixed(2)}`;
+
+    const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: adminEmail,
+      subject: `Payment Failed — ${memberName} (${planName})`,
+      text: `Payment Failure Alert\n\nMember: ${memberName}\nEmail: ${memberEmail}\nPlan: ${planName}\nAmount Due: ${amountDisplay}\nInvoice: ${invoiceNumber}\nAttempt #: ${attemptCount}\n\nStripe will retry automatically. The member has been notified by email.\n\nView in Stripe Dashboard: https://dashboard.stripe.com/customers`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4a5d4a;">Wolf Mother Wellness — Payment Failure Alert</h2>
+          <div style="background-color: #f8d7da; border-left: 4px solid #c9393e; padding: 16px 20px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-weight: bold; color: #721c24;">A membership renewal payment has failed.</p>
+          </div>
+          <div style="background-color: #f4f4f4; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold; width: 130px;">Member:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${memberName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold;">Email:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><a href="mailto:${memberEmail}">${memberEmail}</a></td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold;">Plan:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${planName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold;">Amount Due:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${amountDisplay}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold;">Invoice:</td>
+                <td style="padding: 8px 0; border-bottom: 1px solid #ddd;">${invoiceNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; font-weight: bold;">Attempt #:</td>
+                <td style="padding: 8px 0;">${attemptCount}</td>
+              </tr>
+            </table>
+          </div>
+          <p style="color: #555;">Stripe will retry the charge automatically. The member has been notified by email to update their payment method.</p>
+          <p><a href="https://dashboard.stripe.com/customers" style="color: #4a5d4a;">View in Stripe Dashboard →</a></p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #999; font-size: 12px;">Automated alert from Wolf Mother Wellness</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(msg);
+    console.log(`Payment failed admin alert sent to ${adminEmail} for ${memberEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Payment failed admin email error:', error);
+    return false;
+  }
+}
+
 export async function sendGiftCardEmail(
   recipientEmail: string,
   recipientName: string,

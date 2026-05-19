@@ -43,6 +43,7 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
   const setupIntentMutation = useMutation({
     mutationFn: async () => {
@@ -134,7 +135,13 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
             <div className="space-y-2">
               <label className="text-base font-medium text-gray-900 block">Card Number</label>
               <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                <CardNumberElement options={elementOptions} />
+                <CardNumberElement
+                  options={elementOptions}
+                  onChange={(e) => {
+                    if (e.error) setCardError(e.error.message);
+                    else if (e.complete) setCardError(null);
+                  }}
+                />
               </div>
             </div>
 
@@ -142,17 +149,33 @@ export function AddPaymentMethod({ isUpdating = false, onSuccess, onCancel }: Ad
               <div className="space-y-2">
                 <label className="text-base font-medium text-gray-900 block">Expiry Date</label>
                 <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                  <CardExpiryElement options={elementOptions} />
+                  <CardExpiryElement
+                    options={elementOptions}
+                    onChange={(e) => {
+                      if (e.error) setCardError(e.error.message);
+                      else if (e.complete) setCardError(null);
+                    }}
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-base font-medium text-gray-900 block">CVC</label>
                 <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                  <CardCvcElement options={elementOptions} />
+                  <CardCvcElement
+                    options={elementOptions}
+                    onChange={(e) => {
+                      if (e.error) setCardError(e.error.message);
+                      else if (e.complete) setCardError(null);
+                    }}
+                  />
                 </div>
               </div>
             </div>
+
+            {cardError && (
+              <p className="text-sm text-red-600">{cardError}</p>
+            )}
 
             <p className="text-sm text-gray-500 mt-2">
               Your card information is securely processed by Stripe and never stored on our servers.

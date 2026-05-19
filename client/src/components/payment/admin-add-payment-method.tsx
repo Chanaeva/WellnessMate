@@ -42,6 +42,7 @@ function AdminAddPaymentMethodForm({ clientSecret, memberId, onSuccess, onCancel
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +103,13 @@ function AdminAddPaymentMethodForm({ clientSecret, memberId, onSuccess, onCancel
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700 block">Card Number</label>
           <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20">
-            <CardNumberElement options={elementOptions} />
+            <CardNumberElement
+              options={elementOptions}
+              onChange={(e) => {
+                if (e.error) setCardError(e.error.message);
+                else if (e.complete) setCardError(null);
+              }}
+            />
           </div>
         </div>
 
@@ -110,17 +117,33 @@ function AdminAddPaymentMethodForm({ clientSecret, memberId, onSuccess, onCancel
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 block">Expiry Date</label>
             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20">
-              <CardExpiryElement options={elementOptions} />
+              <CardExpiryElement
+                options={elementOptions}
+                onChange={(e) => {
+                  if (e.error) setCardError(e.error.message);
+                  else if (e.complete) setCardError(null);
+                }}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 block">CVC</label>
             <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20">
-              <CardCvcElement options={elementOptions} />
+              <CardCvcElement
+                options={elementOptions}
+                onChange={(e) => {
+                  if (e.error) setCardError(e.error.message);
+                  else if (e.complete) setCardError(null);
+                }}
+              />
             </div>
           </div>
         </div>
+
+        {cardError && (
+          <p className="text-sm text-red-600">{cardError}</p>
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">

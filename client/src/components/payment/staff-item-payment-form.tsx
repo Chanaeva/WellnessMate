@@ -164,13 +164,25 @@ function PaymentFormContent({ checkoutId, itemName, priceInCents, memberName, me
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Expiry</label>
             <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
-              <CardExpiryElement options={elementOptions} />
+              <CardExpiryElement
+                options={elementOptions}
+                onChange={(e) => {
+                  if (e.error) setCardError(e.error.message);
+                  else if (e.complete) setCardError(null);
+                }}
+              />
             </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300">CVC</label>
             <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
-              <CardCvcElement options={elementOptions} />
+              <CardCvcElement
+                options={elementOptions}
+                onChange={(e) => {
+                  if (e.error) setCardError(e.error.message);
+                  else if (e.complete) setCardError(null);
+                }}
+              />
             </div>
           </div>
         </div>

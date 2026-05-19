@@ -436,14 +436,26 @@ export function CheckoutPaymentForm({ items, promoCode, onSuccess, onCancel, bil
               <div className="space-y-2">
                 <label className="text-base font-medium text-gray-900 block">Expiry Date</label>
                 <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                  <CardExpiryElement options={elementOptions} />
+                  <CardExpiryElement
+                    options={elementOptions}
+                    onChange={(e) => {
+                      if (e.error) setCardError(e.error.message);
+                      else if (e.complete) setCardError(null);
+                    }}
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-base font-medium text-gray-900 block">CVC</label>
                 <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-                  <CardCvcElement options={elementOptions} />
+                  <CardCvcElement
+                    options={elementOptions}
+                    onChange={(e) => {
+                      if (e.error) setCardError(e.error.message);
+                      else if (e.complete) setCardError(null);
+                    }}
+                  />
                 </div>
               </div>
             </div>

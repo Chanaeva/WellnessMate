@@ -1215,16 +1215,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dayPassesRemaining: number;
       }> = [];
       
-      // Search by email or name (partial match)
+      // Search by email or name (partial match) — exclude archived members
       const users = await db
         .select()
         .from(usersTable)
         .where(
-          or(
-            sql`LOWER(${usersTable.email}) LIKE ${`%${searchTerm}%`}`,
-            sql`LOWER(${usersTable.firstName}) LIKE ${`%${searchTerm}%`}`,
-            sql`LOWER(${usersTable.lastName}) LIKE ${`%${searchTerm}%`}`,
-            sql`LOWER(CONCAT(${usersTable.firstName}, ' ', ${usersTable.lastName})) LIKE ${`%${searchTerm}%`}`
+          and(
+            eq(usersTable.isArchived, false),
+            or(
+              sql`LOWER(${usersTable.email}) LIKE ${`%${searchTerm}%`}`,
+              sql`LOWER(${usersTable.firstName}) LIKE ${`%${searchTerm}%`}`,
+              sql`LOWER(${usersTable.lastName}) LIKE ${`%${searchTerm}%`}`,
+              sql`LOWER(CONCAT(${usersTable.firstName}, ' ', ${usersTable.lastName})) LIKE ${`%${searchTerm}%`}`
+            )
           )
         )
         .limit(10);
@@ -1236,10 +1239,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(sql`LOWER(${membershipsTable.membershipId}) LIKE ${`%${searchTerm}%`}`)
         .limit(10);
       
-      // Add users found by membership ID if not already in results
+      // Add users found by membership ID if not already in results — exclude archived
       for (const match of membershipMatches) {
         if (!users.find(u => u.id === match.userId)) {
-          const user = await db.select().from(usersTable).where(eq(usersTable.id, match.userId)).limit(1);
+          const user = await db.select().from(usersTable).where(
+            and(eq(usersTable.id, match.userId), eq(usersTable.isArchived, false))
+          ).limit(1);
           if (user[0]) {
             users.push(user[0]);
           }

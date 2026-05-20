@@ -732,7 +732,11 @@ export default function MemberDashboard() {
                         ? billingInfo?.source === 'stripe'
                           ? `Next billing on ${formattedEndDate}`
                           : `Membership expires ${formattedEndDate}`
-                        : `Membership expired on ${formattedEndDate}`}
+                        : membership && nextBillingDateStr
+                          ? `Membership expired on ${formattedEndDate}`
+                          : membership
+                            ? "Membership inactive"
+                            : "No active membership"}
                     </p>
                   </div>
                 </div>

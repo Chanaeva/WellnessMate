@@ -11,7 +11,7 @@ import { promisify } from "util";
 import { stripe, createStripeClient, STRIPE_CONFIG, formatAmountForStripe, formatAmountFromStripe, STRIPE_ENV_INFO } from "./stripe-config";
 import { setupStripeWebhooks } from "./stripe-webhooks";
 import { walletService } from "./wallet/wallet-service";
-import { eq, or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail, sendWaitlistNotificationEmail } from "./email";

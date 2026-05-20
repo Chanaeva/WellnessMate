@@ -728,11 +728,11 @@ export default function MemberDashboard() {
                       Welcome back, {user?.firstName || "Member"}!
                     </h1>
                     <p className="text-white/90 font-medium">
-                      Your membership is{" "}
                       {membershipStatus === "active"
-                        ? "active until"
-                        : "expired on"}{" "}
-                      {formattedEndDate}
+                        ? billingInfo?.source === 'stripe'
+                          ? `Next billing on ${formattedEndDate}`
+                          : `Membership expires ${formattedEndDate}`
+                        : `Membership expired on ${formattedEndDate}`}
                     </p>
                   </div>
                 </div>
@@ -1216,6 +1216,7 @@ export default function MemberDashboard() {
               isLoading={isMembershipLoading}
               billingInterval={billingInfo?.billingInterval}
               cancelAtPeriodEnd={billingInfo?.cancelAtPeriodEnd}
+              billingSource={billingInfo?.source}
             />
 
             {/* Your Day Pass Packages */}

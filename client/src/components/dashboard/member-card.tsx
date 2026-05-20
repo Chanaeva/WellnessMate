@@ -16,6 +16,7 @@ interface MemberCardProps {
   onCancelMembership?: () => void;
   billingInterval?: string; // 'month' or 'year'
   cancelAtPeriodEnd?: boolean; // from Stripe billing info
+  billingSource?: string; // 'stripe' or 'database'
 }
 
 const MemberCard = ({
@@ -31,6 +32,7 @@ const MemberCard = ({
   isLoading = false,
   billingInterval = 'month',
   cancelAtPeriodEnd = false,
+  billingSource = 'database',
 }: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
   // A cancellation is "pending" only when the member explicitly scheduled one:
@@ -116,7 +118,7 @@ const MemberCard = ({
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs sm:text-sm text-muted-foreground">
-                {isPendingCancellation ? 'Access Until' : 'Next Billing'}
+                {isPendingCancellation ? 'Access Until' : billingSource === 'stripe' ? 'Next Billing' : 'Expires'}
               </span>
             </div>
             <span className="font-semibold text-xs sm:text-sm">{membershipEndDate}</span>

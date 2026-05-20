@@ -15,6 +15,7 @@ interface MemberCardProps {
   payments?: Payment[];
   onCancelMembership?: () => void;
   billingInterval?: string; // 'month' or 'year'
+  cancelAtPeriodEnd?: boolean; // from Stripe billing info
 }
 
 const MemberCard = ({
@@ -29,9 +30,13 @@ const MemberCard = ({
   onCancelMembership,
   isLoading = false,
   billingInterval = 'month',
+  cancelAtPeriodEnd = false,
 }: MemberCardProps & { isLoading?: boolean }) => {
   const isActive = membership?.status === 'active';
-  const isPendingCancellation = isActive && membership?.autoRenew === false;
+  // A cancellation is "pending" only when the member explicitly scheduled one:
+  // - cancelledAt is set (DB record of the cancellation request), OR
+  // - Stripe reports cancel_at_period_end = true
+  const isPendingCancellation = isActive && (membership?.cancelledAt != null || cancelAtPeriodEnd === true);
   const membershipPrice = currentPlan?.monthlyPrice ? (currentPlan.monthlyPrice / 100).toFixed(0) : '65';
   const billingLabel = billingInterval === 'year' ? 'Yearly' : 'Monthly';
   

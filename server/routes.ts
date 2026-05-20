@@ -918,8 +918,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Stripe period-end cancel error:", stripeError.message);
           // Continue — update DB regardless
         }
-        // Keep status active, just disable auto-renew
-        await storage.updateMembership(membership.membershipId, { autoRenew: false });
+        // Keep status active, just disable auto-renew and record when cancellation was requested
+        await storage.updateMembership(membership.membershipId, { autoRenew: false, cancelledAt: new Date() });
         return res.json({
           message: "Your membership will not renew. You'll keep access until the end of your current billing period.",
           endDate: membership.endDate,

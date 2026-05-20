@@ -1215,6 +1215,7 @@ export default function MemberDashboard() {
               onCancelMembership={() => setShowCancelMembershipDialog(true)}
               isLoading={isMembershipLoading}
               billingInterval={billingInfo?.billingInterval}
+              cancelAtPeriodEnd={billingInfo?.cancelAtPeriodEnd}
             />
 
             {/* Your Day Pass Packages */}

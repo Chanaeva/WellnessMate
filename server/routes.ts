@@ -7409,6 +7409,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dayPassDescription = dayPassQuantity > 1 
         ? `${packageData.name} × ${dayPassQuantity}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`
         : `${packageData.name}${discountDescription} - ${validatedMemberData.firstName} ${validatedMemberData.lastName}`;
+
+      // Extract agreement/waiver data so webhook recovery can store it if confirm-member-creation
+      // never reaches the server (reader timeout, network drop, etc.)
+      const agreementDataFromBody = req.body.agreementData || null;
+      
       const paymentIntentConfig: any = {
         amount: Math.round(finalAmount),
         currency: 'usd',
@@ -7428,6 +7433,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           discountAmount: discountData?.amountCents?.toString() || '',
           discountReason: discountData?.reason || '',
           useTerminal: useTerminal ? 'true' : 'false',
+          // Waiver fields for webhook recovery (stored so the webhook can mark the agreement)
+          waiverSigned: agreementDataFromBody ? 'true' : 'false',
+          waiverDateOfBirth: agreementDataFromBody?.dateOfBirth?.slice(0, 50) || '',
+          waiverEmergencyContact: (agreementDataFromBody?.emergencyContact || '').slice(0, 100),
+          waiverEmergencyPhone: (agreementDataFromBody?.emergencyPhone || '').slice(0, 30),
         },
       };
       
@@ -7592,6 +7602,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // ── Deduplication guard ──────────────────────────────────────────────────
+      // If a payment record already exists for this PaymentIntent the webhook
+      // (or a previous confirm call) already handled fulfillment. Return success
+      // immediately so we don't create duplicate punch cards.
+      const existingPaymentRecord = await storage.getPaymentByStripePaymentIntentId(paymentIntentId);
+      if (existingPaymentRecord) {
+        console.log('⏭️  confirm-member-creation: payment already recorded for PI', paymentIntentId, '— skipping duplicate fulfillment');
+        return res.json({ message: "Member created successfully (already fulfilled)", alreadyFulfilled: true });
+      }
+
       let targetUser;
       
       // Check if we're adding a day pass to an existing member or creating new member
@@ -7602,33 +7622,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(404).json({ message: "Existing member not found" });
         }
       } else {
-        // Create the member account with agreement data
+        // Create the member account with agreement data.
+        // Guard against a race where the Stripe webhook already created the user
+        // (e.g. card reader timeout: PI succeeded, webhook fired, then the kiosk
+        // retried confirm-member-creation). If createUser throws a uniqueness
+        // error, fall back to the existing user and patch in the waiver data.
         const salt = randomBytes(16).toString('hex');
         // Use provided password if set, otherwise generate a random one
         const passwordToHash = memberData.password && memberData.password.trim() 
           ? memberData.password 
           : Math.random().toString(36).slice(-8);
         const key = await scryptAsync(passwordToHash, salt, 64) as Buffer;
-        
-        targetUser = await storage.createUser({
+
+        const newUserPayload = {
           username: memberData.email,
           email: memberData.email,
           password: `${key.toString('hex')}:${salt}`,
           firstName: memberData.firstName,
           lastName: memberData.lastName,
           phoneNumber: memberData.phoneNumber || undefined,
-          role: 'member',
-          // Agreement is completed during kiosk registration
+          role: 'member' as const,
           membershipAgreementCompleted: true,
           membershipAgreementDate: new Date(),
           membershipAgreementData: agreementData,
           dateOfBirth: agreementData?.dateOfBirth,
           emergencyContact: agreementData?.emergencyContact,
           emergencyPhone: agreementData?.emergencyPhone,
-        });
-        
-        // Log whether a password was set for debugging
-        console.log(`Member created with ${memberData.password ? 'custom' : 'random'} password`);
+        };
+
+        try {
+          targetUser = await storage.createUser(newUserPayload);
+          console.log(`Member created with ${memberData.password ? 'custom' : 'random'} password`);
+        } catch (createErr: any) {
+          // Unique constraint on email/username — webhook may have created this user already.
+          // Look up the existing record and patch the waiver data onto it.
+          const isUniqueViolation =
+            createErr.code === '23505' ||
+            (createErr.message || '').toLowerCase().includes('unique') ||
+            (createErr.message || '').toLowerCase().includes('already exists');
+
+          if (!isUniqueViolation) throw createErr;
+
+          console.warn('⚠️  createUser unique violation — user likely created by webhook recovery. Falling back to existing user.');
+          const existingUser = await storage.getUserByEmail(memberData.email);
+          if (!existingUser) throw createErr; // unexpected — re-throw original
+
+          targetUser = existingUser;
+
+          // Patch waiver data onto the existing user if it was created by the
+          // webhook recovery (which has no access to the agreement form data).
+          if (!existingUser.membershipAgreementCompleted && agreementData) {
+            await storage.updateUser(existingUser.id, {
+              membershipAgreementCompleted: true,
+              membershipAgreementDate: new Date(),
+              membershipAgreementData: agreementData,
+              dateOfBirth: agreementData.dateOfBirth || existingUser.dateOfBirth,
+              emergencyContact: agreementData.emergencyContact || existingUser.emergencyContact,
+              emergencyPhone: agreementData.emergencyPhone || existingUser.emergencyPhone,
+            });
+            console.log('✅ Patched waiver data onto webhook-recovered user:', existingUser.email);
+          }
+        }
       }
       
       // Use targetUser instead of newUser for remainder of function

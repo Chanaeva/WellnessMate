@@ -45,6 +45,19 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
       // Find or create the user
       let user = await storage.getUserByEmail(meta.memberEmail);
       
+      // Extract waiver data stored in PI metadata by create-member-payment
+      const waiverSigned = meta.waiverSigned === 'true';
+      const waiverAgreementData = waiverSigned ? {
+        dateOfBirth: meta.waiverDateOfBirth || '',
+        emergencyContact: meta.waiverEmergencyContact || '',
+        emergencyPhone: meta.waiverEmergencyPhone || '',
+        healthConfirmation: true,
+        riskAcknowledgment: true,
+        liabilityWaiver: true,
+        rulesAcceptance: true,
+        ageConfirmation: true,
+      } : null;
+
       if (!user) {
         // Generate a random temporary password — the member can claim the account
         // via the /claim-account SMS flow to set their own password.
@@ -66,7 +79,13 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
           lastName: meta.memberLastName || 'Unknown',
           phoneNumber: meta.memberPhone || null,
           role: 'member',
-          membershipAgreementCompleted: false,
+          // Use waiver data from PI metadata if available (stored by create-member-payment)
+          membershipAgreementCompleted: waiverSigned,
+          membershipAgreementDate: waiverSigned ? new Date() : undefined,
+          membershipAgreementData: waiverAgreementData || undefined,
+          dateOfBirth: meta.waiverDateOfBirth || undefined,
+          emergencyContact: meta.waiverEmergencyContact || undefined,
+          emergencyPhone: meta.waiverEmergencyPhone || undefined,
         });
 
         // Link the Stripe customer to this new user
@@ -75,8 +94,20 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
           await storage.updateUserStripeCustomerId(user.id, customerId);
         }
 
-        console.log('👤 Webhook recovery: created user', user.email, 'id', user.id);
+        console.log('👤 Webhook recovery: created user', user.email, 'id', user.id, '| waiverStored:', waiverSigned);
       } else {
+        // Existing user — patch waiver data if the webhook created them without it
+        if (!user.membershipAgreementCompleted && waiverSigned) {
+          await storage.updateUser(user.id, {
+            membershipAgreementCompleted: true,
+            membershipAgreementDate: new Date(),
+            membershipAgreementData: waiverAgreementData,
+            dateOfBirth: meta.waiverDateOfBirth || user.dateOfBirth,
+            emergencyContact: meta.waiverEmergencyContact || user.emergencyContact,
+            emergencyPhone: meta.waiverEmergencyPhone || user.emergencyPhone,
+          });
+          console.log('✅ Webhook recovery: patched waiver onto existing user', user.email);
+        }
         console.log('👤 Webhook recovery: found existing user', user.email, 'id', user.id);
       }
 

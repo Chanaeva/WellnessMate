@@ -37,6 +37,7 @@ import {
   checklistItems, type ChecklistItem, type InsertChecklistItem,
   checklistRuns, type ChecklistRun, type InsertChecklistRun,
   checklistRunItems, type ChecklistRunItem,
+  newsletters, type Newsletter, type InsertNewsletter,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
@@ -312,6 +313,15 @@ export interface IStorage {
     closing: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
     hourly: { total: number; completed: number; hasRun: boolean; isComplete: boolean };
   }>;
+
+  // Newsletter methods
+  getAllNewsletters(): Promise<Newsletter[]>;
+  getNewsletterById(id: number): Promise<Newsletter | undefined>;
+  createNewsletter(data: InsertNewsletter & { createdByUserId?: number }): Promise<Newsletter>;
+  updateNewsletter(id: number, data: Partial<Newsletter>): Promise<Newsletter>;
+  deleteNewsletter(id: number): Promise<void>;
+  markNewsletterSent(id: number, sentCount: number): Promise<Newsletter>;
+  getNewsletterRecipients(filter: 'all' | 'active_members' | 'day_pass_holders'): Promise<{ email: string; firstName: string }[]>;
 
   // Session store
   sessionStore: any;
@@ -2584,6 +2594,86 @@ export class DatabaseStorage implements IStorage {
       };
     }
     return result;
+  }
+
+  // ─── Newsletter methods ────────────────────────────────────────────────────
+
+  async getAllNewsletters(): Promise<Newsletter[]> {
+    return db.select().from(newsletters).orderBy(desc(newsletters.createdAt));
+  }
+
+  async getNewsletterById(id: number): Promise<Newsletter | undefined> {
+    const [row] = await db.select().from(newsletters).where(eq(newsletters.id, id));
+    return row;
+  }
+
+  async createNewsletter(data: InsertNewsletter & { createdByUserId?: number }): Promise<Newsletter> {
+    const [row] = await db.insert(newsletters).values({
+      subject: data.subject,
+      htmlBody: data.htmlBody,
+      plainBody: data.plainBody,
+      recipientFilter: data.recipientFilter ?? 'all',
+      status: 'draft',
+      createdByUserId: data.createdByUserId ?? null,
+    }).returning();
+    return row;
+  }
+
+  async updateNewsletter(id: number, data: Partial<Newsletter>): Promise<Newsletter> {
+    const [row] = await db.update(newsletters).set(data).where(eq(newsletters.id, id)).returning();
+    return row;
+  }
+
+  async deleteNewsletter(id: number): Promise<void> {
+    await db.delete(newsletters).where(eq(newsletters.id, id));
+  }
+
+  async markNewsletterSent(id: number, sentCount: number): Promise<Newsletter> {
+    const [row] = await db.update(newsletters)
+      .set({ status: 'sent', sentAt: new Date(), sentCount })
+      .where(eq(newsletters.id, id))
+      .returning();
+    return row;
+  }
+
+  async getNewsletterRecipients(filter: 'all' | 'active_members' | 'day_pass_holders'): Promise<{ email: string; firstName: string }[]> {
+    if (filter === 'day_pass_holders') {
+      // Users with an active punch card (remaining punches > 0)
+      const rows = await db
+        .selectDistinct({ email: users.email, firstName: users.firstName })
+        .from(users)
+        .innerJoin(punchCards, eq(punchCards.userId, users.id))
+        .where(
+          and(
+            eq(punchCards.status, 'active'),
+            sql`${punchCards.remainingPunches} > 0`,
+            eq(users.isArchived, false)
+          )
+        );
+      return rows.map(r => ({ email: r.email, firstName: r.firstName ?? '' }));
+    }
+
+    if (filter === 'active_members') {
+      // Users with an active recurring membership
+      const rows = await db
+        .selectDistinct({ email: users.email, firstName: users.firstName })
+        .from(users)
+        .innerJoin(memberships, eq(memberships.userId, users.id))
+        .where(
+          and(
+            eq(memberships.status, 'active'),
+            eq(users.isArchived, false)
+          )
+        );
+      return rows.map(r => ({ email: r.email, firstName: r.firstName ?? '' }));
+    }
+
+    // 'all' — every non-archived member-role user
+    const rows = await db
+      .select({ email: users.email, firstName: users.firstName })
+      .from(users)
+      .where(and(eq(users.role, 'member'), eq(users.isArchived, false)));
+    return rows.map(r => ({ email: r.email, firstName: r.firstName ?? '' }));
   }
 }
 

@@ -271,6 +271,49 @@ export async function sendPaymentFailedAdminEmail(
   }
 }
 
+export async function sendNewsletterEmail(
+  toEmail: string,
+  firstName: string,
+  subject: string,
+  htmlBody: string,
+  plainBody: string
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+
+    const wrappedHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 24px 32px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: 1px;">Wolf Mother Wellness</h1>
+        </div>
+        <div style="padding: 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
+          ${htmlBody}
+          <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0 20px 0;">
+          <p style="color: #aaa; font-size: 11px; margin: 0;">
+            You're receiving this because you are a member of Wolf Mother Wellness.<br>
+            &copy; ${new Date().getFullYear()} Wolf Mother Wellness
+          </p>
+        </div>
+      </div>
+    `;
+
+    const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: toEmail,
+      subject,
+      text: plainBody,
+      html: wrappedHtml,
+    };
+
+    await transporter.sendMail(msg);
+    console.log(`Newsletter "${subject}" sent to ${toEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`Newsletter email error for ${toEmail}:`, error);
+    return false;
+  }
+}
+
 export async function sendGiftCardEmail(
   recipientEmail: string,
   recipientName: string,

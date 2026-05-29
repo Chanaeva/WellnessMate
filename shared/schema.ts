@@ -1019,3 +1019,39 @@ export const insertChecklistRunItemSchema = createInsertSchema(checklistRunItems
 });
 export type ChecklistRunItem = typeof checklistRunItems.$inferSelect;
 export type InsertChecklistRunItem = z.infer<typeof insertChecklistRunItemSchema>;
+
+// ─── Newsletters ──────────────────────────────────────────────────────────────
+
+export const newsletterRecipientFilterEnum = pgEnum('newsletter_recipient_filter', [
+  'all',
+  'active_members',
+  'day_pass_holders',
+]);
+
+export const newsletterStatusEnum = pgEnum('newsletter_status', ['draft', 'sent']);
+
+export const newsletters = pgTable("newsletters", {
+  id: serial("id").primaryKey(),
+  subject: text("subject").notNull(),
+  htmlBody: text("html_body").notNull(),
+  plainBody: text("plain_body").notNull(),
+  recipientFilter: newsletterRecipientFilterEnum("recipient_filter").notNull().default('all'),
+  status: newsletterStatusEnum("status").notNull().default('draft'),
+  sentAt: timestamp("sent_at"),
+  sentCount: integer("sent_count").notNull().default(0),
+  createdByUserId: integer("created_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  sentAt: true,
+  sentCount: true,
+  status: true,
+});
+
+export type Newsletter = typeof newsletters.$inferSelect;
+export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;

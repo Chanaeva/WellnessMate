@@ -8100,6 +8100,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Newsletter routes ────────────────────────────────────────────────────
+
+  // GET /api/admin/newsletters — list all newsletters
+  app.get("/api/admin/newsletters", isAdmin, async (req, res) => {
+    try {
+      const items = await storage.getAllNewsletters();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // POST /api/admin/newsletters — create draft
+  app.post("/api/admin/newsletters", isAdmin, async (req, res) => {
+    try {
+      const { subject, htmlBody, plainBody, recipientFilter } = req.body;
+      if (!subject || !htmlBody || !plainBody) {
+        return res.status(400).json({ message: "subject, htmlBody and plainBody are required" });
+      }
+      const newsletter = await storage.createNewsletter({
+        subject,
+        htmlBody,
+        plainBody,
+        recipientFilter: recipientFilter ?? 'all',
+        createdByUserId: (req.user as any)?.id,
+      });
+      res.status(201).json(newsletter);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // GET /api/admin/newsletters/:id
+  app.get("/api/admin/newsletters/:id", isAdmin, async (req, res) => {
+    try {
+      const newsletter = await storage.getNewsletterById(Number(req.params.id));
+      if (!newsletter) return res.status(404).json({ message: "Not found" });
+      res.json(newsletter);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // PATCH /api/admin/newsletters/:id — update draft
+  app.patch("/api/admin/newsletters/:id", isAdmin, async (req, res) => {
+    try {
+      const newsletter = await storage.getNewsletterById(Number(req.params.id));
+      if (!newsletter) return res.status(404).json({ message: "Not found" });
+      if (newsletter.status === 'sent') {
+        return res.status(400).json({ message: "Cannot edit a newsletter that has already been sent" });
+      }
+      const updated = await storage.updateNewsletter(Number(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // DELETE /api/admin/newsletters/:id
+  app.delete("/api/admin/newsletters/:id", isAdmin, async (req, res) => {
+    try {
+      const newsletter = await storage.getNewsletterById(Number(req.params.id));
+      if (!newsletter) return res.status(404).json({ message: "Not found" });
+      await storage.deleteNewsletter(Number(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // GET /api/admin/newsletters/:id/recipients-count — preview count before send
+  app.get("/api/admin/newsletters/:id/recipients-count", isAdmin, async (req, res) => {
+    try {
+      const newsletter = await storage.getNewsletterById(Number(req.params.id));
+      if (!newsletter) return res.status(404).json({ message: "Not found" });
+      const recipients = await storage.getNewsletterRecipients(newsletter.recipientFilter as any);
+      res.json({ count: recipients.length });
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // GET /api/admin/newsletters/recipient-preview?filter=... — preview count for a given filter
+  app.get("/api/admin/newsletters/recipient-preview", isAdmin, async (req, res) => {
+    try {
+      const filter = (req.query.filter as string) || 'all';
+      if (!['all', 'active_members', 'day_pass_holders'].includes(filter)) {
+        return res.status(400).json({ message: "Invalid filter" });
+      }
+      const recipients = await storage.getNewsletterRecipients(filter as any);
+      res.json({ count: recipients.length });
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // POST /api/admin/newsletters/:id/send — send to recipients
+  app.post("/api/admin/newsletters/:id/send", isAdmin, async (req, res) => {
+    try {
+      const newsletter = await storage.getNewsletterById(Number(req.params.id));
+      if (!newsletter) return res.status(404).json({ message: "Not found" });
+      if (newsletter.status === 'sent') {
+        return res.status(400).json({ message: "This newsletter has already been sent" });
+      }
+
+      const { sendNewsletterEmail } = await import("./email");
+      const recipients = await storage.getNewsletterRecipients(newsletter.recipientFilter as any);
+
+      let successCount = 0;
+      for (const recipient of recipients) {
+        const ok = await sendNewsletterEmail(
+          recipient.email,
+          recipient.firstName,
+          newsletter.subject,
+          newsletter.htmlBody,
+          newsletter.plainBody
+        );
+        if (ok) successCount++;
+      }
+
+      const updated = await storage.markNewsletterSent(newsletter.id, successCount);
+      res.json({ newsletter: updated, sent: successCount, total: recipients.length });
+    } catch (error) {
+      console.error("Newsletter send error:", error);
+      res.status(500).json({ message: "Server error sending newsletter" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

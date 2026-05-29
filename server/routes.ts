@@ -8158,7 +8158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PATCH /api/admin/newsletters/:id — update draft
+  // PATCH /api/admin/newsletters/:id — update draft (only whitelisted draft fields)
   app.patch("/api/admin/newsletters/:id", isAdmin, async (req, res) => {
     try {
       const newsletter = await storage.getNewsletterById(Number(req.params.id));
@@ -8166,7 +8166,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newsletter.status === 'sent') {
         return res.status(400).json({ message: "Cannot edit a newsletter that has already been sent" });
       }
-      const updated = await storage.updateNewsletter(Number(req.params.id), req.body);
+      const { subject, htmlBody, plainBody, recipientFilter } = req.body;
+      const allowed: Record<string, any> = {};
+      if (subject !== undefined) allowed.subject = subject;
+      if (htmlBody !== undefined) allowed.htmlBody = htmlBody;
+      if (plainBody !== undefined) allowed.plainBody = plainBody;
+      if (recipientFilter !== undefined) allowed.recipientFilter = recipientFilter;
+      const updated = await storage.updateNewsletter(Number(req.params.id), allowed);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Server error" });

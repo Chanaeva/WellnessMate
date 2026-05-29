@@ -39,6 +39,7 @@ import {
   ListOrdered,
   Link,
   Minus,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -198,6 +199,8 @@ export default function AdminNewsletter() {
   const [htmlBody, setHtmlBody] = useState("");
   // key used to remount RichEditor when opening a different draft
   const [editorKey, setEditorKey] = useState(0);
+
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const [sendConfirmId, setSendConfirmId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -554,19 +557,68 @@ export default function AdminNewsletter() {
               />
             </div>
 
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={closeComposer}>
-                Cancel
-              </Button>
+            <div className="flex gap-2 justify-between pt-2">
               <Button
-                onClick={handleSave}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                variant="outline"
+                onClick={() => setPreviewOpen(true)}
+                disabled={!htmlBody.replace(/<[^>]+>/g, "").trim()}
+                title="Preview how the email will look to recipients"
               >
-                {createMutation.isPending || updateMutation.isPending
-                  ? "Saving..."
-                  : "Save Draft"}
+                <Eye className="h-4 w-4 mr-2" />
+                Preview Email
               </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={closeComposer}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                >
+                  {createMutation.isPending || updateMutation.isPending
+                    ? "Saving..."
+                    : "Save Draft"}
+                </Button>
+              </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Email Preview
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2 mb-3">
+            This is how the email will appear to recipients. The greeting uses each member's actual first name.
+          </p>
+          {/* Rendered email preview matching server/email.ts wrapper */}
+          <div className="border rounded-lg overflow-hidden text-sm">
+            {/* Branded header */}
+            <div style={{ background: "linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%)", padding: "24px 32px" }}>
+              <h1 style={{ color: "white", margin: 0, fontSize: 22, letterSpacing: 1 }}>Wolf Mother Wellness</h1>
+            </div>
+            {/* Body */}
+            <div style={{ padding: "32px", border: "1px solid #e8e8e8", borderTop: "none" }}>
+              <p style={{ margin: "0 0 20px 0", fontSize: 15 }}>Hi [Member Name],</p>
+              <div
+                className="prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-blue-600 [&_a]:underline [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold"
+                dangerouslySetInnerHTML={{ __html: htmlBody }}
+              />
+              <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "28px 0 20px 0" }} />
+              <p style={{ color: "#aaa", fontSize: 11, margin: 0 }}>
+                You're receiving this because you are a member of Wolf Mother Wellness.<br />
+                &copy; {new Date().getFullYear()} Wolf Mother Wellness
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setPreviewOpen(false)}>Close Preview</Button>
           </div>
         </DialogContent>
       </Dialog>

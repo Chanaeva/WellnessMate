@@ -8132,6 +8132,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/admin/newsletters/recipient-preview?filter=... — preview count for a given filter
+  // IMPORTANT: must be registered BEFORE /:id to avoid being shadowed
+  app.get("/api/admin/newsletters/recipient-preview", isAdmin, async (req, res) => {
+    try {
+      const filter = (req.query.filter as string) || 'all';
+      if (!['all', 'active_members', 'day_pass_holders'].includes(filter)) {
+        return res.status(400).json({ message: "Invalid filter" });
+      }
+      const recipients = await storage.getNewsletterRecipients(filter as any);
+      res.json({ count: recipients.length });
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // GET /api/admin/newsletters/:id
   app.get("/api/admin/newsletters/:id", isAdmin, async (req, res) => {
     try {
@@ -8176,20 +8191,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newsletter = await storage.getNewsletterById(Number(req.params.id));
       if (!newsletter) return res.status(404).json({ message: "Not found" });
       const recipients = await storage.getNewsletterRecipients(newsletter.recipientFilter as any);
-      res.json({ count: recipients.length });
-    } catch (error) {
-      res.status(500).json({ message: "Server error" });
-    }
-  });
-
-  // GET /api/admin/newsletters/recipient-preview?filter=... — preview count for a given filter
-  app.get("/api/admin/newsletters/recipient-preview", isAdmin, async (req, res) => {
-    try {
-      const filter = (req.query.filter as string) || 'all';
-      if (!['all', 'active_members', 'day_pass_holders'].includes(filter)) {
-        return res.status(400).json({ message: "Invalid filter" });
-      }
-      const recipients = await storage.getNewsletterRecipients(filter as any);
       res.json({ count: recipients.length });
     } catch (error) {
       res.status(500).json({ message: "Server error" });

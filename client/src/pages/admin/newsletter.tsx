@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Mail, Plus, Trash2, Send, Edit, Clock, Users, CheckCircle2 } from "lucide-react";
+import {
+  Mail,
+  Plus,
+  Trash2,
+  Send,
+  Edit,
+  Clock,
+  Users,
+  CheckCircle2,
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Link,
+  Minus,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -56,17 +71,122 @@ const filterLabel = (v: string) =>
 
 type FormState = {
   subject: string;
-  htmlBody: string;
   plainBody: string;
   recipientFilter: "all" | "active_members" | "day_pass_holders";
 };
 
 const EMPTY_FORM: FormState = {
   subject: "",
-  htmlBody: "",
   plainBody: "",
   recipientFilter: "all",
 };
+
+// ── Rich Text Editor ──────────────────────────────────────────────────────────
+
+type ToolbarButtonProps = {
+  onMouseDown: (e: React.MouseEvent) => void;
+  title: string;
+  children: React.ReactNode;
+  active?: boolean;
+};
+
+function ToolbarButton({ onMouseDown, title, children, active }: ToolbarButtonProps) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={onMouseDown}
+      className={`p-1.5 rounded hover:bg-accent transition-colors ${active ? "bg-accent" : ""}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+type RichEditorProps = {
+  initialHtml: string;
+  onChange: (html: string) => void;
+};
+
+function RichEditor({ initialHtml, onChange }: RichEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const exec = useCallback((cmd: string, value?: string) => {
+    document.execCommand(cmd, false, value);
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+    editorRef.current?.focus();
+  }, [onChange]);
+
+  const handleLink = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const url = window.prompt("Enter URL:", "https://");
+    if (url) exec("createLink", url);
+  }, [exec]);
+
+  const preventBlur = (e: React.MouseEvent) => e.preventDefault();
+
+  return (
+    <div className="border rounded-md overflow-hidden">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b bg-muted/40">
+        <ToolbarButton title="Bold" onMouseDown={(e) => { preventBlur(e); exec("bold"); }}>
+          <Bold className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton title="Italic" onMouseDown={(e) => { preventBlur(e); exec("italic"); }}>
+          <Italic className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <div className="w-px h-4 bg-border mx-1" />
+        <ToolbarButton title="Bulleted list" onMouseDown={(e) => { preventBlur(e); exec("insertUnorderedList"); }}>
+          <List className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton title="Numbered list" onMouseDown={(e) => { preventBlur(e); exec("insertOrderedList"); }}>
+          <ListOrdered className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <div className="w-px h-4 bg-border mx-1" />
+        <ToolbarButton title="Insert link" onMouseDown={handleLink}>
+          <Link className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <ToolbarButton title="Horizontal rule" onMouseDown={(e) => { preventBlur(e); exec("insertHorizontalRule"); }}>
+          <Minus className="h-3.5 w-3.5" />
+        </ToolbarButton>
+        <div className="w-px h-4 bg-border mx-1" />
+        <select
+          className="text-xs border rounded px-1 py-0.5 bg-background"
+          defaultValue=""
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            if (e.target.value) {
+              exec("formatBlock", e.target.value);
+              e.target.value = "";
+            }
+          }}
+          title="Heading"
+        >
+          <option value="" disabled>Heading</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="p">Paragraph</option>
+        </select>
+      </div>
+      {/* Editable area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        dangerouslySetInnerHTML={{ __html: initialHtml }}
+        onInput={() => {
+          if (editorRef.current) onChange(editorRef.current.innerHTML);
+        }}
+        className="min-h-[200px] p-3 text-sm focus:outline-none prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-blue-600 [&_a]:underline [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold"
+        style={{ minHeight: 200 }}
+      />
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminNewsletter() {
   const { toast } = useToast();
@@ -74,6 +194,10 @@ export default function AdminNewsletter() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  // htmlBody is tracked separately so the rich editor controls it
+  const [htmlBody, setHtmlBody] = useState("");
+  // key used to remount RichEditor when opening a different draft
+  const [editorKey, setEditorKey] = useState(0);
 
   const [sendConfirmId, setSendConfirmId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -107,14 +231,13 @@ export default function AdminNewsletter() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: FormState) => {
+    mutationFn: async (data: FormState & { htmlBody: string }) => {
       const res = await apiRequest("POST", "/api/admin/newsletters", data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/newsletters"] });
-      setComposerOpen(false);
-      setForm(EMPTY_FORM);
+      closeComposer();
       toast({ title: "Draft saved", description: "Newsletter draft has been created." });
     },
     onError: () =>
@@ -122,15 +245,13 @@ export default function AdminNewsletter() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: FormState }) => {
+    mutationFn: async ({ id, data }: { id: number; data: FormState & { htmlBody: string } }) => {
       const res = await apiRequest("PATCH", `/api/admin/newsletters/${id}`, data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/newsletters"] });
-      setComposerOpen(false);
-      setEditingId(null);
-      setForm(EMPTY_FORM);
+      closeComposer();
       toast({ title: "Draft updated" });
     },
     onError: () =>
@@ -167,9 +288,18 @@ export default function AdminNewsletter() {
       toast({ title: "Error", description: "Failed to delete.", variant: "destructive" }),
   });
 
+  function closeComposer() {
+    setComposerOpen(false);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setHtmlBody("");
+  }
+
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setHtmlBody("");
+    setEditorKey((k) => k + 1);
     setComposerOpen(true);
   }
 
@@ -177,26 +307,29 @@ export default function AdminNewsletter() {
     setEditingId(nl.id);
     setForm({
       subject: nl.subject,
-      htmlBody: nl.htmlBody,
       plainBody: nl.plainBody,
       recipientFilter: nl.recipientFilter,
     });
+    setHtmlBody(nl.htmlBody);
+    setEditorKey((k) => k + 1);
     setComposerOpen(true);
   }
 
   function handleSave() {
-    if (!form.subject.trim() || !form.htmlBody.trim() || !form.plainBody.trim()) {
+    const strippedHtml = htmlBody.replace(/<[^>]+>/g, "").trim();
+    if (!form.subject.trim() || !strippedHtml || !form.plainBody.trim()) {
       toast({
         title: "Missing fields",
-        description: "Please fill in subject, HTML body, and plain text body.",
+        description: "Please fill in the subject, email body, and plain text version.",
         variant: "destructive",
       });
       return;
     }
+    const payload = { ...form, htmlBody };
     if (editingId !== null) {
-      updateMutation.mutate({ id: editingId, data: form });
+      updateMutation.mutate({ id: editingId, data: payload });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   }
 
@@ -209,7 +342,7 @@ export default function AdminNewsletter() {
         <div>
           <h2 className="text-2xl font-bold">Newsletter</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Compose and send email newsletters to your members.
+            Compose and send email newsletters to your members. Each email includes a personalized greeting.
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -257,18 +390,11 @@ export default function AdminNewsletter() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEdit(nl)}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => openEdit(nl)}>
                       <Edit className="h-3.5 w-3.5 mr-1" />
                       Edit
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setSendConfirmId(nl.id)}
-                    >
+                    <Button size="sm" onClick={() => setSendConfirmId(nl.id)}>
                       <Send className="h-3.5 w-3.5 mr-1" />
                       Send
                     </Button>
@@ -344,7 +470,12 @@ export default function AdminNewsletter() {
       </Card>
 
       {/* Composer Dialog */}
-      <Dialog open={composerOpen} onOpenChange={(open) => { setComposerOpen(open); if (!open) { setEditingId(null); setForm(EMPTY_FORM); } }}>
+      <Dialog
+        open={composerOpen}
+        onOpenChange={(open) => {
+          if (!open) closeComposer();
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -354,6 +485,7 @@ export default function AdminNewsletter() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* Subject */}
             <div className="space-y-2">
               <Label htmlFor="subject">Subject Line</Label>
               <Input
@@ -364,6 +496,7 @@ export default function AdminNewsletter() {
               />
             </div>
 
+            {/* Recipient filter */}
             <div className="space-y-2">
               <Label htmlFor="recipient-filter">Send To</Label>
               <Select
@@ -385,61 +518,66 @@ export default function AdminNewsletter() {
               </Select>
               {recipientCount !== undefined && (
                 <p className="text-xs text-muted-foreground">
-                  Estimated recipients: <span className="font-semibold">{recipientCount.count}</span>
+                  Estimated recipients:{" "}
+                  <span className="font-semibold">{recipientCount.count}</span>
                 </p>
               )}
             </div>
 
+            {/* Rich-text body */}
             <div className="space-y-2">
-              <Label htmlFor="html-body">
-                Email Body (HTML)
-              </Label>
+              <Label>Email Body</Label>
               <p className="text-xs text-muted-foreground -mt-1">
-                Write the main body of the email using HTML. A branded header and footer are added automatically.
+                Use the toolbar to format your message. A personalized greeting ("Hi [Name],") and
+                branded header/footer are added automatically.
               </p>
-              <Textarea
-                id="html-body"
-                placeholder={`<p>Hi there,</p>\n<p>We're excited to share...</p>`}
-                value={form.htmlBody}
-                onChange={(e) => setForm({ ...form, htmlBody: e.target.value })}
-                className="min-h-[200px] font-mono text-sm"
+              <RichEditor
+                key={editorKey}
+                initialHtml={htmlBody}
+                onChange={setHtmlBody}
               />
             </div>
 
+            {/* Plain text */}
             <div className="space-y-2">
               <Label htmlFor="plain-body">Plain Text Version</Label>
               <p className="text-xs text-muted-foreground -mt-1">
-                Used for email clients that don't support HTML (required).
+                Shown to email clients that don't support HTML (required). A personalized greeting
+                is prepended automatically.
               </p>
               <Textarea
                 id="plain-body"
-                placeholder="Hi there,&#10;&#10;We're excited to share..."
+                placeholder={"We're excited to share some news about Wolf Mother Wellness..."}
                 value={form.plainBody}
                 onChange={(e) => setForm({ ...form, plainBody: e.target.value })}
-                className="min-h-[120px] text-sm"
+                className="min-h-[100px] text-sm"
               />
             </div>
 
             <div className="flex gap-2 justify-end pt-2">
-              <Button
-                variant="outline"
-                onClick={() => { setComposerOpen(false); setEditingId(null); setForm(EMPTY_FORM); }}
-              >
+              <Button variant="outline" onClick={closeComposer}>
                 Cancel
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={createMutation.isPending || updateMutation.isPending}
               >
-                {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save Draft"}
+                {createMutation.isPending || updateMutation.isPending
+                  ? "Saving..."
+                  : "Save Draft"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Send Confirm Dialog */}
-      <AlertDialog open={sendConfirmId !== null} onOpenChange={(open) => { if (!open) setSendConfirmId(null); }}>
+      {/* Send Confirm */}
+      <AlertDialog
+        open={sendConfirmId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSendConfirmId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Send Newsletter?</AlertDialogTitle>
@@ -447,8 +585,11 @@ export default function AdminNewsletter() {
               {sendPreviewCount !== undefined ? (
                 <>
                   This will send the newsletter to{" "}
-                  <span className="font-semibold">{sendPreviewCount.count} recipient{sendPreviewCount.count !== 1 ? "s" : ""}</span>.
-                  This action cannot be undone.
+                  <span className="font-semibold">
+                    {sendPreviewCount.count} recipient
+                    {sendPreviewCount.count !== 1 ? "s" : ""}
+                  </span>
+                  . This action cannot be undone.
                 </>
               ) : (
                 "Loading recipient count..."
@@ -467,8 +608,13 @@ export default function AdminNewsletter() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Confirm Dialog */}
-      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+      {/* Delete Confirm */}
+      <AlertDialog
+        open={deleteConfirmId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Newsletter?</AlertDialogTitle>
@@ -480,7 +626,9 @@ export default function AdminNewsletter() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteConfirmId !== null && deleteMutation.mutate(deleteConfirmId)}
+              onClick={() =>
+                deleteConfirmId !== null && deleteMutation.mutate(deleteConfirmId)
+              }
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}

@@ -281,12 +281,16 @@ export async function sendNewsletterEmail(
   try {
     const transporter = createTransporter();
 
+    const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
+    const plainGreeting = `${greeting}\n\n`;
+
     const wrappedHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 24px 32px; border-radius: 8px 8px 0 0;">
           <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: 1px;">Wolf Mother Wellness</h1>
         </div>
         <div style="padding: 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0 0 20px 0; font-size: 15px;">${greeting}</p>
           ${htmlBody}
           <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0 20px 0;">
           <p style="color: #aaa; font-size: 11px; margin: 0;">
@@ -297,11 +301,13 @@ export async function sendNewsletterEmail(
       </div>
     `;
 
+    const personalizedPlain = plainGreeting + plainBody;
+
     const msg = {
       from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
       to: toEmail,
       subject,
-      text: plainBody,
+      text: personalizedPlain,
       html: wrappedHtml,
     };
 

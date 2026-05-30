@@ -580,7 +580,7 @@ function PaymentForm({
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('manual');
+  const [paymentMethod, setPaymentMethod] = useState<'reader' | 'manual'>('reader');
   const [readerStatus, setReaderStatus] = useState<'initializing' | 'searching' | 'found' | 'connecting' | 'connected' | 'waiting' | 'processing' | 'error' | 'idle' | 'ready'>('idle');
   const [readerMessage, setReaderMessage] = useState<string>('');
   const [terminal, setTerminal] = useState<Terminal | null>(null);

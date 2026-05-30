@@ -111,6 +111,16 @@ type RichEditorProps = {
 
 function RichEditor({ initialHtml, onChange }: RichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  // Seed innerHTML once on mount (and when initialHtml identity changes, e.g. opening a
+  // different draft). Never set via dangerouslySetInnerHTML — that causes React to reset
+  // the cursor on every keystroke, making text appear backwards.
+  const seededHtml = useRef<string | null>(null);
+  useEffect(() => {
+    if (editorRef.current && initialHtml !== seededHtml.current) {
+      editorRef.current.innerHTML = initialHtml;
+      seededHtml.current = initialHtml;
+    }
+  }, [initialHtml]);
 
   const exec = useCallback((cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);
@@ -171,12 +181,11 @@ function RichEditor({ initialHtml, onChange }: RichEditorProps) {
           <option value="p">Paragraph</option>
         </select>
       </div>
-      {/* Editable area */}
+      {/* Editable area — innerHTML managed via ref, never via dangerouslySetInnerHTML */}
       <div
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
-        dangerouslySetInnerHTML={{ __html: initialHtml }}
         onInput={() => {
           if (editorRef.current) onChange(editorRef.current.innerHTML);
         }}

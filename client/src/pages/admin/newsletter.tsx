@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,16 +111,17 @@ type RichEditorProps = {
 
 function RichEditor({ initialHtml, onChange }: RichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
-  // Seed innerHTML once on mount (and when initialHtml identity changes, e.g. opening a
-  // different draft). Never set via dangerouslySetInnerHTML — that causes React to reset
-  // the cursor on every keystroke, making text appear backwards.
-  const seededHtml = useRef<string | null>(null);
+  // Capture the initial HTML only once — do NOT track the live prop.
+  // The parent passes htmlBody state as initialHtml, which changes on every keystroke.
+  // Tracking it would re-set innerHTML on every render, resetting the cursor (backwards typing).
+  // Instead: grab the value at mount time, seed it once, and let the DOM own content from there.
+  // The parent uses `editorKey` to remount this component when switching drafts.
+  const mountHtml = useRef(initialHtml);
   useEffect(() => {
-    if (editorRef.current && initialHtml !== seededHtml.current) {
-      editorRef.current.innerHTML = initialHtml;
-      seededHtml.current = initialHtml;
+    if (editorRef.current) {
+      editorRef.current.innerHTML = mountHtml.current;
     }
-  }, [initialHtml]);
+  }, []); // empty deps — run once on mount only
 
   const exec = useCallback((cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);

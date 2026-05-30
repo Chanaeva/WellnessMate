@@ -8204,6 +8204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/admin/newsletters/:id/send — send to recipients
+  // Responds immediately after marking as sent; email delivery runs in background.
   app.post("/api/admin/newsletters/:id/send", isAdmin, async (req, res) => {
     try {
       const newsletter = await storage.getNewsletterById(Number(req.params.id));
@@ -8212,23 +8213,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "This newsletter has already been sent" });
       }
 
-      const { sendNewsletterEmail } = await import("./email");
       const recipients = await storage.getNewsletterRecipients(newsletter.recipientFilter as any);
 
-      let successCount = 0;
-      for (const recipient of recipients) {
-        const ok = await sendNewsletterEmail(
-          recipient.email,
-          recipient.firstName,
-          newsletter.subject,
-          newsletter.htmlBody,
-          newsletter.plainBody
-        );
-        if (ok) successCount++;
-      }
+      // Mark as sent immediately so the UI updates right away
+      const updated = await storage.markNewsletterSent(newsletter.id, recipients.length);
+      res.json({ newsletter: updated, sent: recipients.length, total: recipients.length });
 
-      const updated = await storage.markNewsletterSent(newsletter.id, successCount);
-      res.json({ newsletter: updated, sent: successCount, total: recipients.length });
+      // Deliver emails in the background (non-blocking)
+      const { sendNewsletterEmail } = await import("./email");
+      (async () => {
+        let successCount = 0;
+        for (const recipient of recipients) {
+          const ok = await sendNewsletterEmail(
+            recipient.email,
+            recipient.firstName,
+            newsletter.subject,
+            newsletter.htmlBody,
+            newsletter.plainBody
+          );
+          if (ok) successCount++;
+        }
+        // Update actual delivery count once all emails are processed
+        await storage.markNewsletterSent(newsletter.id, successCount);
+        console.log(`Newsletter "${newsletter.subject}" delivery complete: ${successCount}/${recipients.length} sent.`);
+      })().catch((err) => console.error("Background newsletter delivery error:", err));
     } catch (error) {
       console.error("Newsletter send error:", error);
       res.status(500).json({ message: "Server error sending newsletter" });

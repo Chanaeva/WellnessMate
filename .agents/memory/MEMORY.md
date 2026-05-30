@@ -1,0 +1,2 @@
+- [Rich-text editor in Radix Dialog](rich-editor-radix.md) — contenteditable in a Radix Dialog needs key propagation stopped and innerHTML managed via a mount-only useEffect
+- [Newsletter send timeout](newsletter-send-timeout.md) — sequential email sends block the HTTP response; respond immediately then deliver in background

@@ -284,10 +284,11 @@ export async function sendNewsletterEmail(
     const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
     const plainGreeting = `${greeting}\n\n`;
 
+    // Logo embedded via CID so it displays without external URL dependencies
     const wrappedHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 24px 32px; border-radius: 8px 8px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: 1px;">Wolf Mother Wellness</h1>
+        <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 20px 32px; border-radius: 8px 8px 0 0; text-align: center;">
+          <img src="cid:wmlogo" alt="Wolf Mother Wellness" style="max-height: 90px; width: auto; display: block; margin: 0 auto;" />
         </div>
         <div style="padding: 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
           <p style="margin: 0 0 20px 0; font-size: 15px;">${greeting}</p>
@@ -309,6 +310,13 @@ export async function sendNewsletterEmail(
       subject,
       text: personalizedPlain,
       html: wrappedHtml,
+      attachments: [
+        {
+          filename: 'wm-logo.png',
+          path: new URL('../../attached_assets/WM Logo Linen Transparent_1751905199912.png', import.meta.url).pathname,
+          cid: 'wmlogo',
+        },
+      ],
     };
 
     await transporter.sendMail(msg);

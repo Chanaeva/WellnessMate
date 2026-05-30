@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import logoLinen from "@assets/WM Logo Linen Transparent_1751905199912.png";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -613,8 +614,8 @@ export default function AdminNewsletter() {
           {/* Rendered email preview matching server/email.ts wrapper */}
           <div className="border rounded-lg overflow-hidden text-sm">
             {/* Branded header */}
-            <div style={{ background: "linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%)", padding: "24px 32px" }}>
-              <h1 style={{ color: "white", margin: 0, fontSize: 22, letterSpacing: 1 }}>Wolf Mother Wellness</h1>
+            <div style={{ background: "linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%)", padding: "20px 32px", textAlign: "center" }}>
+              <img src={logoLinen} alt="Wolf Mother Wellness" style={{ maxHeight: 90, width: "auto", display: "block", margin: "0 auto" }} />
             </div>
             {/* Body */}
             <div style={{ padding: "32px", border: "1px solid #e8e8e8", borderTop: "none" }}>

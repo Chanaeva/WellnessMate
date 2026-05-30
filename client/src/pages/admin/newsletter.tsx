@@ -180,6 +180,9 @@ function RichEditor({ initialHtml, onChange }: RichEditorProps) {
         onInput={() => {
           if (editorRef.current) onChange(editorRef.current.innerHTML);
         }}
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
+        onKeyPress={(e) => e.stopPropagation()}
         className="min-h-[200px] p-3 text-sm focus:outline-none prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-blue-600 [&_a]:underline [&_h2]:text-xl [&_h2]:font-bold [&_h3]:text-lg [&_h3]:font-semibold"
         style={{ minHeight: 200 }}
       />

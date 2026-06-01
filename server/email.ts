@@ -1,6 +1,4 @@
 import nodemailer from 'nodemailer';
-import sgMail from '@sendgrid/mail';
-import { readFileSync } from 'fs';
 
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
@@ -294,44 +292,10 @@ function buildNewsletterHtml(greeting: string, htmlBody: string): string {
 
 const LOGO_PATH = new URL('../../attached_assets/WM Logo Linen Transparent_1751905199912.png', import.meta.url).pathname;
 
-// Read logo once at startup so we don't hit the filesystem on every send
-let LOGO_B64: string | null = null;
-try {
-  LOGO_B64 = readFileSync(LOGO_PATH).toString('base64');
-} catch {
-  console.warn('Newsletter logo not found — emails will send without logo image.');
-}
-
-// SendGrid credential helper (uses Replit connector — never cache the client)
-async function getSendGridClient(): Promise<{ client: typeof sgMail; fromEmail: string }> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL
-    : null;
-
-  if (!hostname || !xReplitToken) {
-    throw new Error('SendGrid: Replit connector environment variables not found.');
-  }
-
-  const settings = await fetch(
-    `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=sendgrid`,
-    { headers: { Accept: 'application/json', 'X-Replit-Token': xReplitToken } }
-  ).then(r => r.json()).then((d: any) => d.items?.[0]);
-
-  if (!settings?.settings?.api_key || !settings?.settings?.from_email) {
-    throw new Error('SendGrid not connected — check Replit integrations.');
-  }
-
-  sgMail.setApiKey(settings.settings.api_key);
-  return { client: sgMail, fromEmail: settings.settings.from_email };
-}
-
 /**
- * Send a newsletter to a list of recipients via SendGrid.
- * Delivers emails sequentially with a short delay to stay within sending limits.
- * Returns the number of successfully delivered emails.
+ * Send a newsletter to a list of recipients via Gmail using a single pooled
+ * SMTP connection. Emails are delivered sequentially with a short delay to
+ * avoid Gmail rate limits. Returns the number of successfully delivered emails.
  */
 export async function sendNewsletterBatch(
   recipients: Array<{ email: string; firstName: string }>,
@@ -339,18 +303,17 @@ export async function sendNewsletterBatch(
   htmlBody: string,
   plainBody: string,
 ): Promise<number> {
-  const { client, fromEmail } = await getSendGridClient();
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    throw new Error('Gmail credentials not configured.');
+  }
 
-  // Inline logo attachment (embedded once per email via content-id)
-  const logoAttachment = LOGO_B64
-    ? [{
-        content: LOGO_B64,
-        type: 'image/png',
-        filename: 'wm-logo.png',
-        disposition: 'inline' as const,
-        content_id: 'wmlogo',
-      }]
-    : [];
+  // One pooled transporter for the entire batch — avoids repeated SMTP auth
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    pool: true,
+    maxConnections: 1,
+    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+  });
 
   let successCount = 0;
 
@@ -358,24 +321,25 @@ export async function sendNewsletterBatch(
     const greeting = recipient.firstName ? `Hi ${recipient.firstName},` : 'Hi there,';
 
     try {
-      await client.send({
-        from: { name: 'Wolf Mother Wellness', email: fromEmail },
+      await transporter.sendMail({
+        from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
         to: recipient.email,
         subject,
         text: `${greeting}\n\n${plainBody}`,
         html: buildNewsletterHtml(greeting, htmlBody),
-        attachments: logoAttachment,
+        attachments: [{ filename: 'wm-logo.png', path: LOGO_PATH, cid: 'wmlogo' }],
       });
       console.log(`Newsletter "${subject}" sent to ${recipient.email}`);
       successCount++;
-    } catch (error: any) {
-      console.error(`Newsletter email error for ${recipient.email}:`, error?.response?.body ?? error);
+    } catch (error) {
+      console.error(`Newsletter email error for ${recipient.email}:`, error);
     }
 
-    // Brief pause between sends
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Brief pause between sends to stay within Gmail's rate limits
+    await new Promise((resolve) => setTimeout(resolve, 400));
   }
 
+  transporter.close();
   return successCount;
 }
 

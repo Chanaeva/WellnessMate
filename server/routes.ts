@@ -8220,19 +8220,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ newsletter: updated, sent: recipients.length, total: recipients.length });
 
       // Deliver emails in the background (non-blocking)
-      const { sendNewsletterEmail } = await import("./email");
+      const { sendNewsletterBatch } = await import("./email");
       (async () => {
-        let successCount = 0;
-        for (const recipient of recipients) {
-          const ok = await sendNewsletterEmail(
-            recipient.email,
-            recipient.firstName,
-            newsletter.subject,
-            newsletter.htmlBody,
-            newsletter.plainBody
-          );
-          if (ok) successCount++;
-        }
+        const successCount = await sendNewsletterBatch(
+          recipients.map(r => ({ email: r.email, firstName: r.firstName })),
+          newsletter.subject,
+          newsletter.htmlBody,
+          newsletter.plainBody,
+        );
         // Update actual delivery count once all emails are processed
         await storage.markNewsletterSent(newsletter.id, successCount);
         console.log(`Newsletter "${newsletter.subject}" delivery complete: ${successCount}/${recipients.length} sent.`);

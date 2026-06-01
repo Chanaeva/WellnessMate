@@ -271,61 +271,81 @@ export async function sendPaymentFailedAdminEmail(
   }
 }
 
-export async function sendNewsletterEmail(
-  toEmail: string,
-  firstName: string,
+function buildNewsletterHtml(greeting: string, htmlBody: string): string {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 20px 32px; border-radius: 8px 8px 0 0; text-align: center;">
+        <img src="cid:wmlogo" alt="Wolf Mother Wellness" style="max-height: 90px; width: auto; display: block; margin: 0 auto;" />
+      </div>
+      <div style="padding: 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
+        <p style="margin: 0 0 20px 0; font-size: 15px;">${greeting}</p>
+        ${htmlBody}
+        <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0 20px 0;">
+        <p style="color: #aaa; font-size: 11px; margin: 0;">
+          You're receiving this because you are a member of Wolf Mother Wellness.<br>
+          &copy; ${new Date().getFullYear()} Wolf Mother Wellness
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+const LOGO_PATH = new URL('../../attached_assets/WM Logo Linen Transparent_1751905199912.png', import.meta.url).pathname;
+
+/**
+ * Send a newsletter to a list of recipients using a single pooled SMTP connection.
+ * Emails are delivered sequentially with a short delay to avoid Gmail rate limits.
+ * Returns the number of successfully delivered emails.
+ */
+export async function sendNewsletterBatch(
+  recipients: Array<{ email: string; firstName: string }>,
   subject: string,
   htmlBody: string,
-  plainBody: string
-): Promise<boolean> {
-  try {
-    const transporter = createTransporter();
-
-    const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
-    const plainGreeting = `${greeting}\n\n`;
-
-    // Logo embedded via CID so it displays without external URL dependencies
-    const wrappedHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 20px 32px; border-radius: 8px 8px 0 0; text-align: center;">
-          <img src="cid:wmlogo" alt="Wolf Mother Wellness" style="max-height: 90px; width: auto; display: block; margin: 0 auto;" />
-        </div>
-        <div style="padding: 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
-          <p style="margin: 0 0 20px 0; font-size: 15px;">${greeting}</p>
-          ${htmlBody}
-          <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0 20px 0;">
-          <p style="color: #aaa; font-size: 11px; margin: 0;">
-            You're receiving this because you are a member of Wolf Mother Wellness.<br>
-            &copy; ${new Date().getFullYear()} Wolf Mother Wellness
-          </p>
-        </div>
-      </div>
-    `;
-
-    const personalizedPlain = plainGreeting + plainBody;
-
-    const msg = {
-      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
-      to: toEmail,
-      subject,
-      text: personalizedPlain,
-      html: wrappedHtml,
-      attachments: [
-        {
-          filename: 'wm-logo.png',
-          path: new URL('../../attached_assets/WM Logo Linen Transparent_1751905199912.png', import.meta.url).pathname,
-          cid: 'wmlogo',
-        },
-      ],
-    };
-
-    await transporter.sendMail(msg);
-    console.log(`Newsletter "${subject}" sent to ${toEmail}`);
-    return true;
-  } catch (error) {
-    console.error(`Newsletter email error for ${toEmail}:`, error);
-    return false;
+  plainBody: string,
+): Promise<number> {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+    throw new Error('Gmail credentials not configured.');
   }
+
+  // One pooled transporter for the entire batch — avoids repeated SMTP auth
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    pool: true,
+    maxConnections: 1,
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_APP_PASSWORD,
+    },
+  });
+
+  let successCount = 0;
+
+  for (const recipient of recipients) {
+    const greeting = recipient.firstName ? `Hi ${recipient.firstName},` : 'Hi there,';
+
+    try {
+      await transporter.sendMail({
+        from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+        to: recipient.email,
+        subject,
+        text: `${greeting}\n\n${plainBody}`,
+        html: buildNewsletterHtml(greeting, htmlBody),
+        attachments: [
+          { filename: 'wm-logo.png', path: LOGO_PATH, cid: 'wmlogo' },
+        ],
+      });
+      console.log(`Newsletter "${subject}" sent to ${recipient.email}`);
+      successCount++;
+    } catch (error) {
+      console.error(`Newsletter email error for ${recipient.email}:`, error);
+    }
+
+    // Brief pause between sends to stay within Gmail's rate limits
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+
+  transporter.close();
+  return successCount;
 }
 
 export async function sendGiftCardEmail(

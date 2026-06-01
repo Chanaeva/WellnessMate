@@ -8219,6 +8219,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.markNewsletterSent(newsletter.id, recipients.length);
       res.json({ newsletter: updated, sent: recipients.length, total: recipients.length });
 
+      // Capture base URL before going async (req won't be available in background)
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+      const host = (req.headers['x-forwarded-host'] as string) || req.get('host') || '';
+      const appBaseUrl = `${proto}://${host}`;
+
       // Deliver emails in the background (non-blocking)
       const { sendNewsletterBatch } = await import("./email");
       (async () => {
@@ -8227,6 +8232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           newsletter.subject,
           newsletter.htmlBody,
           newsletter.plainBody,
+          appBaseUrl,
         );
         // Update actual delivery count once all emails are processed
         await storage.markNewsletterSent(newsletter.id, successCount);

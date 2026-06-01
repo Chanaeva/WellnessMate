@@ -1,7 +1,4 @@
 import nodemailer from 'nodemailer';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
@@ -274,11 +271,11 @@ export async function sendPaymentFailedAdminEmail(
   }
 }
 
-function buildNewsletterHtml(greeting: string, htmlBody: string): string {
+function buildNewsletterHtml(greeting: string, htmlBody: string, logoUrl: string): string {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 20px 32px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="cid:wmlogo" alt="Wolf Mother Wellness" style="max-height: 90px; width: auto; display: block; margin: 0 auto;" />
+        <img src="${logoUrl}" alt="Wolf Mother Wellness" style="max-height: 90px; width: auto; display: block; margin: 0 auto;" />
       </div>
       <div style="padding: 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
         <p style="margin: 0 0 20px 0; font-size: 15px;">${greeting}</p>
@@ -293,19 +290,6 @@ function buildNewsletterHtml(greeting: string, htmlBody: string): string {
   `;
 }
 
-// Resolve logo path relative to this file — works in both dev and production
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const LOGO_PATH = join(__dirname, 'wm-logo.png');
-
-// Read once at startup; fall back gracefully if missing
-let LOGO_B64: string | null = null;
-try {
-  LOGO_B64 = readFileSync(LOGO_PATH).toString('base64');
-} catch {
-  console.warn('Newsletter logo file not found — emails will send without the logo image.');
-}
-
 /**
  * Send a newsletter to a list of recipients via Gmail using a single pooled
  * SMTP connection. Emails are delivered sequentially with a short delay to
@@ -316,10 +300,13 @@ export async function sendNewsletterBatch(
   subject: string,
   htmlBody: string,
   plainBody: string,
+  appBaseUrl: string,
 ): Promise<number> {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
     throw new Error('Gmail credentials not configured.');
   }
+
+  const logoUrl = `${appBaseUrl}/wm-logo.png`;
 
   // One pooled transporter for the entire batch — avoids repeated SMTP auth
   const transporter = nodemailer.createTransport({
@@ -340,10 +327,7 @@ export async function sendNewsletterBatch(
         to: recipient.email,
         subject,
         text: `${greeting}\n\n${plainBody}`,
-        html: buildNewsletterHtml(greeting, htmlBody),
-        attachments: LOGO_B64
-          ? [{ filename: 'wm-logo.png', content: Buffer.from(LOGO_B64, 'base64'), contentType: 'image/png', cid: 'wmlogo' }]
-          : [],
+        html: buildNewsletterHtml(greeting, htmlBody, logoUrl),
       });
       console.log(`Newsletter "${subject}" sent to ${recipient.email}`);
       successCount++;

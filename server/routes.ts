@@ -8244,6 +8244,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // DATABASE BACKUP ROUTES (admin only)
+  // ============================================
+
+  // POST /api/admin/backup — trigger a new pg_dump backup
+  app.post("/api/admin/backup", isAdmin, async (req, res) => {
+    try {
+      const { createBackup } = await import("./backup");
+      const result = await createBackup();
+      res.json({ success: true, filename: result.filename, sizeBytes: result.sizeBytes });
+    } catch (error: any) {
+      console.error("[backup] Error creating backup:", error);
+      res.status(500).json({ message: error.message || "Failed to create backup" });
+    }
+  });
+
+  // GET /api/admin/backups — list past backups with signed download URLs
+  app.get("/api/admin/backups", isAdmin, async (req, res) => {
+    try {
+      const { listBackups } = await import("./backup");
+      const backups = await listBackups();
+      res.json(backups);
+    } catch (error: any) {
+      console.error("[backup] Error listing backups:", error);
+      res.status(500).json({ message: error.message || "Failed to list backups" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

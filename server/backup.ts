@@ -18,7 +18,7 @@ function getBackupPrefix(): { bucketName: string; prefix: string } {
   if (!dir) throw new Error("PRIVATE_OBJECT_DIR not set — Object Storage not configured.");
   const base = dir.endsWith("/") ? dir : `${dir}/`;
   const { bucketName, objectName } = parseObjectPath(`${base}backups`);
-  return { bucketName, objectName: objectName + "/" };
+  return { bucketName, prefix: objectName + "/" };
 }
 
 async function signedUrl(
@@ -54,7 +54,8 @@ export interface BackupFile {
 
 /**
  * Run pg_dump, gzip the output, and upload directly to Object Storage.
- * Returns the backup filename.
+ * The promise rejects if pg_dump exits with a non-zero code or if gzip fails.
+ * Upload only happens after both pg_dump and gzip complete successfully.
  */
 export async function createBackup(): Promise<{ filename: string; sizeBytes: number }> {
   const dbUrl = process.env.DATABASE_URL;
@@ -65,10 +66,7 @@ export async function createBackup(): Promise<{ filename: string; sizeBytes: num
   const filename = `backup_${ts}.sql.gz`;
   const objectName = `${prefix}${filename}`;
 
-  const uploadUrl = await signedUrl(bucketName, objectName, "PUT", 3600);
-
   const chunks: Buffer[] = [];
-  let totalBytes = 0;
 
   await new Promise<void>((resolve, reject) => {
     const pgDump = spawn("pg_dump", [dbUrl, "--no-password"], {
@@ -77,33 +75,49 @@ export async function createBackup(): Promise<{ filename: string; sizeBytes: num
 
     const gzip = createGzip({ level: 6 });
 
+    let pgDumpExitCode: number | null = null;
+    let gzipDone = false;
+
+    function tryResolve() {
+      if (!gzipDone) return;
+      if (pgDumpExitCode === null) return;
+      if (pgDumpExitCode === 0) {
+        resolve();
+      } else {
+        reject(new Error(`pg_dump exited with code ${pgDumpExitCode}`));
+      }
+    }
+
     pgDump.stderr.on("data", (d: Buffer) => {
-      const msg = d.toString();
-      if (!msg.includes("NOTICE") && !msg.includes("pg_dump:")) {
-        console.warn("[backup] pg_dump stderr:", msg.trim());
+      const msg = d.toString().trim();
+      if (msg && !msg.startsWith("pg_dump: last built-in OID")) {
+        console.warn("[backup] pg_dump stderr:", msg);
       }
     });
 
     gzip.on("data", (chunk: Buffer) => {
       chunks.push(chunk);
-      totalBytes += chunk.length;
     });
 
-    gzip.on("end", () => resolve());
-    gzip.on("error", reject);
-    pgDump.on("error", reject);
-    pgDump.stderr.on("error", () => {});
+    gzip.on("end", () => {
+      gzipDone = true;
+      tryResolve();
+    });
 
-    pgDump.stdout.pipe(gzip);
+    gzip.on("error", (err) => reject(new Error(`Gzip error: ${err.message}`)));
+    pgDump.on("error", (err) => reject(new Error(`pg_dump spawn error: ${err.message}`)));
 
     pgDump.on("close", (code) => {
-      if (code !== 0 && code !== null) {
-        reject(new Error(`pg_dump exited with code ${code}`));
-      }
+      pgDumpExitCode = code ?? 1;
+      tryResolve();
     });
+
+    pgDump.stdout.pipe(gzip);
   });
 
   const body = Buffer.concat(chunks);
+
+  const uploadUrl = await signedUrl(bucketName, objectName, "PUT", 3600);
 
   const uploadRes = await fetch(uploadUrl, {
     method: "PUT",
@@ -118,13 +132,13 @@ export async function createBackup(): Promise<{ filename: string; sizeBytes: num
     throw new Error(`Upload failed: ${uploadRes.status} ${await uploadRes.text()}`);
   }
 
-  console.log(`[backup] Uploaded ${filename} (${body.length} bytes) to Object Storage`);
+  console.log(`[backup] Uploaded ${filename} (${body.length} bytes) to Object Storage at ${objectName}`);
   return { filename, sizeBytes: body.length };
 }
 
 /**
- * List all backups stored in Object Storage, newest first.
- * Each entry includes a short-lived signed download URL.
+ * List all backups stored in Object Storage under the backups/ prefix, newest first.
+ * Each entry includes a short-lived signed download URL valid for 1 hour.
  */
 export async function listBackups(): Promise<BackupFile[]> {
   const { bucketName, prefix } = getBackupPrefix();

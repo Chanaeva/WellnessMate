@@ -69,6 +69,14 @@ async function runStartupMigrations() {
   await runStartupMigrations();
   const server = await registerRoutes(app);
 
+  // Initialize the automatic backup scheduler after routes (and storage) are ready
+  try {
+    const { initBackupScheduler } = await import("./scheduler");
+    await initBackupScheduler();
+  } catch (err: any) {
+    log(`[scheduler] Could not initialize backup scheduler: ${err.message}`);
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

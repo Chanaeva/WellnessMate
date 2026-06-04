@@ -8272,6 +8272,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/admin/backup-schedule — update the automatic backup schedule
+  app.post("/api/admin/backup-schedule", isAdmin, async (req, res) => {
+    try {
+      const { schedule } = req.body;
+      const valid = ["disabled", "daily", "weekly"];
+      if (!valid.includes(schedule)) {
+        return res.status(400).json({ message: "Invalid schedule. Must be one of: disabled, daily, weekly." });
+      }
+      await storage.upsertSiteSetting("backupSchedule", schedule, "Automatic database backup schedule");
+      const { applySchedule } = await import("./scheduler");
+      applySchedule(schedule);
+      res.json({ schedule });
+    } catch (error: any) {
+      console.error("[backup] Error updating backup schedule:", error);
+      res.status(500).json({ message: error.message || "Failed to update backup schedule" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

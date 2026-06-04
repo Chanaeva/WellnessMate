@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Users, Calendar, ShoppingBag, Bell, Save, RefreshCw, Database, Download, HardDrive } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Settings, Users, Calendar, ShoppingBag, Bell, Save, RefreshCw, Database, Download, HardDrive, Clock } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -110,8 +111,18 @@ function SettingField({
   );
 }
 
-function DatabaseBackups() {
+type BackupScheduleValue = "disabled" | "daily" | "weekly";
+
+const SCHEDULE_LABELS: Record<BackupScheduleValue, string> = {
+  disabled: "Disabled",
+  daily: "Daily at midnight",
+  weekly: "Weekly (Sunday midnight)",
+};
+
+function DatabaseBackups({ currentSchedule }: { currentSchedule: BackupScheduleValue }) {
   const { toast } = useToast();
+  const [pendingSchedule, setPendingSchedule] = useState<BackupScheduleValue>(currentSchedule);
+  const [scheduleDirty, setScheduleDirty] = useState(false);
 
   const { data: backups = [], isLoading, refetch } = useQuery<BackupFile[]>({
     queryKey: ["/api/admin/backups"],
@@ -142,6 +153,31 @@ function DatabaseBackups() {
       });
     },
   });
+
+  const scheduleMutation = useMutation({
+    mutationFn: async (schedule: BackupScheduleValue) => {
+      const res = await apiRequest("POST", "/api/admin/backup-schedule", { schedule });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Unknown error" }));
+        throw new Error(err.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Schedule Saved", description: `Backup schedule updated to: ${SCHEDULE_LABELS[pendingSchedule]}` });
+      setScheduleDirty(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/config-settings"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleScheduleChange = (val: string) => {
+    const v = val as BackupScheduleValue;
+    setPendingSchedule(v);
+    setScheduleDirty(v !== currentSchedule);
+  };
 
   return (
     <Card>
@@ -175,7 +211,46 @@ function DatabaseBackups() {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-5">
+        {/* Automatic Schedule */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pb-4 border-b">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Automatic Backup Schedule</Label>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Automatically run a backup on a repeating schedule. Failures are logged and emailed to the Admin Alert Email address.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Select value={pendingSchedule} onValueChange={handleScheduleChange}>
+              <SelectTrigger className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="disabled">Disabled</SelectItem>
+                <SelectItem value="daily">Daily at midnight</SelectItem>
+                <SelectItem value="weekly">Weekly (Sunday midnight)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={() => scheduleMutation.mutate(pendingSchedule)}
+              disabled={!scheduleDirty || scheduleMutation.isPending}
+              variant={scheduleDirty ? "default" : "outline"}
+            >
+              {scheduleMutation.isPending ? (
+                <RefreshCw className="h-3 w-3 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3" />
+              )}
+              <span className="ml-1">{scheduleMutation.isPending ? "Saving..." : "Save"}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Backup list */}
         {isLoading ? (
           <p className="text-sm text-muted-foreground py-4 text-center">Loading backups…</p>
         ) : backups.length === 0 ? (
@@ -374,7 +449,7 @@ export default function AdminConfiguration() {
         </Card>
 
         {/* Database Backups */}
-        <DatabaseBackups />
+        <DatabaseBackups currentSchedule={(getVal("backupSchedule", "disabled") as BackupScheduleValue)} />
 
         {/* All Raw Settings */}
         <Card>

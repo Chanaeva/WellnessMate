@@ -401,3 +401,41 @@ export async function sendGiftCardEmail(
     return false;
   }
 }
+
+export async function sendBackupAlertEmail(
+  toEmail: string,
+  schedule: string,
+  errorMessage: string
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+    const now = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+
+    await transporter.sendMail({
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: toEmail,
+      subject: 'Wolf Mother Wellness - Scheduled Database Backup Failed',
+      text: `A scheduled database backup failed.\n\nSchedule: ${schedule}\nTime: ${now}\nError: ${errorMessage}\n\nPlease check the server logs and create a manual backup from the admin Configuration page.\n\nWolf Mother Wellness System`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #b91c1c;">⚠ Scheduled Database Backup Failed</h2>
+          <p>A scheduled backup did not complete successfully.</p>
+          <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+            <tr><td style="padding:6px 10px; background:#f4f4f4; font-weight:bold; width:120px;">Schedule</td><td style="padding:6px 10px;">${schedule}</td></tr>
+            <tr><td style="padding:6px 10px; background:#f4f4f4; font-weight:bold;">Time</td><td style="padding:6px 10px;">${now} CT</td></tr>
+            <tr><td style="padding:6px 10px; background:#f4f4f4; font-weight:bold;">Error</td><td style="padding:6px 10px; color:#b91c1c; font-family:monospace;">${errorMessage}</td></tr>
+          </table>
+          <p>Please check the server logs and create a manual backup from the <strong>Admin → Configuration</strong> page.</p>
+          <hr style="border:none; border-top:1px solid #eee; margin:20px 0;">
+          <p style="color:#999; font-size:12px;">Wolf Mother Wellness System</p>
+        </div>
+      `,
+    });
+
+    console.log(`Backup failure alert sent to ${toEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Gmail backup alert email error:', error);
+    return false;
+  }
+}

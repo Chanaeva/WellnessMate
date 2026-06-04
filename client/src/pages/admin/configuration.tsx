@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Users, Calendar, ShoppingBag, Bell, Save, RefreshCw, Database, Download, HardDrive, Clock } from "lucide-react";
+import { Settings, Users, Calendar, ShoppingBag, Bell, Save, RefreshCw, Database, Download, HardDrive, Clock, ExternalLink } from "lucide-react";
+import { SiGoogledrive } from "react-icons/si";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -24,6 +25,7 @@ interface BackupFile {
   sizeBytes: number;
   createdAt: string;
   downloadUrl: string;
+  source: "google-drive" | "object-storage";
 }
 
 function formatBytes(bytes: number): string {
@@ -139,9 +141,10 @@ function DatabaseBackups({ currentSchedule }: { currentSchedule: BackupScheduleV
       return res.json();
     },
     onSuccess: (data) => {
+      const where = data.source === "google-drive" ? "Google Drive" : "Object Storage";
       toast({
         title: "Backup Created",
-        description: `${data.filename} (${formatBytes(data.sizeBytes)}) saved to Object Storage.`,
+        description: `${data.filename} (${formatBytes(data.sizeBytes)}) saved to ${where}.`,
       });
       refetch();
     },
@@ -189,7 +192,7 @@ function DatabaseBackups({ currentSchedule }: { currentSchedule: BackupScheduleV
               Database Backups
             </CardTitle>
             <CardDescription className="mt-1">
-              Create a compressed snapshot of the production database and store it in Object Storage. Backups are kept indefinitely.
+              Create a compressed snapshot of the production database. Backups are saved to your Google Drive in a "Wolf Mother Wellness Backups" folder.
             </CardDescription>
           </div>
           <Button
@@ -265,21 +268,43 @@ function DatabaseBackups({ currentSchedule }: { currentSchedule: BackupScheduleV
                 key={b.name}
                 className="flex items-center justify-between p-3 rounded-lg border bg-muted/40 hover:bg-muted/60 transition-colors"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-mono font-medium truncate">{b.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-mono font-medium truncate">{b.name}</p>
+                    {b.source === "google-drive" ? (
+                      <Badge variant="outline" className="shrink-0 text-[10px] gap-1 border-blue-300 text-blue-700 bg-blue-50">
+                        <SiGoogledrive className="h-2.5 w-2.5" />
+                        Google Drive
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="shrink-0 text-[10px] gap-1">
+                        <HardDrive className="h-2.5 w-2.5" />
+                        Object Storage
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {format(new Date(b.createdAt), "MMM d, yyyy 'at' h:mm a")} &middot; {formatBytes(b.sizeBytes)}
                   </p>
                 </div>
                 <a
                   href={b.downloadUrl}
-                  download={b.name}
                   target="_blank"
                   rel="noreferrer"
+                  {...(b.source === "object-storage" ? { download: b.name } : {})}
                 >
                   <Button size="sm" variant="outline" className="shrink-0 ml-3">
-                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                    Download
+                    {b.source === "google-drive" ? (
+                      <>
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                        Open in Drive
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                        Download
+                      </>
+                    )}
                   </Button>
                 </a>
               </div>

@@ -3710,6 +3710,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // DAY PASSES: Use one-time PaymentIntent
       if (dayPassItems.length > 0) {
         let subtotal = 0;
+        // Capture resolved template info so the webhook can recover if finalize-order never runs
+        const resolvedDayPassItems: Array<{ templateId: number; qty: number; name: string }> = [];
         for (const item of dayPassItems) {
           const templates = await storage.getAllPunchCardTemplates();
           // Support both templateId and id (frontend passes whole template object with .id)
@@ -3732,6 +3734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           subtotal += template.totalPrice * quantity;
+          resolvedDayPassItems.push({ templateId: template.id, qty: quantity, name: template.name });
         }
 
         // Apply promo code discount if provided
@@ -3765,6 +3768,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: user.id.toString(),
             itemCount: dayPassItems.length.toString(),
             type: 'day_pass',
+            // Store item data so the webhook can recover if finalize-order never reaches the server
+            items: JSON.stringify(resolvedDayPassItems).slice(0, 490),
           },
         });
 
@@ -4115,6 +4120,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Handle DAY PASS (one-time) orders
+      // Dedup guard: webhook recovery may have already created punch cards and recorded payment.
+      // If a payment record for this PI already exists, skip to avoid duplicates.
+      const dayPassAlreadyFulfilled = await storage.getPaymentByStripePaymentIntentId(
+        resolvedPaymentIntentId || paymentIntentId
+      );
+      if (dayPassAlreadyFulfilled) {
+        console.log('⏭️ finalize-order: day pass payment already recorded (webhook recovery ran first), skipping duplicate fulfillment for PI', resolvedPaymentIntentId || paymentIntentId);
+        return res.json({ success: true, message: "Order finalized successfully" });
+      }
+
       for (const item of items) {
         if (item.type === 'punch_card') {
           const templates = await storage.getAllPunchCardTemplates();

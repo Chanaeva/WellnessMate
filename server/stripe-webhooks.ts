@@ -150,6 +150,67 @@ const handlePaymentIntentSucceeded = async (paymentIntent: Stripe.PaymentIntent)
       return;
     }
 
+    // ─── ONLINE PORTAL DAY PASS RECOVERY ────────────────────────────────────
+    // When finalize-order never reaches the server (network drop, tab close, etc.)
+    // the card is charged but no punch cards are created. The webhook is the safety
+    // net: if the PI has type='day_pass' and userId metadata (set by create-payment-intent
+    // for authenticated members) and no payment record exists yet, create the punch cards now.
+    if (meta.type === 'day_pass' && meta.userId && !meta.memberEmail) {
+      const userId = parseInt(meta.userId);
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        console.warn('⚠️ Webhook: online day pass recovery — user not found for userId:', meta.userId);
+      } else {
+        let recoveredItems: Array<{ templateId: number; qty: number; name: string }> = [];
+        try {
+          recoveredItems = meta.items ? JSON.parse(meta.items) : [];
+        } catch {
+          console.warn('⚠️ Webhook: online day pass recovery — could not parse items metadata for PI', paymentIntent.id);
+        }
+
+        if (recoveredItems.length === 0) {
+          console.warn('⚠️ Webhook: online day pass recovery — no item data in PI metadata, cannot create punch cards for PI', paymentIntent.id);
+        } else {
+          let totalCreated = 0;
+          for (const itemMeta of recoveredItems) {
+            const template = await storage.getPunchCardTemplateById(itemMeta.templateId);
+            if (!template) {
+              console.warn('⚠️ Webhook: online day pass recovery — template not found:', itemMeta.templateId);
+              continue;
+            }
+            const qty = Math.min(Math.max(itemMeta.qty || 1, 1), 10);
+            for (let i = 0; i < qty; i++) {
+              await storage.createPunchCard({
+                userId: user.id,
+                templateId: template.id,
+                name: template.name,
+                totalPunches: template.totalPunches,
+                remainingPunches: template.totalPunches,
+                pricePerPunch: template.pricePerPunch,
+                totalPrice: template.totalPrice,
+                status: 'active',
+              });
+              totalCreated++;
+            }
+          }
+
+          await storage.createPayment({
+            userId: user.id,
+            amount: paymentIntent.amount,
+            status: 'successful',
+            description: `Day Pass Package${totalCreated > 1 ? ` × ${totalCreated}` : ''} - Webhook Recovery (finalize-order did not reach server)`,
+            method: 'credit_card',
+            stripePaymentIntentId: paymentIntent.id,
+            stripePaymentMethodId: paymentIntent.payment_method as string,
+          });
+
+          console.log(`🎫 Webhook recovery: created ${totalCreated} punch card(s) for online member ${user.email}`);
+          return;
+        }
+      }
+    }
+
     // ─── KIOSK MEMBERSHIP GHOST PAYMENT ALERT ───────────────────────────────
     // Membership recovery requires creating a subscription and is complex.
     // Log a critical alert so staff can manually investigate via Stripe Dashboard.

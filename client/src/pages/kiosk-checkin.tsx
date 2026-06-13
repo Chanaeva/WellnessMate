@@ -24,7 +24,8 @@ import {
   Waves,
   UserPlus,
   Search,
-  Crown
+  Crown,
+  History
 } from "lucide-react";
 import KioskMemberCreation, { ExistingMember } from "./kiosk-member-creation";
 
@@ -103,6 +104,7 @@ interface WaiverQuestion {
 }
 
 interface GuestPrefill {
+  userId: number;
   firstName: string;
   lastName: string;
   email: string;
@@ -123,6 +125,19 @@ function GuestWaiverForm({ onSuccess, onCancel, prefill }: GuestWaiverFormProps)
   const { data: waiverQuestions = [] } = useQuery<WaiverQuestion[]>({
     queryKey: ["/api/waiver-questions"],
     staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: guestHistory } = useQuery<{ visitCount: number; lastVisit: string | null }>({
+    queryKey: ["/api/kiosk/guest-history", prefill?.userId],
+    queryFn: async () => {
+      const res = await fetch(`/api/kiosk/guest-history?userId=${prefill!.userId}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch guest history");
+      return res.json();
+    },
+    enabled: !!prefill?.userId,
+    staleTime: 0,
   });
   
   const form = useForm<GuestWaiverFormData>({
@@ -171,8 +186,39 @@ function GuestWaiverForm({ onSuccess, onCancel, prefill }: GuestWaiverFormProps)
     guestWaiverMutation.mutate(data);
   };
 
+  const isReturningGuest = !!prefill && !!guestHistory && guestHistory.visitCount > 0;
+
+  const formatLastVisit = (lastVisit: string | null) => {
+    if (!lastVisit) return null;
+    return new Date(lastVisit).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {isReturningGuest && (
+        <div className="flex items-center gap-3 rounded-xl border border-purple-200 bg-purple-50 px-5 py-4">
+          <History className="h-6 w-6 flex-shrink-0 text-purple-500" />
+          <div>
+            <p className="font-semibold text-purple-900">
+              Welcome back, {prefill!.firstName}! 🌊
+            </p>
+            <p className="text-sm text-purple-700">
+              You've visited{" "}
+              <span className="font-bold">{guestHistory!.visitCount}</span>{" "}
+              {guestHistory!.visitCount === 1 ? "time" : "times"} before
+              {formatLastVisit(guestHistory!.lastVisit) && (
+                <> — last visit on {formatLastVisit(guestHistory!.lastVisit)}</>
+              )}
+              .
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="text-center mb-4">
         <p className="text-lg text-muted-foreground">
           Please complete this form and sign the waiver to check in as a guest
@@ -667,6 +713,7 @@ export default function KioskCheckIn() {
                           onClick={() => {
                             if (member.isGuest) {
                               setGuestPrefill({
+                                userId: member.id,
                                 firstName: member.firstName,
                                 lastName: member.lastName,
                                 email: member.email,

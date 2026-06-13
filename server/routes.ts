@@ -1645,6 +1645,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GUEST WAIVER ROUTES
   // ============================================
 
+  // Get guest visit history by userId (kiosk - public endpoint for returning guest banner)
+  app.get("/api/kiosk/guest-history", async (req, res) => {
+    try {
+      const { userId, email } = req.query;
+      let waivers;
+      if (userId && typeof userId === 'string') {
+        const uid = parseInt(userId, 10);
+        if (isNaN(uid)) return res.status(400).json({ message: "Invalid userId" });
+        waivers = await storage.getGuestWaiversByUserId(uid);
+      } else if (email && typeof email === 'string') {
+        waivers = await storage.getGuestWaiversByEmail(email);
+      } else {
+        return res.status(400).json({ message: "userId or email is required" });
+      }
+      const visitCount = waivers.length;
+      const lastVisit = visitCount > 0 ? waivers[0].checkInTimestamp : null;
+      res.json({ visitCount, lastVisit });
+    } catch (error: any) {
+      console.error("Guest history error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create a guest waiver (kiosk - public endpoint for walk-in guests)
   app.post("/api/kiosk/guest-waiver", async (req, res) => {
     try {

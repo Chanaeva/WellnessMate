@@ -238,6 +238,7 @@ export interface IStorage {
   getAllGuestWaivers(): Promise<GuestWaiver[]>;
   getGuestWaiverById(id: number): Promise<GuestWaiver | undefined>;
   getGuestWaiversByEmail(email: string): Promise<GuestWaiver[]>;
+  getGuestWaiversByUserId(userId: number): Promise<GuestWaiver[]>;
   getTodayGuestWaivers(): Promise<GuestWaiver[]>;
   getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }>;
   getPaginatedGuestWaivers(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: GuestWaiver[]; total: number }>;
@@ -2100,6 +2101,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(guestWaivers)
       .where(eq(guestWaivers.email, email.toLowerCase()))
+      .orderBy(desc(guestWaivers.checkInTimestamp));
+  }
+
+  async getGuestWaiversByUserId(userId: number): Promise<GuestWaiver[]> {
+    return await db
+      .select()
+      .from(guestWaivers)
+      .where(eq(guestWaivers.userId, userId))
       .orderBy(desc(guestWaivers.checkInTimestamp));
   }
 

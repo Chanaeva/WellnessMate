@@ -1274,9 +1274,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
+          phoneNumber: user.phoneNumber ?? null,
           membershipId: membership?.membershipId || null,
           membershipStatus,
-          dayPassesRemaining
+          dayPassesRemaining,
+          isGuest: user.role === 'guest',
         });
       }
 
@@ -1671,7 +1673,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           answers.map(a => ({ guestWaiverId: waiver.id, questionId: a.questionId, answer: a.answer }))
         );
       }
-      
+
+      // Upsert a guest user record so this person appears in future kiosk member searches
+      try {
+        const guestUser = await storage.upsertGuestUser({
+          firstName: waiverData.firstName,
+          lastName: waiverData.lastName,
+          email: waiverData.email.toLowerCase(),
+          phoneNumber: waiverData.phoneNumber,
+        });
+        await storage.updateGuestWaiverUserId(waiver.id, guestUser.id);
+      } catch (upsertErr: any) {
+        console.warn('[guest-waiver] Could not upsert guest user (non-fatal):', upsertErr.message);
+      }
+
       console.log(`Guest waiver signed: ${waiver.firstName} ${waiver.lastName} (${waiver.email})`);
       
       res.json({ 

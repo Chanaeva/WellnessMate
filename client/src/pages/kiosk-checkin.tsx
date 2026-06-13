@@ -102,12 +102,20 @@ interface WaiverQuestion {
   sortOrder: number;
 }
 
+interface GuestPrefill {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+}
+
 interface GuestWaiverFormProps {
   onSuccess: (guestName: string) => void;
   onCancel: () => void;
+  prefill?: GuestPrefill;
 }
 
-function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
+function GuestWaiverForm({ onSuccess, onCancel, prefill }: GuestWaiverFormProps) {
   const { toast } = useToast();
   const [showWaiverText, setShowWaiverText] = useState(false);
   const [questionAnswers, setQuestionAnswers] = useState<Record<number, boolean>>({});
@@ -120,10 +128,10 @@ function GuestWaiverForm({ onSuccess, onCancel }: GuestWaiverFormProps) {
   const form = useForm<GuestWaiverFormData>({
     resolver: zodResolver(guestWaiverSchema),
     defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phoneNumber: "",
+      firstName: prefill?.firstName ?? "",
+      lastName: prefill?.lastName ?? "",
+      email: prefill?.email ?? "",
+      phoneNumber: prefill?.phoneNumber ?? "",
       waiverAgreed: false,
     },
   });
@@ -365,6 +373,7 @@ export default function KioskCheckIn() {
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [manualSearchTerm, setManualSearchTerm] = useState("");
+  const [guestPrefill, setGuestPrefill] = useState<GuestPrefill | undefined>(undefined);
   // Unified purchase flow state
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState("");
   const [selectedPurchaseMember, setSelectedPurchaseMember] = useState<ExistingMember | null>(null);
@@ -459,34 +468,31 @@ export default function KioskCheckIn() {
   };
 
   const resetToWaiting = () => {
-    // Clear any auto-resume timers
     if (autoResumeTimerRef.current) {
       clearTimeout(autoResumeTimerRef.current);
       autoResumeTimerRef.current = null;
     }
-    
     setScannerMode('waiting');
     setScanResult(null);
     setPendingMembershipId(null);
     setPendingUserId(null);
     setManualSearchTerm("");
+    setGuestPrefill(undefined);
     setPurchaseSearchTerm("");
     setSelectedPurchaseMember(null);
     setPurchaseType(null);
   };
 
   const resetAndResume = () => {
-    // Clear any auto-resume timers
     if (autoResumeTimerRef.current) {
       clearTimeout(autoResumeTimerRef.current);
       autoResumeTimerRef.current = null;
     }
-    
-    // Reset all state and go back to waiting
     setScanResult(null);
     setPendingMembershipId(null);
     setPendingUserId(null);
     setManualSearchTerm("");
+    setGuestPrefill(undefined);
     setPurchaseSearchTerm("");
     setSelectedPurchaseMember(null);
     setPurchaseType(null);
@@ -650,19 +656,31 @@ export default function KioskCheckIn() {
                         firstName: string;
                         lastName: string;
                         email: string;
+                        phoneNumber?: string | null;
                         membershipId: string | null;
                         membershipStatus: string;
                         dayPassesRemaining: number;
+                        isGuest?: boolean;
                       }) => (
                         <button
                           key={member.id}
                           onClick={() => {
+                            if (member.isGuest) {
+                              setGuestPrefill({
+                                firstName: member.firstName,
+                                lastName: member.lastName,
+                                email: member.email,
+                                phoneNumber: member.phoneNumber ?? undefined,
+                              });
+                              setManualSearchTerm("");
+                              setScannerMode('guest-waiver');
+                              return;
+                            }
                             if (member.membershipId) {
                               setPendingMembershipId(member.membershipId);
                               setPendingUserId(null);
                               checkInMutation.mutate({ membershipId: member.membershipId });
                             } else {
-                              // Check in by userId (works for day pass users or members without active membership)
                               setPendingMembershipId(null);
                               setPendingUserId(member.id);
                               checkInMutation.mutate({ userId: member.id });
@@ -680,22 +698,27 @@ export default function KioskCheckIn() {
                               <div className="text-sm text-muted-foreground">{member.email}</div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                              {member.membershipStatus === 'active' && (
+                              {member.isGuest && (
+                                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                                  Past Guest
+                                </Badge>
+                              )}
+                              {!member.isGuest && member.membershipStatus === 'active' && (
                                 <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                                   Member
                                 </Badge>
                               )}
-                              {member.membershipStatus === 'day-pass' && (
+                              {!member.isGuest && member.membershipStatus === 'day-pass' && (
                                 <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
                                   Day Pass ({member.dayPassesRemaining} left)
                                 </Badge>
                               )}
-                              {member.membershipStatus === 'expired' && (
+                              {!member.isGuest && member.membershipStatus === 'expired' && (
                                 <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                                   Expired
                                 </Badge>
                               )}
-                              {member.membershipStatus === 'none' && member.dayPassesRemaining === 0 && (
+                              {!member.isGuest && member.membershipStatus === 'none' && member.dayPassesRemaining === 0 && (
                                 <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-100">
                                   No Membership
                                 </Badge>
@@ -1053,7 +1076,9 @@ export default function KioskCheckIn() {
             {/* Guest Waiver State */}
             {scannerMode === 'guest-waiver' && (
               <GuestWaiverForm 
+                prefill={guestPrefill}
                 onSuccess={(guestName) => {
+                  setGuestPrefill(undefined);
                   setScannerMode('success');
                   setScanResult({
                     success: true,

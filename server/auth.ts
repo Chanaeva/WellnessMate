@@ -68,7 +68,8 @@ export function setupAuth(app: Express) {
           if (!user) {
             user = await storage.getUserByUsername(email);
           }
-          if (!user || !(await comparePasswords(password, user.password))) {
+          // Guest users have no password — block login attempts cleanly
+          if (!user || user.role === 'guest' || !(await comparePasswords(password, user.password))) {
             return done(null, false);
           } else {
             return done(null, user);

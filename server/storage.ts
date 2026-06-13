@@ -241,6 +241,8 @@ export interface IStorage {
   getTodayGuestWaivers(): Promise<GuestWaiver[]>;
   getGuestWaiverAnalytics(): Promise<{ total: number; today: number; thisWeek: number; thisMonth: number }>;
   getPaginatedGuestWaivers(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: GuestWaiver[]; total: number }>;
+  upsertGuestUser(data: { firstName: string; lastName: string; email: string; phoneNumber?: string | null }): Promise<User>;
+  updateGuestWaiverUserId(waiverId: number, userId: number): Promise<void>;
   
   // Waiver question methods
   getActiveWaiverQuestions(): Promise<WaiverQuestion[]>;
@@ -2205,6 +2207,50 @@ export class DatabaseStorage implements IStorage {
       .offset((page - 1) * pageSize);
 
     return { data, total: Number(countResult?.count || 0) };
+  }
+
+  async upsertGuestUser(data: { firstName: string; lastName: string; email: string; phoneNumber?: string | null }): Promise<User> {
+    const email = data.email.toLowerCase();
+    const existing = await this.getUserByEmail(email);
+
+    if (existing) {
+      if (existing.role !== 'guest') {
+        return existing;
+      }
+      const [updated] = await db
+        .update(users)
+        .set({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          ...(data.phoneNumber != null ? { phoneNumber: data.phoneNumber } : {}),
+        })
+        .where(eq(users.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const username = `guest_${email}`;
+    const [created] = await db
+      .insert(users)
+      .values({
+        username,
+        email,
+        password: '__guest_no_login__',
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber ?? null,
+        role: 'guest',
+        membershipAgreementCompleted: false,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateGuestWaiverUserId(waiverId: number, userId: number): Promise<void> {
+    await db
+      .update(guestWaivers)
+      .set({ userId })
+      .where(eq(guestWaivers.id, waiverId));
   }
 
   // Waiver question methods

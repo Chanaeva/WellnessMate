@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // User roles enum
-export const roleEnum = pgEnum('role', ['member', 'admin', 'staff']);
+export const roleEnum = pgEnum('role', ['member', 'admin', 'staff', 'guest']);
 
 // User table definition
 export const users = pgTable("users", {
@@ -761,6 +761,7 @@ export type InsertDayPassHours = z.infer<typeof insertDayPassHoursSchema>;
 // Guest waivers table - for walk-in guests who sign waivers without creating accounts
 export const guestWaivers = pgTable("guest_waivers", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
   email: text("email").notNull(),
   phoneNumber: text("phone_number"),
   firstName: text("first_name").notNull(),

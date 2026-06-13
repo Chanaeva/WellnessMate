@@ -2013,6 +2013,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all guests (role='guest') with visit counts
+  app.get("/api/admin/guests", isAdmin, async (req, res) => {
+    try {
+      const guests = await storage.getAllGuests();
+      res.json(guests);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Get waiver history for a specific guest
+  app.get("/api/admin/guests/:id/waivers", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      if (isNaN(userId)) return res.status(400).json({ message: "Invalid guest ID" });
+      const waivers = await storage.getGuestWaiversByUserId(userId);
+      res.json(waivers);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Sync all memberships with their Stripe subscription status (Admin only)
   app.post("/api/admin/sync-stripe-memberships", isAdmin, async (req, res) => {
     try {

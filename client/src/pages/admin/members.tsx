@@ -11,6 +11,7 @@ import {
   Payment,
   PunchCard,
   PaymentMethod,
+  GuestWaiver,
 } from "@shared/schema";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
@@ -146,6 +147,10 @@ export default function AdminMembers() {
   const [isCreateMembershipOpen, setIsCreateMembershipOpen] = useState(false);
   const [selectedPlanType, setSelectedPlanType] = useState<string>("");
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [activeMainTab, setActiveMainTab] = useState<"members" | "guests">("members");
+  const [selectedGuest, setSelectedGuest] = useState<(User & { visitCount: number }) | null>(null);
+  const [isViewGuestOpen, setIsViewGuestOpen] = useState(false);
+  const [guestSearchQuery, setGuestSearchQuery] = useState("");
   const [linkStripeInput, setLinkStripeInput] = useState("");
   const [linkStripeStatus, setLinkStripeStatus] = useState<{ type: "success" | "warning" | "error"; message: string; emailMismatch?: boolean; stripeCustomerId?: string; stripeEmail?: string } | null>(null);
   const [linkStripeMode, setLinkStripeMode] = useState<"id" | "email">("id");
@@ -193,6 +198,26 @@ export default function AdminMembers() {
   >({
     queryKey: ["/api/admin/members"],
     enabled: !!user && user.role === "admin",
+  });
+
+  // Fetch guests data
+  const { data: guests, isLoading: isLoadingGuests } = useQuery<
+    (User & { visitCount: number })[]
+  >({
+    queryKey: ["/api/admin/guests"],
+    enabled: !!user && user.role === "admin",
+  });
+
+  // Fetch selected guest's waiver history
+  const { data: guestWaivers, isLoading: isLoadingGuestWaivers } = useQuery<GuestWaiver[]>({
+    queryKey: ["/api/admin/guests", selectedGuest?.id, "waivers"],
+    queryFn: async () => {
+      if (!selectedGuest?.id) return [];
+      const response = await fetch(`/api/admin/guests/${selectedGuest.id}/waivers`);
+      if (!response.ok) throw new Error("Failed to fetch guest waivers");
+      return response.json();
+    },
+    enabled: !!selectedGuest && isViewGuestOpen,
   });
 
   // Fetch member's payment history
@@ -690,6 +715,8 @@ export default function AdminMembers() {
             Member Management
           </CardTitle>
           <div className="flex flex-wrap gap-2">
+            {activeMainTab === "members" && (
+            <>
             {/* Stripe Sync Button */}
             <Button
               variant="outline"
@@ -861,10 +888,27 @@ export default function AdminMembers() {
               </Form>
             </DialogContent>
             </Dialog>
+            </>
+            )}
           </div>
         </CardHeader>
 
         <CardContent>
+          {/* Main tab switch: Members / Guests */}
+          <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as "members" | "guests")} className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="members">Members</TabsTrigger>
+              <TabsTrigger value="guests">
+                Guests
+                {guests && guests.length > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-medium px-1.5 py-0.5">
+                    {guests.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+          <TabsContent value="members">
           {/* Search and Filter */}
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-1">
@@ -1238,6 +1282,94 @@ export default function AdminMembers() {
               </div>
             </div>
           )}
+          </TabsContent>
+
+          {/* Guests Tab */}
+          <TabsContent value="guests">
+            {/* Guest search */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search guests by name or email"
+                  className="pl-10"
+                  value={guestSearchQuery}
+                  onChange={(e) => setGuestSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {isLoadingGuests ? (
+              <div className="text-center py-12">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-gray-500">Loading guests...</p>
+              </div>
+            ) : (() => {
+              const filteredGuests = (guests || []).filter((g) => {
+                if (!guestSearchQuery) return true;
+                const q = guestSearchQuery.toLowerCase();
+                return (
+                  `${g.firstName} ${g.lastName}`.toLowerCase().includes(q) ||
+                  g.email.toLowerCase().includes(q)
+                );
+              });
+              return filteredGuests.length > 0 ? (
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Guest</th>
+                        <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Email</th>
+                        <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Visits</th>
+                        <th className="px-3 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredGuests.map((guest, index) => (
+                        <tr key={guest.id} className={index % 2 === 1 ? "bg-gray-50" : ""}>
+                          <td className="px-3 md:px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-medium text-xs md:text-sm">
+                                {guest.firstName.charAt(0)}{guest.lastName.charAt(0)}
+                              </div>
+                              <div className="ml-2 md:ml-3">
+                                <div className="text-sm font-medium text-gray-900">{guest.firstName} {guest.lastName}</div>
+                                <div className="text-xs text-gray-500 sm:hidden truncate max-w-[140px]">{guest.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 md:px-6 py-4 whitespace-nowrap text-gray-600 text-sm hidden sm:table-cell">{guest.email}</td>
+                          <td className="px-3 md:px-6 py-4 whitespace-nowrap">
+                            <Badge className="bg-purple-100 text-purple-700">{guest.visitCount} {guest.visitCount === 1 ? "visit" : "visits"}</Badge>
+                          </td>
+                          <td className="px-3 md:px-6 py-4 whitespace-nowrap">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-primary hover:text-primary/80 h-8 w-8 p-0"
+                              title="View Waiver History"
+                              onClick={() => { setSelectedGuest(guest); setIsViewGuestOpen(true); }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-medium text-gray-900">No guests found</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {guestSearchQuery ? "Try adjusting your search" : "No guest visitors have been recorded yet"}
+                  </p>
+                </div>
+              );
+            })()}
+          </TabsContent>
+
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -2403,6 +2535,81 @@ export default function AdminMembers() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsSyncDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Guest Dialog */}
+      <Dialog open={isViewGuestOpen} onOpenChange={(open) => { setIsViewGuestOpen(open); if (!open) setSelectedGuest(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Guest Visit History</DialogTitle>
+            <DialogDescription>
+              Viewing waiver history for {selectedGuest?.firstName} {selectedGuest?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedGuest && (
+            <div className="space-y-4">
+              {/* Guest info */}
+              <div className="grid grid-cols-2 gap-4 bg-purple-50 p-4 rounded-lg">
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Name</h4>
+                  <p className="text-sm font-medium">{selectedGuest.firstName} {selectedGuest.lastName}</p>
+                </div>
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Email</h4>
+                  <p className="text-sm">{selectedGuest.email}</p>
+                </div>
+                {selectedGuest.phoneNumber && (
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500 mb-1">Phone</h4>
+                    <p className="text-sm">{selectedGuest.phoneNumber}</p>
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-xs font-medium text-gray-500 mb-1">Total Visits</h4>
+                  <Badge className="bg-purple-100 text-purple-700">{selectedGuest.visitCount} {selectedGuest.visitCount === 1 ? "visit" : "visits"}</Badge>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Waiver History</h4>
+                {isLoadingGuestWaivers ? (
+                  <div className="text-center py-6">
+                    <div className="animate-spin h-6 w-6 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p className="text-sm text-gray-500">Loading history...</p>
+                  </div>
+                ) : guestWaivers && guestWaivers.length > 0 ? (
+                  <div className="space-y-2">
+                    {guestWaivers.map((waiver) => (
+                      <div key={waiver.id} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg border">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm font-medium">
+                              {format(new Date(waiver.checkInTimestamp), "MMM d, yyyy 'at' h:mm a")}
+                            </span>
+                          </div>
+                          {waiver.notes && (
+                            <p className="text-xs text-gray-500 ml-6">{waiver.notes}</p>
+                          )}
+                        </div>
+                        <Badge className="bg-green-100 text-green-700 text-xs">Signed</Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No waiver records found.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewGuestOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

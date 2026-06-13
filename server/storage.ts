@@ -244,6 +244,8 @@ export interface IStorage {
   getPaginatedGuestWaivers(page: number, pageSize: number, period?: string, search?: string): Promise<{ data: GuestWaiver[]; total: number }>;
   upsertGuestUser(data: { firstName: string; lastName: string; email: string; phoneNumber?: string | null }): Promise<User>;
   updateGuestWaiverUserId(waiverId: number, userId: number): Promise<void>;
+  getAllGuests(): Promise<(User & { visitCount: number })[]>;
+  getGuestWaiversByUserId(userId: number): Promise<GuestWaiver[]>;
   
   // Waiver question methods
   getActiveWaiverQuestions(): Promise<WaiverQuestion[]>;
@@ -2260,6 +2262,32 @@ export class DatabaseStorage implements IStorage {
       .update(guestWaivers)
       .set({ userId })
       .where(eq(guestWaivers.id, waiverId));
+  }
+
+  async getAllGuests(): Promise<(User & { visitCount: number })[]> {
+    const guestUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, 'guest'))
+      .orderBy(desc(users.createdAt));
+
+    const result: (User & { visitCount: number })[] = [];
+    for (const guestUser of guestUsers) {
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(guestWaivers)
+        .where(eq(guestWaivers.userId, guestUser.id));
+      result.push({ ...guestUser, visitCount: Number(countResult?.count || 0) });
+    }
+    return result;
+  }
+
+  async getGuestWaiversByUserId(userId: number): Promise<GuestWaiver[]> {
+    return await db
+      .select()
+      .from(guestWaivers)
+      .where(eq(guestWaivers.userId, userId))
+      .orderBy(desc(guestWaivers.checkInTimestamp));
   }
 
   // Waiver question methods

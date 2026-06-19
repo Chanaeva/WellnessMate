@@ -178,6 +178,9 @@ export const punchCardTemplates = pgTable("punch_card_templates", {
   stockLimit: integer("stock_limit"),
   // Optional badge label displayed on the card (e.g. "Best Value", "Popular")
   badgeText: text("badge_text"),
+  // Optional feature tags shown below the card name (e.g. ["No Expiration", "All Facilities"])
+  // null = use defaults, array = use these instead
+  featureTags: text("feature_tags").array(),
 });
 
 // Punch cards table for day pass packages

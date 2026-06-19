@@ -888,20 +888,20 @@ export default function LandingPage() {
                         </p>
                       )}
 
-                      {/* Badges */}
+                      {/* Feature labels: visit count always auto, rest from featureTags or defaults */}
                       <div className="flex flex-wrap gap-1.5 mb-5">
                         <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
                           <Clock className="h-3 w-3 mr-1" />
                           {dayPass.totalPunches} {dayPass.totalPunches === 1 ? 'Visit' : 'Visits'}
                         </Badge>
-                        <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          No Expiration
-                        </Badge>
-                        <Badge className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
-                          <Waves className="h-3 w-3 mr-1" />
-                          All Facilities
-                        </Badge>
+                        {(dayPass.featureTags && dayPass.featureTags.length > 0
+                          ? dayPass.featureTags
+                          : ['No Expiration', 'All Facilities']
+                        ).map((tag: string) => (
+                          <Badge key={tag} className="bg-secondary/80 text-secondary-foreground border-0 text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
                       </div>
 
                       <Link href="/auth?tab=register">

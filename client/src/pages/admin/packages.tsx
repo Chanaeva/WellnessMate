@@ -54,7 +54,7 @@ export default function PackagesManagement() {
   // Punch card template state
   const [editingTemplate, setEditingTemplate] = useState<PunchCardTemplate | null>(null);
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
-  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate> & { stockLimit?: number | null; badgeText?: string | null }>({
+  const [templateFormData, setTemplateFormData] = useState<Partial<InsertPunchCardTemplate> & { stockLimit?: number | null; badgeText?: string | null; featureTags?: string[] | null }>({
     name: '',
     totalPunches: 0,
     pricePerPunch: 0,
@@ -69,7 +69,9 @@ export default function PackagesManagement() {
     availableInCart: true,
     stockLimit: null,
     badgeText: null,
+    featureTags: null,
   });
+  const [customTagInput, setCustomTagInput] = useState('');
   const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
   const [templateHasAvailabilityDates, setTemplateHasAvailabilityDates] = useState(false);
   const [templateHasNoEndDate, setTemplateHasNoEndDate] = useState(false);
@@ -302,7 +304,9 @@ export default function PackagesManagement() {
       availableInCart: true,
       stockLimit: null,
       badgeText: null,
+      featureTags: null,
     });
+    setCustomTagInput('');
     setTemplateHasAvailabilityDates(false);
     setTemplateHasNoEndDate(false);
     setTemplateHasStockLimit(false);
@@ -348,7 +352,9 @@ export default function PackagesManagement() {
       availableInCart: template.availableInCart ?? true,
       stockLimit: (template as any).stockLimit ?? null,
       badgeText: (template as any).badgeText ?? null,
+      featureTags: (template as any).featureTags ?? null,
     });
+    setCustomTagInput('');
     setTemplateHasAvailabilityDates(!!(template.availableFrom || template.availableUntil));
     setTemplateHasNoEndDate(!template.availableUntil && !!template.availableFrom);
     setTemplateHasStockLimit((template as any).stockLimit !== null && (template as any).stockLimit !== undefined);
@@ -1125,6 +1131,112 @@ export default function PackagesManagement() {
                         ? `Pill will show "${templateFormData.badgeText}" on the landing page.`
                         : 'No pill selected — packages with 10+ visits show one automatically.'}
                     </p>
+                  </div>
+
+                  {/* Feature tags */}
+                  <div>
+                    <Label>Feature Labels</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Labels shown on the card (e.g. "No Expiration", "All Facilities"). The visit count is always shown automatically. Leave empty to use defaults.
+                    </p>
+                    {/* Preset options */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {['No Expiration', 'All Facilities', 'Pools & Saunas', 'Cold Plunge Included', 'Towels Included', 'Valid 1 Year', 'Weekdays Only', 'Weekends Only'].map((preset) => {
+                        const tags = templateFormData.featureTags ?? [];
+                        const isSelected = tags.includes(preset);
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => {
+                              const current = templateFormData.featureTags ?? [];
+                              const next = isSelected
+                                ? current.filter(t => t !== preset)
+                                : [...current, preset];
+                              setTemplateFormData(prev => ({ ...prev, featureTags: next.length ? next : null }));
+                            }}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                              isSelected
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-white text-muted-foreground border-border hover:border-primary/50 hover:text-primary'
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Custom tag input */}
+                    <div className="flex gap-2">
+                      <Input
+                        value={customTagInput}
+                        onChange={(e) => setCustomTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = customTagInput.trim();
+                            if (val) {
+                              const current = templateFormData.featureTags ?? [];
+                              if (!current.includes(val)) {
+                                setTemplateFormData(prev => ({ ...prev, featureTags: [...current, val] }));
+                              }
+                              setCustomTagInput('');
+                            }
+                          }
+                        }}
+                        placeholder="Custom label… (press Enter to add)"
+                        className="text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = customTagInput.trim();
+                          if (val) {
+                            const current = templateFormData.featureTags ?? [];
+                            if (!current.includes(val)) {
+                              setTemplateFormData(prev => ({ ...prev, featureTags: [...current, val] }));
+                            }
+                            setCustomTagInput('');
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium rounded border border-border hover:border-primary/50 hover:text-primary transition-colors whitespace-nowrap"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {/* Current tags */}
+                    {templateFormData.featureTags && templateFormData.featureTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {templateFormData.featureTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs bg-secondary/80 text-secondary-foreground"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = (templateFormData.featureTags ?? []).filter(t => t !== tag);
+                                setTemplateFormData(prev => ({ ...prev, featureTags: next.length ? next : null }));
+                              }}
+                              className="ml-0.5 hover:text-destructive transition-colors"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setTemplateFormData(prev => ({ ...prev, featureTags: null }))}
+                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-destructive"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+                    {!templateFormData.featureTags && (
+                      <p className="text-xs text-muted-foreground mt-1.5 italic">Using defaults: "No Expiration" + "All Facilities"</p>
+                    )}
                   </div>
                   <div className="space-y-3 border-t pt-4">
                     <div className="flex items-center space-x-2">

@@ -845,8 +845,9 @@ export default function LandingPage() {
                       {/* Badge row + price */}
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex-1 min-w-0">
-                          {/* badgeText from DB, or auto badge for value packages */}
-                          {(dayPass.badgeText || dayPass.totalPunches >= 10) && (
+                          {/* badgeText from DB, or auto badge for value packages.
+                              'none' sentinel means admin explicitly disabled the pill. */}
+                          {dayPass.badgeText !== 'none' && (dayPass.badgeText || dayPass.totalPunches >= 10) && (
                             <div className="mb-1.5">
                               {dayPass.badgeText ? (
                                 <Badge className="bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold">

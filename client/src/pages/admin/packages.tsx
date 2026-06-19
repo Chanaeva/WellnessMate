@@ -1054,15 +1054,77 @@ export default function PackagesManagement() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="template-badge-text">Badge Label <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                    <Input
-                      id="template-badge-text"
-                      value={templateFormData.badgeText || ''}
-                      onChange={(e) => setTemplateFormData(prev => ({...prev, badgeText: e.target.value || null}))}
-                      placeholder="e.g. Best Value, Popular, Limited Time"
-                      data-testid="input-template-badge-text"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Shown as a highlighted badge on the card visible to members.</p>
+                    <Label>Landing Page Pill <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <div className="mt-2 space-y-3">
+                      {/* Preset pill buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        {['Popular', 'Best Value', 'New', 'Limited Time', 'Featured', 'Sale'].map((preset) => {
+                          const isSelected = templateFormData.badgeText === preset;
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setTemplateFormData(prev => ({
+                                ...prev,
+                                badgeText: isSelected ? null : preset,
+                              }))}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                                isSelected
+                                  ? 'bg-amber-500 text-white border-amber-500'
+                                  : 'bg-white text-muted-foreground border-border hover:border-amber-400 hover:text-amber-700'
+                              }`}
+                            >
+                              {preset}
+                            </button>
+                          );
+                        })}
+                        {/* None — explicitly disables auto-badge */}
+                        <button
+                          type="button"
+                          onClick={() => setTemplateFormData(prev => ({
+                            ...prev,
+                            badgeText: prev.badgeText === 'none' ? null : 'none',
+                          }))}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                            templateFormData.badgeText === 'none'
+                              ? 'bg-gray-500 text-white border-gray-500'
+                              : 'bg-white text-muted-foreground border-border hover:border-gray-400'
+                          }`}
+                        >
+                          No pill
+                        </button>
+                      </div>
+                      {/* Custom text input — shown when value isn't a preset or 'none' */}
+                      {templateFormData.badgeText !== null &&
+                       templateFormData.badgeText !== 'none' &&
+                       !['Popular', 'Best Value', 'New', 'Limited Time', 'Featured', 'Sale'].includes(templateFormData.badgeText || '') && (
+                        <Input
+                          id="template-badge-text"
+                          value={templateFormData.badgeText || ''}
+                          onChange={(e) => setTemplateFormData(prev => ({...prev, badgeText: e.target.value || null}))}
+                          placeholder="Custom label…"
+                          data-testid="input-template-badge-text"
+                        />
+                      )}
+                      {/* Custom text entry trigger */}
+                      {(templateFormData.badgeText === null ||
+                        ['Popular', 'Best Value', 'New', 'Limited Time', 'Featured', 'Sale'].includes(templateFormData.badgeText || '')) && (
+                        <button
+                          type="button"
+                          onClick={() => setTemplateFormData(prev => ({...prev, badgeText: ''}))}
+                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                        >
+                          + Custom text
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {templateFormData.badgeText === 'none'
+                        ? 'No pill will appear on this card.'
+                        : templateFormData.badgeText
+                        ? `Pill will show "${templateFormData.badgeText}" on the landing page.`
+                        : 'No pill selected — packages with 10+ visits show one automatically.'}
+                    </p>
                   </div>
                   <div className="space-y-3 border-t pt-4">
                     <div className="flex items-center space-x-2">

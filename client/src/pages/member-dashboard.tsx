@@ -130,7 +130,7 @@ function SmsOptInToggle() {
         <p className="text-sm font-medium">SMS Text Messages</p>
         <p className="text-xs text-muted-foreground mt-0.5">
           {hasPhone
-            ? "Receive important updates and promotions via text."
+            ? "Receive important updates and promotions via text. Msg & data rates may apply. Reply STOP to unsubscribe."
             : "Add a phone number to your profile to enable SMS notifications."}
         </p>
       </div>

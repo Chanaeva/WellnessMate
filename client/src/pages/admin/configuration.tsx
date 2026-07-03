@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Users, Calendar, ShoppingBag, Bell, Save, RefreshCw, Database, Download, HardDrive, Clock, ExternalLink } from "lucide-react";
+import { Settings, Users, Calendar, ShoppingBag, Bell, Save, RefreshCw, Database, Download, HardDrive, Clock, ExternalLink, MessageSquare } from "lucide-react";
 import { SiGoogledrive } from "react-icons/si";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +42,7 @@ function SettingField({
   type = "text",
   placeholder,
   unit,
+  wide = false,
 }: {
   label: string;
   description?: string;
@@ -50,6 +51,7 @@ function SettingField({
   type?: string;
   placeholder?: string;
   unit?: string;
+  wide?: boolean;
 }) {
   const [value, setValue] = useState(currentValue);
   const [isDirty, setIsDirty] = useState(false);
@@ -79,19 +81,19 @@ function SettingField({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-4">
+    <div className={`flex gap-3 py-4 ${wide ? "flex-col" : "flex-col sm:flex-row sm:items-center"}`}>
       <div className="flex-1 min-w-0">
         <Label className="text-sm font-medium">{label}</Label>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1">
+      <div className={`flex items-start gap-2 ${wide ? "" : "shrink-0"}`}>
+        <div className="flex items-center gap-1 flex-1">
           <Input
             type={type}
             value={value}
             onChange={(e) => handleChange(e.target.value)}
             placeholder={placeholder}
-            className="w-40"
+            className={wide ? "w-full" : "w-40"}
           />
           {unit && <span className="text-sm text-muted-foreground whitespace-nowrap">{unit}</span>}
         </div>
@@ -100,6 +102,7 @@ function SettingField({
           onClick={() => saveMutation.mutate()}
           disabled={!isDirty || saveMutation.isPending}
           variant={isDirty ? "default" : "outline"}
+          className="shrink-0"
         >
           {saveMutation.isPending ? (
             <RefreshCw className="h-3 w-3 animate-spin" />
@@ -469,6 +472,37 @@ export default function AdminConfiguration() {
               type="number"
               placeholder="2"
               unit="hours before"
+            />
+          </CardContent>
+        </Card>
+
+        {/* SMS Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-teal-600" />
+              SMS Settings
+            </CardTitle>
+            <CardDescription>
+              Configure SMS opt-in messaging and compliance text sent with every outbound SMS
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y">
+            <SettingField
+              label="Opt-In Prompt Text"
+              description="Short description shown to members when they enable SMS notifications on their dashboard."
+              settingKey="smsOptInPromptText"
+              currentValue={getVal("smsOptInPromptText", "Receive important updates and promotions via text.")}
+              placeholder="Receive important updates and promotions via text."
+              wide
+            />
+            <SettingField
+              label="Opt-Out Footer"
+              description="Text automatically appended to every outbound SMS. Required for TCPA compliance."
+              settingKey="smsOptOutFooter"
+              currentValue={getVal("smsOptOutFooter", "Reply STOP to unsubscribe. Msg & data rates may apply.")}
+              placeholder="Reply STOP to unsubscribe. Msg & data rates may apply."
+              wide
             />
           </CardContent>
         </Card>

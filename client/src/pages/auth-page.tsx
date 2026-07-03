@@ -545,7 +545,7 @@ function AuthPage() {
                                 Opt in to SMS text messages (optional)
                               </FormLabel>
                               <p className="text-sm text-muted-foreground">
-                                Receive important updates, promotions, and event reminders via text. You can opt out at any time in your account settings. A phone number is required to receive messages.
+                                Receive important updates, promotions, and event reminders via text. Msg &amp; data rates may apply. Reply STOP to unsubscribe. You can opt out at any time in your account settings. A phone number is required to receive messages.
                               </p>
                             </div>
                           </FormItem>

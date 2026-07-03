@@ -8415,7 +8415,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No opted-in members with phone numbers found" });
       }
 
-      // Respond immediately, send in background
+      // Fetch opt-out footer from settings
+      const footerSetting = await storage.getSiteSetting('smsOptOutFooter');
+      const footer = footerSetting || "Reply STOP to unsubscribe. Msg & data rates may apply.";
+      const fullMessage = `${message.trim()}\n\n${footer}`;
+
+      // Create a single broadcast record upfront, update it when done
       const broadcast = await storage.createSmsBroadcast({
         message: message.trim(),
         sentBy: req.user!.id,
@@ -8425,13 +8430,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json({ id: broadcast.id, recipientCount: recipients.length, status: "sending" });
 
-      // Fire-and-forget delivery
+      // Fire-and-forget delivery — updates the same record when complete
       (async () => {
         let successCount = 0;
         let failCount = 0;
         for (const r of recipients) {
           try {
-            await sendSMS(r.phoneNumber, message.trim());
+            await sendSMS(r.phoneNumber, fullMessage);
             successCount++;
           } catch {
             failCount++;
@@ -8439,13 +8444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Small delay to avoid Twilio rate limits
           await new Promise(resolve => setTimeout(resolve, 100));
         }
-        await storage.createSmsBroadcast({
-          message: message.trim(),
-          sentBy: req.user!.id,
-          recipientCount: recipients.length,
-          successCount,
-          failCount,
-        });
+        await storage.updateSmsBroadcast(broadcast.id, { successCount, failCount });
       })().catch(e => console.error("[sms broadcast] background error:", e));
 
     } catch (error: any) {
@@ -8454,8 +8453,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/admin/sms/send — send to a single member
-  app.post("/api/admin/sms/send", isAdmin, async (req, res) => {
+  // POST /api/admin/sms/send — send to a single member (admin or staff)
+  app.post("/api/admin/sms/send", isAdminOrStaff, async (req, res) => {
     const { userId, message } = req.body;
     if (!userId || !message || typeof message !== "string" || message.trim().length === 0) {
       return res.status(400).json({ message: "userId and message are required" });
@@ -8465,7 +8464,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!member) return res.status(404).json({ message: "Member not found" });
       if (!member.phoneNumber) return res.status(400).json({ message: "Member has no phone number on file" });
 
-      await sendSMS(member.phoneNumber, message.trim());
+      // Append opt-out footer to individual messages too
+      const footerSetting = await storage.getSiteSetting('smsOptOutFooter');
+      const footer = footerSetting || "Reply STOP to unsubscribe. Msg & data rates may apply.";
+      const fullMessage = `${message.trim()}\n\n${footer}`;
+
+      await sendSMS(member.phoneNumber, fullMessage);
       res.json({ success: true, to: member.phoneNumber });
     } catch (error: any) {
       console.error("[sms send] error:", error);

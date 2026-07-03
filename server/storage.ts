@@ -332,6 +332,7 @@ export interface IStorage {
   // SMS Broadcast methods
   getOptedInSmsRecipients(): Promise<{ id: number; phoneNumber: string; firstName: string; lastName: string }[]>;
   createSmsBroadcast(data: InsertSmsBroadcast): Promise<SmsBroadcast>;
+  updateSmsBroadcast(id: number, data: Partial<SmsBroadcast>): Promise<SmsBroadcast>;
   getAllSmsBroadcasts(): Promise<SmsBroadcast[]>;
 
   // Session store
@@ -2783,6 +2784,11 @@ export class DatabaseStorage implements IStorage {
 
   async createSmsBroadcast(data: InsertSmsBroadcast): Promise<SmsBroadcast> {
     const [row] = await db.insert(smsBroadcasts).values(data).returning();
+    return row;
+  }
+
+  async updateSmsBroadcast(id: number, data: Partial<SmsBroadcast>): Promise<SmsBroadcast> {
+    const [row] = await db.update(smsBroadcasts).set(data).where(eq(smsBroadcasts.id, id)).returning();
     return row;
   }
 

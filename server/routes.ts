@@ -5582,6 +5582,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public: SMS opt-in settings (prompt text for member-facing UI)
+  app.get("/api/public/sms-settings", async (_req, res) => {
+    try {
+      const promptText = await storage.getSiteSetting('smsOptInPromptText');
+      res.json({
+        optInPromptText: promptText || "Receive important updates and promotions via text.",
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/business-date", async (_req, res) => {
     try {
       const { DateTime } = await import('luxon');

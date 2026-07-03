@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { usePageAmbient, useAudioEffects } from "@/hooks/use-audio-effects";
 import { useLocation, Link } from "wouter";
@@ -96,6 +97,12 @@ function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
+
+  const { data: smsSettings } = useQuery<{ optInPromptText: string }>({
+    queryKey: ["/api/public/sms-settings"],
+    staleTime: 10 * 60 * 1000,
+  });
+  const smsOptInPromptText = smsSettings?.optInPromptText ?? "Receive important updates, promotions, and event reminders via text.";
 
   // Check URL parameters to set default tab
   useEffect(() => {
@@ -545,7 +552,7 @@ function AuthPage() {
                                 Opt in to SMS text messages (optional)
                               </FormLabel>
                               <p className="text-sm text-muted-foreground">
-                                Receive important updates, promotions, and event reminders via text. Msg &amp; data rates may apply. Reply STOP to unsubscribe. You can opt out at any time in your account settings. A phone number is required to receive messages.
+                                {smsOptInPromptText} Msg &amp; data rates may apply. Reply STOP to unsubscribe. You can opt out at any time in your account settings. A phone number is required to receive messages.
                               </p>
                             </div>
                           </FormItem>

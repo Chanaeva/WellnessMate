@@ -102,6 +102,11 @@ function SmsOptInToggle() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const { data: smsSettings } = useQuery<{ optInPromptText: string }>({
+    queryKey: ["/api/public/sms-settings"],
+    staleTime: 10 * 60 * 1000,
+  });
+
   const mutation = useMutation({
     mutationFn: async (smsOptIn: boolean) => {
       const res = await apiRequest("PATCH", "/api/user/sms-opt-in", { smsOptIn });
@@ -123,6 +128,7 @@ function SmsOptInToggle() {
 
   const hasPhone = !!(user as any)?.phoneNumber;
   const optedIn = !!(user as any)?.smsOptIn;
+  const promptText = smsSettings?.optInPromptText ?? "Receive important updates and promotions via text.";
 
   return (
     <div className="flex items-start justify-between gap-4">
@@ -130,7 +136,7 @@ function SmsOptInToggle() {
         <p className="text-sm font-medium">SMS Text Messages</p>
         <p className="text-xs text-muted-foreground mt-0.5">
           {hasPhone
-            ? "Receive important updates and promotions via text. Msg & data rates may apply. Reply STOP to unsubscribe."
+            ? `${promptText} Msg & data rates may apply. Reply STOP to unsubscribe.`
             : "Add a phone number to your profile to enable SMS notifications."}
         </p>
       </div>

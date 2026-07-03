@@ -43,6 +43,7 @@ const registerSchema = insertUserSchema
     ageConfirmation: z.boolean().refine(val => val === true, {
       message: "You must be 18 years or older to register",
     }),
+    smsOptIn: z.boolean().optional().default(false),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -143,6 +144,7 @@ function AuthPage() {
       phoneNumber: "",
       dateOfBirth: "",
       ageConfirmation: false,
+      smsOptIn: false,
       role: "member",
     },
   });
@@ -520,6 +522,32 @@ function AuthPage() {
                               </p>
                             </div>
                             <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={registerForm.control}
+                        name="smsOptIn"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-muted/30">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value ?? false}
+                                onChange={field.onChange}
+                                className="mt-1"
+                                data-testid="checkbox-sms-opt-in"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>
+                                Opt in to SMS text messages (optional)
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Receive important updates, promotions, and event reminders via text. You can opt out at any time in your account settings. A phone number is required to receive messages.
+                              </p>
+                            </div>
                           </FormItem>
                         )}
                       />

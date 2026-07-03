@@ -15,7 +15,7 @@ import { and, eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail, sendWaitlistNotificationEmail } from "./email";
-import { sendWaitlistNotificationSMS } from "./sms";
+import { sendWaitlistNotificationSMS, sendSMS } from "./sms";
 
 const scryptAsync = promisify(scrypt);
 
@@ -8362,6 +8362,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[backup] Error updating backup schedule:", error);
       res.status(500).json({ message: error.message || "Failed to update backup schedule" });
+    }
+  });
+
+  // ── SMS Routes ──────────────────────────────────────────────────────────────
+
+  // PATCH /api/user/sms-opt-in — member self-service toggle
+  app.patch("/api/user/sms-opt-in", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const { smsOptIn } = req.body;
+    if (typeof smsOptIn !== "boolean") return res.status(400).json({ message: "smsOptIn must be a boolean" });
+    try {
+      const updated = await storage.updateUser(req.user!.id, { smsOptIn });
+      res.json({ smsOptIn: updated.smsOptIn });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to update SMS preference" });
+    }
+  });
+
+  // GET /api/admin/sms/broadcasts — list broadcast history
+  app.get("/api/admin/sms/broadcasts", isAdmin, async (req, res) => {
+    try {
+      const broadcasts = await storage.getAllSmsBroadcasts();
+      res.json(broadcasts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch broadcasts" });
+    }
+  });
+
+  // GET /api/admin/sms/recipients — preview opted-in count
+  app.get("/api/admin/sms/recipients", isAdmin, async (req, res) => {
+    try {
+      const recipients = await storage.getOptedInSmsRecipients();
+      res.json({ count: recipients.length, recipients });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch recipients" });
+    }
+  });
+
+  // POST /api/admin/sms/broadcast — send to all opted-in members
+  app.post("/api/admin/sms/broadcast", isAdmin, async (req, res) => {
+    const { message } = req.body;
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      return res.status(400).json({ message: "Message is required" });
+    }
+    if (message.length > 1600) {
+      return res.status(400).json({ message: "Message too long (max 1600 characters)" });
+    }
+    try {
+      const recipients = await storage.getOptedInSmsRecipients();
+      if (recipients.length === 0) {
+        return res.status(400).json({ message: "No opted-in members with phone numbers found" });
+      }
+
+      // Respond immediately, send in background
+      const broadcast = await storage.createSmsBroadcast({
+        message: message.trim(),
+        sentBy: req.user!.id,
+        recipientCount: recipients.length,
+        successCount: 0,
+        failCount: 0,
+      });
+      res.json({ id: broadcast.id, recipientCount: recipients.length, status: "sending" });
+
+      // Fire-and-forget delivery
+      (async () => {
+        let successCount = 0;
+        let failCount = 0;
+        for (const r of recipients) {
+          try {
+            await sendSMS(r.phoneNumber, message.trim());
+            successCount++;
+          } catch {
+            failCount++;
+          }
+          // Small delay to avoid Twilio rate limits
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        await storage.createSmsBroadcast({
+          message: message.trim(),
+          sentBy: req.user!.id,
+          recipientCount: recipients.length,
+          successCount,
+          failCount,
+        });
+      })().catch(e => console.error("[sms broadcast] background error:", e));
+
+    } catch (error: any) {
+      console.error("[sms broadcast] error:", error);
+      res.status(500).json({ message: error.message || "Failed to send broadcast" });
+    }
+  });
+
+  // POST /api/admin/sms/send — send to a single member
+  app.post("/api/admin/sms/send", isAdmin, async (req, res) => {
+    const { userId, message } = req.body;
+    if (!userId || !message || typeof message !== "string" || message.trim().length === 0) {
+      return res.status(400).json({ message: "userId and message are required" });
+    }
+    try {
+      const member = await storage.getUserById(Number(userId));
+      if (!member) return res.status(404).json({ message: "Member not found" });
+      if (!member.phoneNumber) return res.status(400).json({ message: "Member has no phone number on file" });
+
+      await sendSMS(member.phoneNumber, message.trim());
+      res.json({ success: true, to: member.phoneNumber });
+    } catch (error: any) {
+      console.error("[sms send] error:", error);
+      res.status(500).json({ message: error.message || "Failed to send SMS" });
     }
   });
 

@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,6 +97,51 @@ import { PaymentMethodCard } from "@/components/payment/payment-method-card";
 const stripePromise = fetch("/api/stripe/config")
   .then((res) => res.json())
   .then(({ publicKey }) => loadStripe(publicKey));
+
+function SmsOptInToggle() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (smsOptIn: boolean) => {
+      const res = await apiRequest("PATCH", "/api/user/sms-opt-in", { smsOptIn });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({
+        title: data.smsOptIn ? "SMS notifications enabled" : "SMS notifications disabled",
+        description: data.smsOptIn
+          ? "You'll receive text message updates from Wolf Mother Wellness."
+          : "You will no longer receive SMS messages.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update SMS preference.", variant: "destructive" });
+    },
+  });
+
+  const hasPhone = !!(user as any)?.phoneNumber;
+  const optedIn = !!(user as any)?.smsOptIn;
+
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex-1">
+        <p className="text-sm font-medium">SMS Text Messages</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {hasPhone
+            ? "Receive important updates and promotions via text."
+            : "Add a phone number to your profile to enable SMS notifications."}
+        </p>
+      </div>
+      <Switch
+        checked={optedIn}
+        onCheckedChange={(checked) => mutation.mutate(checked)}
+        disabled={!hasPhone || mutation.isPending}
+      />
+    </div>
+  );
+}
 
 export default function MemberDashboard() {
   const { user } = useAuth();
@@ -1465,6 +1511,19 @@ export default function MemberDashboard() {
                   Add New Card
                 </Button>
               </CardFooter>
+            </Card>
+
+            {/* SMS Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Notification Preferences
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SmsOptInToggle />
+              </CardContent>
             </Card>
 
             {/* External Links Section */}

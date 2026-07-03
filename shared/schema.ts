@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   isArchived: boolean("is_archived").notNull().default(false),
   archivedAt: timestamp("archived_at"),
   
+  smsOptIn: boolean("sms_opt_in").notNull().default(false),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1059,3 +1061,22 @@ export const insertNewsletterSchema = createInsertSchema(newsletters).omit({
 
 export type Newsletter = typeof newsletters.$inferSelect;
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
+
+// SMS Broadcasts table
+export const smsBroadcasts = pgTable("sms_broadcasts", {
+  id: serial("id").primaryKey(),
+  message: text("message").notNull(),
+  sentBy: integer("sent_by").notNull().references(() => users.id),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  failCount: integer("fail_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSmsBroadcastSchema = createInsertSchema(smsBroadcasts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SmsBroadcast = typeof smsBroadcasts.$inferSelect;
+export type InsertSmsBroadcast = z.infer<typeof insertSmsBroadcastSchema>;

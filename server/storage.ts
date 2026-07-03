@@ -38,6 +38,7 @@ import {
   checklistRuns, type ChecklistRun, type InsertChecklistRun,
   checklistRunItems, type ChecklistRunItem,
   newsletters, type Newsletter, type InsertNewsletter,
+  smsBroadcasts, type SmsBroadcast, type InsertSmsBroadcast,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
@@ -327,6 +328,11 @@ export interface IStorage {
   deleteNewsletter(id: number): Promise<void>;
   markNewsletterSent(id: number, sentCount: number): Promise<Newsletter>;
   getNewsletterRecipients(filter: 'all' | 'active_members' | 'day_pass_holders'): Promise<{ email: string; firstName: string }[]>;
+
+  // SMS Broadcast methods
+  getOptedInSmsRecipients(): Promise<{ id: number; phoneNumber: string; firstName: string; lastName: string }[]>;
+  createSmsBroadcast(data: InsertSmsBroadcast): Promise<SmsBroadcast>;
+  getAllSmsBroadcasts(): Promise<SmsBroadcast[]>;
 
   // Session store
   sessionStore: any;
@@ -2757,6 +2763,31 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(and(eq(users.role, 'member'), eq(users.isArchived, false)));
     return rows.map(r => ({ email: r.email, firstName: r.firstName ?? '' }));
+  }
+
+  // SMS Broadcast methods
+  async getOptedInSmsRecipients(): Promise<{ id: number; phoneNumber: string; firstName: string; lastName: string }[]> {
+    const rows = await db
+      .select({ id: users.id, phoneNumber: users.phoneNumber, firstName: users.firstName, lastName: users.lastName })
+      .from(users)
+      .where(and(eq(users.smsOptIn, true), eq(users.isArchived, false)));
+    return rows
+      .filter(r => r.phoneNumber)
+      .map(r => ({
+        id: r.id,
+        phoneNumber: r.phoneNumber!,
+        firstName: r.firstName ?? '',
+        lastName: r.lastName ?? '',
+      }));
+  }
+
+  async createSmsBroadcast(data: InsertSmsBroadcast): Promise<SmsBroadcast> {
+    const [row] = await db.insert(smsBroadcasts).values(data).returning();
+    return row;
+  }
+
+  async getAllSmsBroadcasts(): Promise<SmsBroadcast[]> {
+    return db.select().from(smsBroadcasts).orderBy(desc(smsBroadcasts.createdAt));
   }
 }
 

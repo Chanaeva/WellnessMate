@@ -170,6 +170,7 @@ export default function AdminMembers() {
     errorDetails: SyncErrorRow[];
   };
   const [syncResults, setSyncResults] = useState<SyncResults | null>(null);
+  const [smsMessage, setSmsMessage] = useState("");
   const itemsPerPage = 10;
 
   // Form for adding new member
@@ -440,10 +441,30 @@ export default function AdminMembers() {
     }
   };
 
+  // SMS send mutation
+  const sendSmsMutation = useMutation({
+    mutationFn: async ({ userId, message }: { userId: number; message: string }) => {
+      const res = await apiRequest("POST", "/api/admin/sms/send", { userId, message });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Unknown error" }));
+        throw new Error(err.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "SMS Sent", description: "Message delivered successfully." });
+      setSmsMessage("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to send SMS.", variant: "destructive" });
+    },
+  });
+
   // Handle view member
   const handleViewMember = (member: User & { membership?: Membership }) => {
     setSelectedMember(member);
     setIsViewMemberOpen(true);
+    setSmsMessage("");
   };
 
   // Handle edit member
@@ -1580,6 +1601,42 @@ export default function AdminMembers() {
                       <p className="text-sm text-yellow-800">No membership agreement on file</p>
                       <p className="text-xs text-yellow-600">Member has not signed the membership agreement yet</p>
                     </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Send SMS Section */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Send SMS
+                  </h4>
+                  {selectedMember.phoneNumber ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Send a direct text to {selectedMember.firstName} ({selectedMember.phoneNumber})</p>
+                      <Textarea
+                        value={smsMessage}
+                        onChange={(e) => setSmsMessage(e.target.value)}
+                        placeholder="Type your message…"
+                        rows={3}
+                        maxLength={1600}
+                      />
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">{smsMessage.length}/1600</span>
+                        <Button
+                          size="sm"
+                          onClick={() => sendSmsMutation.mutate({ userId: selectedMember.id, message: smsMessage })}
+                          disabled={!smsMessage.trim() || sendSmsMutation.isPending}
+                        >
+                          {sendSmsMutation.isPending ? "Sending…" : "Send SMS"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground bg-muted/40 rounded-md p-3">
+                      No phone number on file. Ask the member to add their phone number to enable SMS.
+                    </p>
                   )}
                 </div>
               </TabsContent>

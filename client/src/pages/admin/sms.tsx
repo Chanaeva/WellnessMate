@@ -48,9 +48,10 @@ export default function AdminSMS() {
       return res.json();
     },
     onSuccess: (data) => {
+      const count = data.queued ?? data.recipientCount ?? 0;
       toast({
         title: "Broadcast Queued",
-        description: `Sending to ${data.recipientCount} member${data.recipientCount !== 1 ? "s" : ""}…`,
+        description: `Sending to ${count} member${count !== 1 ? "s" : ""}…`,
       });
       setBroadcastMessage("");
       setTimeout(() => {

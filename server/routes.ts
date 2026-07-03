@@ -5585,9 +5585,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public: SMS opt-in settings (prompt text for member-facing UI)
   app.get("/api/public/sms-settings", async (_req, res) => {
     try {
-      const promptText = await storage.getSiteSetting('smsOptInPromptText');
+      const setting = await storage.getSiteSetting('smsOptInPromptText');
       res.json({
-        optInPromptText: promptText || "Receive important updates and promotions via text.",
+        optInPromptText: setting?.value || "Receive important updates and promotions via text.",
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -8429,7 +8429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fetch opt-out footer from settings
       const footerSetting = await storage.getSiteSetting('smsOptOutFooter');
-      const footer = footerSetting || "Reply STOP to unsubscribe. Msg & data rates may apply.";
+      const footer = footerSetting?.value || "Reply STOP to unsubscribe. Msg & data rates may apply.";
       const fullMessage = `${message.trim()}\n\n${footer}`;
 
       // Create a single broadcast record upfront, update it when done
@@ -8440,7 +8440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         successCount: 0,
         failCount: 0,
       });
-      res.json({ id: broadcast.id, recipientCount: recipients.length, status: "sending" });
+      res.json({ queued: recipients.length, id: broadcast.id, status: "sending" });
 
       // Fire-and-forget delivery — updates the same record when complete
       (async () => {
@@ -8478,7 +8478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Append opt-out footer to individual messages too
       const footerSetting = await storage.getSiteSetting('smsOptOutFooter');
-      const footer = footerSetting || "Reply STOP to unsubscribe. Msg & data rates may apply.";
+      const footer = footerSetting?.value || "Reply STOP to unsubscribe. Msg & data rates may apply.";
       const fullMessage = `${message.trim()}\n\n${footer}`;
 
       await sendSMS(member.phoneNumber, fullMessage);

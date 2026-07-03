@@ -911,7 +911,7 @@ export default function KioskCheckIn() {
                   </Button>
                   
                   <Button 
-                    onClick={() => setPurchaseType('membership')}
+                    onClick={() => setPurchaseType('daypass')}
                     className="bg-primary hover:bg-primary/90 text-white"
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
@@ -937,16 +937,7 @@ export default function KioskCheckIn() {
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <Button 
-                    onClick={() => setPurchaseType('membership')}
-                    size="lg"
-                    className="bg-primary hover:bg-primary/90 text-white py-8 text-lg font-semibold"
-                  >
-                    <Crown className="h-6 w-6 mr-2" />
-                    Membership
-                  </Button>
-                  
+                <div className="grid grid-cols-1 gap-4">
                   <Button 
                     onClick={() => setPurchaseType('daypass')}
                     size="lg"

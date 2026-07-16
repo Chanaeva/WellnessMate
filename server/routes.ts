@@ -7803,6 +7803,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log('✅ Membership created with subscription:', { membershipId, subscriptionId: finalSubscriptionId });
+
+        // If the user was a guest (e.g. signed a waiver previously), promote them to a full member
+        // so they appear correctly in kiosk check-in searches and can use their membership.
+        if (newUser.role === 'guest') {
+          await storage.updateUser(newUser.id, {
+            role: 'member',
+            membershipAgreementCompleted: true,
+            membershipAgreementDate: newUser.membershipAgreementDate || new Date(),
+          });
+          console.log(`✅ Promoted guest user ${newUser.id} to member role after membership purchase`);
+        }
         
         // Handle additional members for multi-membership purchases
         // Note: Max 3 additional members validation is done at the start of this endpoint

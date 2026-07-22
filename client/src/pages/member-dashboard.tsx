@@ -867,11 +867,13 @@ export default function MemberDashboard() {
                       const dayOfWeek = selectedDateObj.getDay();
                       const sessionAvailableDays = (session as any).availableDays ?? [0, 1, 2, 3, 4, 5, 6];
                       const isAvailableOnDay = sessionAvailableDays.includes(dayOfWeek);
+                      // Morning sessions must be booked the day before — same-day not allowed
+                      const isMorningSameDayClosed = session.sessionType === 'morning' && selectedBookingDate === businessToday;
 
                       return (
                         <div 
                           key={session.id} 
-                          className={`p-4 rounded-lg border ${bgColor} space-y-3 ${!isAvailableOnDay ? 'opacity-50' : ''}`}
+                          className={`p-4 rounded-lg border ${bgColor} space-y-3 ${(!isAvailableOnDay || isMorningSameDayClosed) ? 'opacity-50' : ''}`}
                         >
                           <div className="flex items-center gap-2">
                             <Icon className={`h-5 w-5 ${iconColor}`} />
@@ -891,6 +893,10 @@ export default function MemberDashboard() {
                           {!isAvailableOnDay ? (
                             <div className="text-sm text-muted-foreground italic">
                               Not available on {['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][dayOfWeek]}
+                            </div>
+                          ) : isMorningSameDayClosed ? (
+                            <div className="text-sm text-muted-foreground italic">
+                              Booking closed — morning sessions must be reserved the day before.
                             </div>
                           ) : isBooked ? (
                             <div className="space-y-2">

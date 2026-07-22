@@ -5682,8 +5682,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return hours * 60 + minutes;
       };
       
-      // For same-day bookings, check if the session time window is still open for booking
-      if (bookingDateInBusinessTz.equals(todayInBusinessTz)) {
+      // Morning sessions must be booked the day before — same-day morning booking is never allowed
+      if (sessionType === 'morning' && bookingDateInBusinessTz.equals(todayInBusinessTz)) {
+        return res.status(400).json({
+          message: "Morning sessions must be booked the day before. Please select tomorrow or a future date."
+        });
+      }
+
+      // For same-day evening bookings, check if the booking window is still open
+      if (sessionType === 'evening' && bookingDateInBusinessTz.equals(todayInBusinessTz)) {
         const currentMinutes = nowInBusinessTz.hour * 60 + nowInBusinessTz.minute;
         const sessionStartMinutes = parseTimeToMinutes(config.startTime);
         const sessionEndMinutes = parseTimeToMinutes(config.endTime);

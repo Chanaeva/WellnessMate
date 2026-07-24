@@ -1566,6 +1566,63 @@ export default function AdminMembers() {
 
                 <Separator />
 
+                {/* Stripe Status */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Stripe Status
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {/* Customer row */}
+                    <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {selectedMember.stripeCustomerId ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-700">Stripe Customer</p>
+                          {selectedMember.stripeCustomerId ? (
+                            <p className="text-xs text-gray-500 font-mono truncate">{selectedMember.stripeCustomerId}</p>
+                          ) : (
+                            <p className="text-xs text-gray-400">Not linked — will be created automatically next time a payment method is added</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subscription row */}
+                    <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {selectedMember.membership?.stripeSubscriptionId ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-700">Stripe Subscription</p>
+                          {selectedMember.membership?.stripeSubscriptionId ? (
+                            <p className="text-xs text-gray-500 font-mono truncate">{selectedMember.membership.stripeSubscriptionId}</p>
+                          ) : selectedMember.membership ? (
+                            <p className="text-xs text-gray-400">
+                              {selectedMember.stripeCustomerId
+                                ? memberPaymentMethods && memberPaymentMethods.length > 0
+                                  ? 'Customer linked but no subscription — use "Create Subscription" in the Membership section above'
+                                  : 'Add a card in the Payments tab, then use "Create Subscription"'
+                                : 'Link a Stripe customer first via the Edit dialog'}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-400">No membership — create one first</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
                 <div>
                   <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
                     <Download className="h-4 w-4 mr-2" />

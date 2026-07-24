@@ -2299,11 +2299,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const memberId = parseInt(req.params.id);
       const { password, email, ...updateData } = req.body;
+
+      // Fetch existing user before update so we can compare and sync to Stripe
+      const existingUser = await storage.getUser(memberId);
       
       // If email is being changed, check if it's already in use
       if (email) {
-        const existingUser = await storage.getUserByEmail(email);
-        if (existingUser && existingUser.id !== memberId) {
+        const existingByEmail = await storage.getUserByEmail(email);
+        if (existingByEmail && existingByEmail.id !== memberId) {
           return res.status(400).json({ message: "This email address is already in use by another member" });
         }
         updateData.email = email;
@@ -2317,6 +2320,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedUser = await storage.updateUser(memberId, updateData);
+
+      // Sync relevant profile changes to Stripe (non-fatal)
+      const stripeId = existingUser?.stripeCustomerId;
+      if (stripeId) {
+        try {
+          const stripeUpdates: Record<string, any> = {};
+          if (email !== undefined) stripeUpdates.email = email;
+          const newFirst = updateData.firstName ?? updatedUser.firstName ?? '';
+          const newLast  = updateData.lastName  ?? updatedUser.lastName  ?? '';
+          if (updateData.firstName !== undefined || updateData.lastName !== undefined) {
+            stripeUpdates.name = `${newFirst} ${newLast}`.trim();
+          }
+          if (updateData.phoneNumber !== undefined) {
+            stripeUpdates.phone = updateData.phoneNumber || null;
+          }
+          if (Object.keys(stripeUpdates).length > 0) {
+            const freshStripe = createStripeClient();
+            await freshStripe.customers.update(stripeId, stripeUpdates);
+            console.log(`✅ [Admin update-member] Synced profile to Stripe customer ${stripeId}`);
+          }
+        } catch (stripeErr: any) {
+          console.warn(`⚠️ [Admin update-member] Could not sync to Stripe for user ${memberId}: ${stripeErr.message}`);
+        }
+      }
+
       res.json(updatedUser);
     } catch (error: any) {
       // Handle unique constraint violation
@@ -4547,6 +4575,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: 'member'
       });
 
+      // Auto-create a Stripe Customer for the new member so billing can start
+      const freshStripeForCreate = createStripeClient();
+      let stripeCustomerId: string | undefined;
+      let stripeNote: string | undefined;
+      try {
+        const customer = await freshStripeForCreate.customers.create({
+          email: newUser.email || undefined,
+          name: `${newUser.firstName} ${newUser.lastName}`.trim(),
+          metadata: { userId: newUser.id.toString(), source: 'admin_portal' },
+        });
+        stripeCustomerId = customer.id;
+        await storage.updateUserStripeCustomerId(newUser.id, stripeCustomerId);
+        console.log(`✅ [Admin create-member] Created Stripe customer ${stripeCustomerId} for user ${newUser.id}`);
+      } catch (stripeErr: any) {
+        console.warn(`⚠️ [Admin create-member] Could not create Stripe customer for user ${newUser.id}: ${stripeErr.message}`);
+        stripeNote = 'Stripe customer could not be created automatically — link one from the member profile when ready.';
+      }
+
       // Generate unique membership ID
       const membershipId = `WM-${String(newUser.id).padStart(3, '0')}`;
       
@@ -4564,9 +4610,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: endDate.toISOString(),
       });
 
+      // Attempt to create a Stripe Subscription if the plan has a price ID and the
+      // customer already has a saved payment method (rare for brand-new members, but
+      // possible if admin pre-loaded a card via the setup-intent flow).
+      let stripeSubscriptionId: string | undefined;
+      if (stripeCustomerId) {
+        try {
+          const allPlans = await storage.getAllMembershipPlans();
+          const plan = allPlans.find(p => p.planType === planType && p.isActive);
+
+          if (plan?.stripePriceId) {
+            const paymentMethods = await freshStripeForCreate.paymentMethods.list({
+              customer: stripeCustomerId,
+              type: 'card',
+            });
+
+            if (paymentMethods.data.length > 0) {
+              const defaultPM = paymentMethods.data[0].id;
+              await freshStripeForCreate.customers.update(stripeCustomerId, {
+                invoice_settings: { default_payment_method: defaultPM },
+              });
+              // trial_end = membership end date so the first recurring charge aligns with renewal
+              const trialEnd = Math.floor(endDate.getTime() / 1000);
+              const subscription = await freshStripeForCreate.subscriptions.create({
+                customer: stripeCustomerId,
+                items: [{ price: plan.stripePriceId }],
+                default_payment_method: defaultPM,
+                trial_end: trialEnd,
+                metadata: {
+                  source: 'admin_portal',
+                  membershipId,
+                  userId: newUser.id.toString(),
+                },
+              });
+              stripeSubscriptionId = subscription.id;
+              await storage.updateMembership(membershipId, { stripeSubscriptionId });
+              console.log(`✅ [Admin create-member] Created Stripe subscription ${stripeSubscriptionId} for membership ${membershipId}`);
+            } else {
+              stripeNote = (stripeNote ? stripeNote + ' ' : '') + 'No payment method on file — add a card in the member profile to activate the subscription.';
+            }
+          } else {
+            stripeNote = (stripeNote ? stripeNote + ' ' : '') + 'No Stripe price configured for this plan — sync plans with Stripe first to enable auto-billing.';
+          }
+        } catch (subErr: any) {
+          console.warn(`⚠️ [Admin create-member] Could not create subscription for membership ${membershipId}: ${subErr.message}`);
+          stripeNote = (stripeNote ? stripeNote + ' ' : '') + 'Subscription could not be created automatically — use "Create Subscription" in the member profile.';
+        }
+      }
+
       res.json({ 
-        user: { ...newUser, password: undefined }, 
-        membership 
+        user: { ...newUser, password: undefined, stripeCustomerId }, 
+        membership: { ...membership, stripeSubscriptionId },
+        stripeCustomerId,
+        stripeSubscriptionId,
+        stripeNote,
       });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to create member: " + error.message });

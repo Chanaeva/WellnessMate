@@ -13,7 +13,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  CardElement,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useStripe,
+  useElements,
+} from "@stripe/react-stripe-js";
+import { loadStripeTerminal } from "@stripe/terminal-js";
 import logoMossGreen from "@assets/WM Emblem Moss Green.png";
 import { 
   CheckCircle, 
@@ -27,6 +36,14 @@ import {
   Crown,
   History,
   Gift,
+  CreditCard,
+  Wifi,
+  WifiOff,
+  Loader2,
+  RefreshCw,
+  Shield,
+  HelpCircle,
+  Radio,
 } from "lucide-react";
 import KioskMemberCreation, { ExistingMember } from "./kiosk-member-creation";
 
@@ -427,59 +444,253 @@ interface GiftCardPackage {
   availableOnKiosk: boolean;
 }
 
-// ─── Gift Card Payment (inner Stripe hook component) ─────────────────────────
+// ─── Gift Card Payment (inner Stripe hook component — mirrors day pass PaymentForm) ───
+
+interface GiftCardPaymentFormData {
+  templateId: number;
+  packageName: string;
+  totalPunches: number;
+  totalPrice: number;
+  recipientEmail: string;
+  recipientName: string;
+  purchaserEmail: string;
+  purchaserName: string;
+  personalMessage: string;
+}
 
 function GiftCardPaymentInner({
-  clientSecret,
-  paymentIntentId,
   formData,
   onSuccess,
   onBack,
 }: {
-  clientSecret: string;
-  paymentIntentId: string;
-  formData: {
-    templateId: number;
-    recipientEmail: string;
-    recipientName: string;
-    purchaserEmail: string;
-    purchaserName: string;
-    personalMessage: string;
-    packageName: string;
-    amount: number;
-    totalPunches: number;
-  };
+  formData: GiftCardPaymentFormData;
   onSuccess: () => void;
   onBack: () => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
-  const [isPending, setIsPending] = useState(false);
 
-  const handlePay = async () => {
-    if (!stripe || !elements) return;
-    setIsPending(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"reader" | "manual">("reader");
+  const [readerStatus, setReaderStatus] = useState<
+    "idle" | "ready" | "searching" | "found" | "connecting" | "connected" | "processing" | "error"
+  >("idle");
+  const [readerMessage, setReaderMessage] = useState("");
+  const [discoveredReaders, setDiscoveredReaders] = useState<any[]>([]);
+  const [selectedServerReader, setSelectedServerReader] = useState<any>(null);
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [billingZip, setBillingZip] = useState("");
+  const [cardError, setCardError] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+  const paymentMethodRef = useRef(paymentMethod);
+  useEffect(() => { paymentMethodRef.current = paymentMethod; }, [paymentMethod]);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+  const elementOptions = {
+    style: {
+      base: {
+        fontSize: "18px",
+        color: "#1f2937",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        lineHeight: "1.5",
+        "::placeholder": { color: "#6b7280" },
+        iconColor: "#374151",
+        padding: "16px 0",
+      },
+      invalid: { color: "#ef4444", iconColor: "#ef4444" },
+      complete: { color: "#059669", iconColor: "#059669" },
+    },
+  };
+
+  // ── Finalize gift card after payment succeeds ──────────────────────────────
+  const finalizeGiftCard = async (paymentIntentId: string) => {
+    const res = await fetch("/api/kiosk/gift-card-purchase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paymentIntentId,
+        personalMessage: formData.personalMessage || undefined,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || "Failed to create gift card");
+    }
+  };
+
+  // ── Reader: scan for readers ───────────────────────────────────────────────
+  const scanForReaders = async () => {
     try {
-      const cardEl = elements.getElement(CardElement);
-      if (!cardEl) throw new Error("Card element not found");
+      setReaderStatus("searching");
+      setReaderMessage("Searching for card readers…");
+      setDiscoveredReaders([]);
+      setSelectedServerReader(null);
 
-      const { error: stripeError } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: { card: cardEl },
-      });
+      const res = await fetch("/api/stripe/terminal/discover-readers");
+      const result = await res.json();
 
-      if (stripeError) {
-        toast({ title: "Payment Failed", description: stripeError.message, variant: "destructive" });
-        setIsPending(false);
-        return;
+      if (!mountedRef.current || paymentMethodRef.current !== "reader") return;
+
+      if (result.readers && result.readers.length > 0) {
+        setDiscoveredReaders(result.readers);
+        const reader = result.readers[0];
+        setSelectedServerReader(reader);
+        setReaderStatus("connected");
+        setReaderMessage(`Connected to ${reader.label}`);
+      } else {
+        setReaderStatus("ready");
+        setReaderMessage("No card readers found. Make sure your WisePOS E is powered on and registered in Stripe.");
+        setShowTroubleshooting(true);
       }
+    } catch (err: any) {
+      if (!mountedRef.current || paymentMethodRef.current !== "reader") return;
+      setReaderStatus("ready");
+      setReaderMessage(err.message || "Scan failed. Try again.");
+      setShowTroubleshooting(true);
+    }
+  };
 
-      // Payment confirmed — finalize gift card on server
-      const res = await fetch("/api/kiosk/gift-card-purchase", {
+  const retryDiscovery = () => {
+    setConnectionAttempts((n) => n + 1);
+    setSelectedServerReader(null);
+    setDiscoveredReaders([]);
+    setShowTroubleshooting(false);
+    scanForReaders();
+  };
+
+  // Auto-scan when switching to reader mode
+  useEffect(() => {
+    if (paymentMethod === "reader" && !selectedServerReader) {
+      scanForReaders();
+    } else if (paymentMethod === "manual") {
+      setReaderStatus("idle");
+      setReaderMessage("");
+      setDiscoveredReaders([]);
+      setShowTroubleshooting(false);
+      setSelectedServerReader(null);
+    }
+  }, [paymentMethod]);
+
+  // ── Reader payment ─────────────────────────────────────────────────────────
+  const handleReaderPayment = async () => {
+    if (!selectedServerReader) {
+      toast({ title: "Reader Not Connected", description: "Please wait for the reader to connect or use manual entry.", variant: "destructive" });
+      return;
+    }
+    setIsProcessing(true);
+    setReaderStatus("processing");
+    setReaderMessage("Creating payment…");
+
+    let paymentIntentId: string | null = null;
+
+    try {
+      // Step 1: create a Terminal-mode PI
+      const piRes = await fetch("/api/kiosk/gift-card-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paymentIntentId,
+          templateId: formData.templateId,
+          recipientEmail: formData.recipientEmail,
+          recipientName: formData.recipientName,
+          purchaserEmail: formData.purchaserEmail,
+          purchaserName: formData.purchaserName,
+          personalMessage: formData.personalMessage || undefined,
+          useTerminal: true,
+        }),
+      });
+      if (!piRes.ok) { const e = await piRes.json(); throw new Error(e.message); }
+      const piData = await piRes.json();
+      paymentIntentId = piData.paymentIntentId;
+
+      // Step 2: present to reader
+      setReaderMessage("Please tap, insert, or swipe your card on the reader…");
+      const processRes = await fetch("/api/stripe/terminal/process-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ readerId: selectedServerReader.id, paymentIntentId }),
+      });
+      if (!processRes.ok) { const e = await processRes.json(); throw new Error(e.message || "Failed to send payment to reader"); }
+
+      // Step 3: poll reader action
+      const maxPolls = 120;
+      let pollCount = 0;
+      let readerDone = false;
+      while (pollCount < maxPolls && !readerDone) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const statusRes = await fetch(`/api/stripe/terminal/reader-status/${selectedServerReader.id}`);
+        const statusData = await statusRes.json();
+        if (statusData.action?.status === "succeeded") { readerDone = true; }
+        else if (statusData.action?.status === "failed") { throw new Error(statusData.action.failure_message || "Payment failed on reader"); }
+        else if (!statusData.action) { readerDone = true; }
+        pollCount++;
+      }
+      if (!readerDone) throw new Error("Card reader timed out. Please try again.");
+
+      // Step 4: poll PI until succeeded
+      setReaderMessage("Card accepted! Processing payment…");
+      let piSucceeded = false;
+      for (let i = 0; i < 30 && !piSucceeded; i++) {
+        const piStatusRes = await fetch(`/api/stripe/payment-intent-status/${paymentIntentId}`);
+        if (piStatusRes.ok) {
+          const piStatus = await piStatusRes.json();
+          if (piStatus.status === "succeeded") { piSucceeded = true; }
+          else if (piStatus.status === "canceled" || piStatus.status === "requires_payment_method") {
+            throw new Error("Payment was declined. Please try a different card.");
+          }
+        }
+        if (!piSucceeded) await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (!piSucceeded) throw new Error("Payment processing timed out. Please let a staff member know.");
+      if (!paymentIntentId) throw new Error("Payment intent ID missing after polling.");
+
+      // Step 5: finalize gift card
+      setReaderMessage("Payment successful! Creating gift card…");
+      await finalizeGiftCard(paymentIntentId);
+
+      toast({ title: "Payment Successful", description: `Gift card sent to ${formData.recipientName}!` });
+      onSuccess();
+    } catch (err: any) {
+      console.error("[Card Reader] Gift card payment error:", err);
+      if (selectedServerReader && paymentIntentId) {
+        fetch("/api/stripe/terminal/cancel-action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ readerId: selectedServerReader.id }),
+        }).catch(() => {});
+      }
+      setReaderStatus("error");
+      setReaderMessage(err.message || "Payment failed. Please try again.");
+      toast({ title: "Payment Failed", description: err.message || "Failed to process payment", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => {
+        if (selectedServerReader) {
+          setReaderStatus("connected");
+          setReaderMessage(`Connected to ${selectedServerReader.label}`);
+        }
+      }, 2000);
+    }
+  };
+
+  // ── Manual card payment ────────────────────────────────────────────────────
+  const handleManualPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setIsProcessing(true);
+    setCardError(null);
+
+    const cardNumberElement = elements.getElement(CardNumberElement);
+    if (!cardNumberElement) { setIsProcessing(false); return; }
+
+    try {
+      // Create a standard (non-Terminal) PI
+      const piRes = await fetch("/api/kiosk/gift-card-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           templateId: formData.templateId,
           recipientEmail: formData.recipientEmail,
           recipientName: formData.recipientName,
@@ -488,57 +699,273 @@ function GiftCardPaymentInner({
           personalMessage: formData.personalMessage || undefined,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to create gift card");
+      if (!piRes.ok) { const e = await piRes.json(); throw new Error(e.message || "Failed to create payment"); }
+      const { clientSecret, paymentIntentId } = await piRes.json();
+      if (!clientSecret) throw new Error("Failed to create payment. Please try again.");
+
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardNumberElement,
+          billing_details: {
+            name: formData.purchaserName,
+            email: formData.purchaserEmail,
+            address: { postal_code: billingZip },
+          },
+        },
+      });
+
+      if (error) {
+        toast({ title: "Payment Failed", description: error.message, variant: "destructive" });
+      } else if (paymentIntent?.status === "succeeded") {
+        await finalizeGiftCard(paymentIntentId);
+        toast({ title: "Payment Successful", description: `Gift card sent to ${formData.recipientName}!` });
+        onSuccess();
       }
-      onSuccess();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-      setIsPending(false);
+      toast({ title: "Error", description: err.message || "Failed to process payment", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold">Payment</h3>
-        <Button variant="outline" onClick={onBack} disabled={isPending}>
+        <h2 className="text-2xl font-bold">Payment Information</h2>
+        <Button variant="outline" onClick={onBack} disabled={isProcessing}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
       </div>
 
-      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-green-900">{formData.packageName}</p>
-            <p className="text-sm text-green-700">
-              {formData.totalPunches} day pass{formData.totalPunches > 1 ? "es" : ""} for {formData.recipientName}
+      {/* Order summary */}
+      <div className="bg-gray-50 p-6 rounded-lg space-y-2">
+        <h3 className="font-semibold mb-2">Order Summary</h3>
+        <div className="flex justify-between text-sm">
+          <span>Package:</span>
+          <span className="font-medium">{formData.packageName}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span>Passes:</span>
+          <span className="font-medium">{formData.totalPunches} day pass{formData.totalPunches > 1 ? "es" : ""}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span>Recipient:</span>
+          <span className="font-medium">{formData.recipientName}</span>
+        </div>
+        <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
+          <span>Total:</span>
+          <span>${(formData.totalPrice / 100).toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Payment method toggle */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={paymentMethod === "reader" ? "default" : "outline"}
+          onClick={() => setPaymentMethod("reader")}
+          disabled={isProcessing}
+          className="flex-1"
+        >
+          <Wifi className="h-4 w-4 mr-2" />
+          Card Reader
+        </Button>
+        <Button
+          type="button"
+          variant={paymentMethod === "manual" ? "default" : "outline"}
+          onClick={() => setPaymentMethod("manual")}
+          disabled={isProcessing}
+          className="flex-1"
+        >
+          <CreditCard className="h-4 w-4 mr-2" />
+          Manual Entry
+        </Button>
+      </div>
+
+      {/* ── Card reader UI ── */}
+      {paymentMethod === "reader" && (
+        <div className="space-y-6">
+          <div className={`p-6 border-2 rounded-lg ${
+            readerStatus === "connected" ? "border-green-500 bg-green-50" :
+            readerStatus === "processing" ? "border-blue-500 bg-blue-50" :
+            readerStatus === "error" ? "border-red-500 bg-red-50" :
+            readerStatus === "ready" ? "border-blue-400 bg-blue-50" :
+            readerStatus === "searching" ? "border-blue-300 bg-blue-50" :
+            "border-gray-300 bg-gray-50"
+          }`}>
+            <div className="flex justify-center mb-4">
+              {(readerStatus === "idle" || readerStatus === "connecting") && <Loader2 className="h-12 w-12 text-gray-500 animate-spin" />}
+              {readerStatus === "searching" && (
+                <div className="relative">
+                  <Wifi className="h-12 w-12 text-blue-600" />
+                  <Radio className="h-6 w-6 text-blue-400 absolute -top-1 -right-1 animate-pulse" />
+                </div>
+              )}
+              {readerStatus === "connected" && (
+                <div className="relative">
+                  <Wifi className="h-12 w-12 text-green-600" />
+                  <CheckCircle className="h-5 w-5 text-green-600 absolute -bottom-1 -right-1 bg-green-50 rounded-full" />
+                </div>
+              )}
+              {readerStatus === "processing" && <CreditCard className="h-12 w-12 text-blue-600 animate-pulse" />}
+              {readerStatus === "error" && <WifiOff className="h-12 w-12 text-red-600" />}
+              {readerStatus === "ready" && <Wifi className="h-12 w-12 text-blue-600" />}
+            </div>
+            <p className={`text-lg font-medium text-center ${
+              readerStatus === "connected" ? "text-green-700" :
+              readerStatus === "processing" ? "text-blue-700" :
+              readerStatus === "error" ? "text-red-700" :
+              readerStatus === "searching" ? "text-blue-600" :
+              readerStatus === "ready" ? "text-blue-700" :
+              "text-gray-600"
+            }`}>
+              {readerMessage || "Initializing…"}
             </p>
+            {readerStatus === "processing" && (
+              <p className="text-sm text-blue-600 mt-2 text-center">Please do not remove your card until prompted</p>
+            )}
+
+            {readerStatus === "ready" && (
+              <div className="mt-4 space-y-3">
+                <Button variant="default" className="w-full py-6 text-lg" onClick={scanForReaders}>
+                  <Wifi className="h-5 w-5 mr-2" />
+                  Scan Network for Readers
+                </Button>
+                <Button variant="ghost" size="sm" className="w-full text-gray-600" onClick={() => setShowTroubleshooting(!showTroubleshooting)}>
+                  <HelpCircle className="h-4 w-4 mr-2" />
+                  {showTroubleshooting ? "Hide" : "Show"} Troubleshooting Tips
+                </Button>
+              </div>
+            )}
+
+            {readerStatus === "error" && (
+              <div className="mt-4 space-y-3">
+                <Button variant="outline" className="w-full" onClick={retryDiscovery}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry Connection
+                </Button>
+                <Button variant="ghost" size="sm" className="w-full text-gray-600" onClick={() => setShowTroubleshooting(!showTroubleshooting)}>
+                  <HelpCircle className="h-4 w-4 mr-2" />
+                  {showTroubleshooting ? "Hide" : "Show"} Troubleshooting Tips
+                </Button>
+              </div>
+            )}
+
+            {showTroubleshooting && (
+              <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4 text-left">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <HelpCircle className="h-4 w-4 mr-2 text-blue-600" />
+                  Card Reader Setup Tips
+                </h4>
+                <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                  <li><strong>Power on the reader:</strong> Ensure your WisePOS E is powered on and showing the home screen</li>
+                  <li><strong>Same WiFi network:</strong> The reader and this kiosk must be on the same WiFi network</li>
+                  <li><strong>Check WiFi connection:</strong> On the reader, go to Settings → Network to verify WiFi is connected</li>
+                  <li><strong>Register in Stripe Dashboard:</strong> New readers must be registered at dashboard.stripe.com/terminal/readers first</li>
+                  <li><strong>Restart if needed:</strong> Try restarting the reader if it's not appearing</li>
+                </ol>
+              </div>
+            )}
+
+            {connectionAttempts > 0 && readerStatus === "error" && (
+              <p className="text-xs text-gray-500 mt-2 text-center">Connection attempts: {connectionAttempts}</p>
+            )}
           </div>
-          <p className="text-2xl font-bold text-green-800">
-            ${(formData.amount / 100).toFixed(2)}
-          </p>
-        </div>
-      </div>
 
-      <div className="border rounded-xl p-4">
-        <Label className="text-base font-semibold mb-3 block">Card Details</Label>
-        <div className="border rounded-lg p-4 bg-white">
-          <CardElement options={{ style: { base: { fontSize: "16px", color: "#374151" } } }} />
-        </div>
-      </div>
+          <Button
+            onClick={handleReaderPayment}
+            disabled={isProcessing || readerStatus !== "connected"}
+            className="w-full text-lg py-6"
+          >
+            {isProcessing ? (
+              <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Processing…</>
+            ) : (
+              `Pay $${(formData.totalPrice / 100).toFixed(2)} with Card Reader`
+            )}
+          </Button>
 
-      <Button
-        onClick={handlePay}
-        disabled={isPending || !stripe}
-        className="w-full py-6 text-lg bg-green-600 hover:bg-green-700 text-white"
-      >
-        {isPending
-          ? "Processing..."
-          : `Pay $${(formData.amount / 100).toFixed(2)} & Send Gift Card`}
-      </Button>
+          {(readerStatus === "error" || readerStatus === "searching") && (
+            <p className="text-center text-sm text-gray-500">
+              Having trouble?{" "}
+              <button type="button" className="text-primary underline hover:text-primary/80" onClick={() => setPaymentMethod("manual")}>
+                Manual Card Entry
+              </button>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Manual card entry UI ── */}
+      {paymentMethod === "manual" && (
+        <form onSubmit={handleManualPayment} className="space-y-6">
+          <Card className="bg-white border-gray-200 shadow-lg">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-xl text-gray-900 flex items-center justify-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Enter Payment Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-base font-medium text-gray-900 block">Card Number</Label>
+                  <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                    <CardNumberElement options={elementOptions} onChange={(e) => setCardError(e.error ? e.error.message : null)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium text-gray-900 block">Expiry Date</Label>
+                    <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                      <CardExpiryElement options={elementOptions} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium text-gray-900 block">CVC</Label>
+                    <div className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                      <CardCvcElement options={elementOptions} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-base font-medium text-gray-900 block">ZIP Code</Label>
+                    <Input
+                      type="text"
+                      placeholder="12345"
+                      value={billingZip}
+                      onChange={(e) => setBillingZip(e.target.value)}
+                      className="h-[58px] text-lg bg-gray-50 border-2 border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/10"
+                      maxLength={10}
+                    />
+                  </div>
+                </div>
+
+                {cardError && <p className="text-sm text-red-600 mt-2">{cardError}</p>}
+
+                <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
+                  <Shield className="h-4 w-4" />
+                  <span>Your card information is securely processed by Stripe</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Button
+            type="submit"
+            disabled={!stripe || isProcessing}
+            className="w-full text-lg py-6 bg-primary hover:bg-primary/90"
+            size="lg"
+          >
+            {isProcessing ? (
+              <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Processing Payment…</>
+            ) : (
+              <><Shield className="h-5 w-5 mr-2" />Pay ${(formData.totalPrice / 100).toFixed(2)}</>
+            )}
+          </Button>
+        </form>
+      )}
     </div>
   );
 }
@@ -567,16 +994,6 @@ function KioskGiftCardPurchase({
   const [purchaserLastName, setPurchaserLastName] = useState(prefillPurchaser?.lastName ?? "");
   const [purchaserEmail, setPurchaserEmail] = useState(prefillPurchaser?.email ?? "");
 
-  // Payment intent data returned from server
-  const [paymentData, setPaymentData] = useState<{
-    clientSecret: string;
-    paymentIntentId: string;
-    amount: number;
-    packageName: string;
-    totalPunches: number;
-  } | null>(null);
-  const [isCreatingPI, setIsCreatingPI] = useState(false);
-
   const { data: packages = [], isLoading: packagesLoading } = useQuery<GiftCardPackage[]>({
     queryKey: ["/api/punch-cards/options"],
     staleTime: 5 * 60 * 1000,
@@ -584,7 +1001,7 @@ function KioskGiftCardPurchase({
 
   const kioskPackages = packages.filter((p) => p.availableOnKiosk);
 
-  const handleFormSubmit = async () => {
+  const handleFormSubmit = () => {
     if (!selectedPkg) {
       toast({ title: "Please select a package", variant: "destructive" });
       return;
@@ -605,33 +1022,7 @@ function KioskGiftCardPurchase({
       toast({ title: "Valid purchaser email is required", variant: "destructive" });
       return;
     }
-
-    setIsCreatingPI(true);
-    try {
-      const res = await fetch("/api/kiosk/gift-card-payment-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateId: selectedPkg.id,
-          recipientEmail: recipientEmail.trim(),
-          recipientName: `${recipientFirstName.trim()} ${recipientLastName.trim()}`,
-          purchaserEmail: purchaserEmail.trim(),
-          purchaserName: `${purchaserFirstName.trim()} ${purchaserLastName.trim()}`,
-          personalMessage: personalMessage.trim() || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to initiate payment");
-      }
-      const data = await res.json();
-      setPaymentData(data);
-      setStep("payment");
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setIsCreatingPI(false);
-    }
+    setStep("payment");
   };
 
   // ── Success screen ──────────────────────────────────────────────────────────
@@ -830,30 +1221,27 @@ function KioskGiftCardPurchase({
                   </Button>
                   <Button
                     onClick={handleFormSubmit}
-                    disabled={isCreatingPI}
                     className="flex-1 py-5 text-lg bg-green-600 hover:bg-green-700 text-white"
                   >
-                    {isCreatingPI ? "Please wait…" : "Continue to Payment"}
+                    Continue to Payment
                   </Button>
                 </div>
               </>
             )}
 
-            {step === "payment" && paymentData && (
-              <Elements stripe={stripePromise} options={{ clientSecret: paymentData.clientSecret }}>
+            {step === "payment" && selectedPkg && (
+              <Elements stripe={stripePromise}>
                 <GiftCardPaymentInner
-                  clientSecret={paymentData.clientSecret}
-                  paymentIntentId={paymentData.paymentIntentId}
                   formData={{
-                    templateId: selectedPkg!.id,
+                    templateId: selectedPkg.id,
+                    packageName: selectedPkg.name,
+                    totalPunches: selectedPkg.totalPunches,
+                    totalPrice: selectedPkg.totalPrice,
                     recipientEmail: recipientEmail.trim(),
                     recipientName: `${recipientFirstName.trim()} ${recipientLastName.trim()}`,
                     purchaserEmail: purchaserEmail.trim(),
                     purchaserName: `${purchaserFirstName.trim()} ${purchaserLastName.trim()}`,
                     personalMessage: personalMessage.trim(),
-                    packageName: paymentData.packageName,
-                    amount: paymentData.amount,
-                    totalPunches: paymentData.totalPunches,
                   }}
                   onSuccess={() => setStep("success")}
                   onBack={() => setStep("form")}

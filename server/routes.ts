@@ -6282,9 +6282,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Package not found or not available at kiosk" });
       }
 
+      const useTerminal = req.body.useTerminal === true;
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: template.totalPrice,
         currency: 'usd',
+        ...(useTerminal
+          ? { payment_method_types: ['card_present'], capture_method: 'automatic' }
+          : {}),
         metadata: {
           type: 'kiosk_gift_card',
           templateId: template.id.toString(),

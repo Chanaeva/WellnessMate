@@ -25,7 +25,8 @@ import {
   UserPlus,
   Search,
   Crown,
-  History
+  History,
+  Gift,
 } from "lucide-react";
 import KioskMemberCreation, { ExistingMember } from "./kiosk-member-creation";
 
@@ -413,6 +414,462 @@ function GuestWaiverForm({ onSuccess, onCancel, prefill }: GuestWaiverFormProps)
   );
 }
 
+// ─── Gift Card Types ──────────────────────────────────────────────────────────
+
+interface GiftCardPackage {
+  id: number;
+  name: string;
+  totalPunches: number;
+  totalPrice: number;
+  pricePerPunch: number;
+  description?: string | null;
+  badgeText?: string | null;
+  availableOnKiosk: boolean;
+}
+
+// ─── Gift Card Payment (inner Stripe hook component) ─────────────────────────
+
+function GiftCardPaymentInner({
+  clientSecret,
+  paymentIntentId,
+  formData,
+  onSuccess,
+  onBack,
+}: {
+  clientSecret: string;
+  paymentIntentId: string;
+  formData: {
+    templateId: number;
+    recipientEmail: string;
+    recipientName: string;
+    purchaserEmail: string;
+    purchaserName: string;
+    personalMessage: string;
+    packageName: string;
+    amount: number;
+    totalPunches: number;
+  };
+  onSuccess: () => void;
+  onBack: () => void;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const { toast } = useToast();
+  const [isPending, setIsPending] = useState(false);
+
+  const handlePay = async () => {
+    if (!stripe || !elements) return;
+    setIsPending(true);
+    try {
+      const cardEl = elements.getElement(CardElement);
+      if (!cardEl) throw new Error("Card element not found");
+
+      const { error: stripeError } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: cardEl },
+      });
+
+      if (stripeError) {
+        toast({ title: "Payment Failed", description: stripeError.message, variant: "destructive" });
+        setIsPending(false);
+        return;
+      }
+
+      // Payment confirmed — finalize gift card on server
+      const res = await fetch("/api/kiosk/gift-card-purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentIntentId,
+          templateId: formData.templateId,
+          recipientEmail: formData.recipientEmail,
+          recipientName: formData.recipientName,
+          purchaserEmail: formData.purchaserEmail,
+          purchaserName: formData.purchaserName,
+          personalMessage: formData.personalMessage || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to create gift card");
+      }
+      onSuccess();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-bold">Payment</h3>
+        <Button variant="outline" onClick={onBack} disabled={isPending}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+      </div>
+
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-green-900">{formData.packageName}</p>
+            <p className="text-sm text-green-700">
+              {formData.totalPunches} day pass{formData.totalPunches > 1 ? "es" : ""} for {formData.recipientName}
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-green-800">
+            ${(formData.amount / 100).toFixed(2)}
+          </p>
+        </div>
+      </div>
+
+      <div className="border rounded-xl p-4">
+        <Label className="text-base font-semibold mb-3 block">Card Details</Label>
+        <div className="border rounded-lg p-4 bg-white">
+          <CardElement options={{ style: { base: { fontSize: "16px", color: "#374151" } } }} />
+        </div>
+      </div>
+
+      <Button
+        onClick={handlePay}
+        disabled={isPending || !stripe}
+        className="w-full py-6 text-lg bg-green-600 hover:bg-green-700 text-white"
+      >
+        {isPending
+          ? "Processing..."
+          : `Pay $${(formData.amount / 100).toFixed(2)} & Send Gift Card`}
+      </Button>
+    </div>
+  );
+}
+
+// ─── Gift Card Purchase Flow ──────────────────────────────────────────────────
+
+function KioskGiftCardPurchase({
+  onBack,
+  onSuccess,
+  prefillPurchaser,
+}: {
+  onBack: () => void;
+  onSuccess: () => void;
+  prefillPurchaser?: { firstName: string; lastName: string; email: string };
+}) {
+  const { toast } = useToast();
+  const [step, setStep] = useState<"form" | "payment" | "success">("form");
+
+  // Form state
+  const [selectedPkg, setSelectedPkg] = useState<GiftCardPackage | null>(null);
+  const [recipientFirstName, setRecipientFirstName] = useState("");
+  const [recipientLastName, setRecipientLastName] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [personalMessage, setPersonalMessage] = useState("");
+  const [purchaserFirstName, setPurchaserFirstName] = useState(prefillPurchaser?.firstName ?? "");
+  const [purchaserLastName, setPurchaserLastName] = useState(prefillPurchaser?.lastName ?? "");
+  const [purchaserEmail, setPurchaserEmail] = useState(prefillPurchaser?.email ?? "");
+
+  // Payment intent data returned from server
+  const [paymentData, setPaymentData] = useState<{
+    clientSecret: string;
+    paymentIntentId: string;
+    amount: number;
+    packageName: string;
+    totalPunches: number;
+  } | null>(null);
+  const [isCreatingPI, setIsCreatingPI] = useState(false);
+
+  const { data: packages = [], isLoading: packagesLoading } = useQuery<GiftCardPackage[]>({
+    queryKey: ["/api/punch-cards/options"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const kioskPackages = packages.filter((p) => p.availableOnKiosk);
+
+  const handleFormSubmit = async () => {
+    if (!selectedPkg) {
+      toast({ title: "Please select a package", variant: "destructive" });
+      return;
+    }
+    if (!recipientFirstName.trim() || !recipientLastName.trim()) {
+      toast({ title: "Recipient name is required", variant: "destructive" });
+      return;
+    }
+    if (!recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+      toast({ title: "Valid recipient email is required", variant: "destructive" });
+      return;
+    }
+    if (!purchaserFirstName.trim() || !purchaserLastName.trim()) {
+      toast({ title: "Purchaser name is required", variant: "destructive" });
+      return;
+    }
+    if (!purchaserEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(purchaserEmail)) {
+      toast({ title: "Valid purchaser email is required", variant: "destructive" });
+      return;
+    }
+
+    setIsCreatingPI(true);
+    try {
+      const res = await fetch("/api/kiosk/gift-card-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: selectedPkg.id,
+          recipientEmail: recipientEmail.trim(),
+          recipientName: `${recipientFirstName.trim()} ${recipientLastName.trim()}`,
+          purchaserEmail: purchaserEmail.trim(),
+          purchaserName: `${purchaserFirstName.trim()} ${purchaserLastName.trim()}`,
+          personalMessage: personalMessage.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to initiate payment");
+      }
+      const data = await res.json();
+      setPaymentData(data);
+      setStep("payment");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsCreatingPI(false);
+    }
+  };
+
+  // ── Success screen ──────────────────────────────────────────────────────────
+  if (step === "success") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl mx-auto">
+          <Card className="shadow-2xl border-0 bg-card/95">
+            <CardContent className="pt-10 pb-10 text-center space-y-6">
+              <CheckCircle className="h-20 w-20 text-green-500 mx-auto" />
+              <h2 className="text-3xl font-bold text-green-700">Gift Card Sent!</h2>
+              <p className="text-lg text-muted-foreground">
+                A gift card has been emailed to{" "}
+                <strong>
+                  {recipientFirstName} {recipientLastName}
+                </strong>{" "}
+                at <strong>{recipientEmail}</strong>.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                The email includes their gift card code and a link to sign the facility waiver
+                before their first visit.
+              </p>
+              <Button
+                onClick={onSuccess}
+                className="w-full py-6 text-lg bg-primary hover:bg-primary/90 text-white"
+              >
+                Done
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main form + payment wrapper ─────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-4">
+            <img src={logoMossGreen} alt="Wolf Mother Wellness" className="h-16 w-16 drop-shadow-lg" />
+          </div>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Gift Card Purchase</h1>
+          <p className="text-muted-foreground mt-1">Send day passes as a gift</p>
+        </div>
+
+        <Card className="shadow-2xl border-0 bg-card/95 backdrop-blur-sm">
+          <CardContent className="pt-6 pb-6 space-y-6">
+
+            {step === "form" && (
+              <>
+                {/* Package Picker */}
+                <div>
+                  <Label className="text-base font-semibold mb-3 block">
+                    <Gift className="h-4 w-4 inline mr-2" />
+                    Select Package
+                  </Label>
+                  {packagesLoading ? (
+                    <p className="text-muted-foreground text-center py-6">Loading packages…</p>
+                  ) : kioskPackages.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-6">No packages available</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                      {kioskPackages.map((pkg) => (
+                        <button
+                          key={pkg.id}
+                          type="button"
+                          onClick={() => setSelectedPkg(pkg)}
+                          className={`w-full text-left border-2 rounded-xl p-4 transition-all ${
+                            selectedPkg?.id === pkg.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-foreground">{pkg.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {pkg.totalPunches} day pass{pkg.totalPunches > 1 ? "es" : ""}
+                                {pkg.description ? ` — ${pkg.description}` : ""}
+                              </p>
+                              {pkg.badgeText && (
+                                <span className="inline-block mt-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                                  {pkg.badgeText}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xl font-bold text-primary ml-4">
+                              ${(pkg.totalPrice / 100).toFixed(2)}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recipient Info */}
+                <div>
+                  <Label className="text-base font-semibold mb-3 block">Recipient</Label>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="recFirst" className="text-sm">First Name</Label>
+                        <Input
+                          id="recFirst"
+                          value={recipientFirstName}
+                          onChange={(e) => setRecipientFirstName(e.target.value)}
+                          placeholder="First name"
+                          className="text-lg py-5 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="recLast" className="text-sm">Last Name</Label>
+                        <Input
+                          id="recLast"
+                          value={recipientLastName}
+                          onChange={(e) => setRecipientLastName(e.target.value)}
+                          placeholder="Last name"
+                          className="text-lg py-5 mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="recEmail" className="text-sm">Email Address</Label>
+                      <Input
+                        id="recEmail"
+                        type="email"
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        placeholder="recipient@email.com"
+                        className="text-lg py-5 mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="message" className="text-sm">
+                        Personal Message <span className="text-muted-foreground font-normal">(Optional)</span>
+                      </Label>
+                      <Input
+                        id="message"
+                        value={personalMessage}
+                        onChange={(e) => setPersonalMessage(e.target.value)}
+                        placeholder="Happy Birthday! Enjoy your visit…"
+                        className="text-lg py-5 mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Purchaser Info */}
+                <div>
+                  <Label className="text-base font-semibold mb-3 block">Purchaser</Label>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="purFirst" className="text-sm">First Name</Label>
+                        <Input
+                          id="purFirst"
+                          value={purchaserFirstName}
+                          onChange={(e) => setPurchaserFirstName(e.target.value)}
+                          placeholder="First name"
+                          className="text-lg py-5 mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="purLast" className="text-sm">Last Name</Label>
+                        <Input
+                          id="purLast"
+                          value={purchaserLastName}
+                          onChange={(e) => setPurchaserLastName(e.target.value)}
+                          placeholder="Last name"
+                          className="text-lg py-5 mt-1"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="purEmail" className="text-sm">Email Address</Label>
+                      <Input
+                        id="purEmail"
+                        type="email"
+                        value={purchaserEmail}
+                        onChange={(e) => setPurchaserEmail(e.target.value)}
+                        placeholder="purchaser@email.com"
+                        className="text-lg py-5 mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" onClick={onBack} className="flex-1 py-5 text-lg">
+                    <ArrowLeft className="h-5 w-5 mr-2" />
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleFormSubmit}
+                    disabled={isCreatingPI}
+                    className="flex-1 py-5 text-lg bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {isCreatingPI ? "Please wait…" : "Continue to Payment"}
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {step === "payment" && paymentData && (
+              <Elements stripe={stripePromise} options={{ clientSecret: paymentData.clientSecret }}>
+                <GiftCardPaymentInner
+                  clientSecret={paymentData.clientSecret}
+                  paymentIntentId={paymentData.paymentIntentId}
+                  formData={{
+                    templateId: selectedPkg!.id,
+                    recipientEmail: recipientEmail.trim(),
+                    recipientName: `${recipientFirstName.trim()} ${recipientLastName.trim()}`,
+                    purchaserEmail: purchaserEmail.trim(),
+                    purchaserName: `${purchaserFirstName.trim()} ${purchaserLastName.trim()}`,
+                    personalMessage: personalMessage.trim(),
+                    packageName: paymentData.packageName,
+                    amount: paymentData.amount,
+                    totalPunches: paymentData.totalPunches,
+                  }}
+                  onSuccess={() => setStep("success")}
+                  onBack={() => setStep("form")}
+                />
+              </Elements>
+            )}
+
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Kiosk Component ─────────────────────────────────────────────────────
+
 export default function KioskCheckIn() {
   const [scannerMode, setScannerMode] = useState<'waiting' | 'manual-entry' | 'confirmation' | 'success' | 'error' | 'new-purchase' | 'guest-waiver'>('waiting');
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
@@ -423,7 +880,7 @@ export default function KioskCheckIn() {
   // Unified purchase flow state
   const [purchaseSearchTerm, setPurchaseSearchTerm] = useState("");
   const [selectedPurchaseMember, setSelectedPurchaseMember] = useState<ExistingMember | null>(null);
-  const [purchaseType, setPurchaseType] = useState<'membership' | 'daypass' | null>(null);
+  const [purchaseType, setPurchaseType] = useState<'membership' | 'daypass' | 'giftcard' | null>(null);
   const { toast } = useToast();
   const autoResumeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -554,7 +1011,30 @@ export default function KioskCheckIn() {
     };
   }, []);
 
-  // Show purchase form when member and purchase type are selected
+  // Show gift card purchase flow
+  if (purchaseType === 'giftcard') {
+    return (
+      <KioskGiftCardPurchase
+        prefillPurchaser={selectedPurchaseMember ? {
+          firstName: selectedPurchaseMember.firstName,
+          lastName: selectedPurchaseMember.lastName,
+          email: selectedPurchaseMember.email,
+        } : undefined}
+        onBack={() => {
+          setPurchaseType(null);
+          setScannerMode('new-purchase');
+        }}
+        onSuccess={() => {
+          setSelectedPurchaseMember(null);
+          setPurchaseSearchTerm("");
+          setPurchaseType(null);
+          setScannerMode('waiting');
+        }}
+      />
+    );
+  }
+
+  // Show membership/day-pass purchase form when member and purchase type are selected
   if (purchaseType) {
     return (
       <KioskMemberCreation
@@ -917,6 +1397,14 @@ export default function KioskCheckIn() {
                     <UserPlus className="h-4 w-4 mr-2" />
                     New Member
                   </Button>
+
+                  <Button
+                    onClick={() => setPurchaseType('giftcard')}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    <Gift className="h-4 w-4 mr-2" />
+                    Gift Card
+                  </Button>
                 </div>
               </div>
             )}
@@ -945,6 +1433,14 @@ export default function KioskCheckIn() {
                   >
                     <Sparkles className="h-6 w-6 mr-2" />
                     Day Pass
+                  </Button>
+                  <Button
+                    onClick={() => setPurchaseType('giftcard')}
+                    size="lg"
+                    className="bg-amber-600 hover:bg-amber-700 text-white py-8 text-lg font-semibold"
+                  >
+                    <Gift className="h-6 w-6 mr-2" />
+                    Gift Card
                   </Button>
                 </div>
                 

@@ -49,7 +49,8 @@ import {
   users as usersTable,
   memberships as membershipsTable,
   hoursOfOperation,
-  insertHoursOfOperationSchema
+  insertHoursOfOperationSchema,
+  giftCards as giftCardsTable,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -6263,6 +6264,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
         giftCard: card,
         clientSecret: paymentIntent.client_secret,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Create a PaymentIntent for a kiosk gift card purchase
+  app.post("/api/kiosk/gift-card-payment-intent", async (req, res) => {
+    try {
+      const { templateId, recipientEmail, recipientName, purchaserEmail, purchaserName, personalMessage } = req.body;
+      if (!templateId || !recipientEmail || !recipientName) {
+        return res.status(400).json({ message: "Missing required fields: templateId, recipientEmail, recipientName" });
+      }
+
+      const template = await storage.getPunchCardTemplateById(Number(templateId));
+      if (!template || !template.isActive || !template.availableOnKiosk) {
+        return res.status(404).json({ message: "Package not found or not available at kiosk" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: template.totalPrice,
+        currency: 'usd',
+        metadata: {
+          type: 'kiosk_gift_card',
+          templateId: template.id.toString(),
+          recipientEmail,
+          recipientName,
+          purchaserEmail: purchaserEmail || '',
+          purchaserName: purchaserName || '',
+        },
+      });
+
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: template.totalPrice,
+        packageName: template.name,
+        totalPunches: template.totalPunches,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Public: Finalize a kiosk gift card purchase after payment is confirmed.
+  // Only paymentIntentId and personalMessage are accepted from the client.
+  // All fulfillment details (template, recipient, purchaser) are read from
+  // server-set PaymentIntent metadata to prevent tampering.
+  app.post("/api/kiosk/gift-card-purchase", async (req, res) => {
+    try {
+      const { paymentIntentId, personalMessage } = req.body;
+      if (!paymentIntentId) {
+        return res.status(400).json({ message: "paymentIntentId is required" });
+      }
+
+      // Retrieve and validate the PaymentIntent from Stripe (server-side truth)
+      const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+      if (pi.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment has not been completed" });
+      }
+
+      // Ensure this PI was created by the kiosk gift card flow
+      if (pi.metadata?.type !== 'kiosk_gift_card') {
+        return res.status(400).json({ message: "Invalid payment intent type" });
+      }
+
+      const metaTemplateId = pi.metadata?.templateId;
+      const recipientEmail = pi.metadata?.recipientEmail;
+      const recipientName = pi.metadata?.recipientName;
+      const purchaserEmail = pi.metadata?.purchaserEmail || recipientEmail;
+      const purchaserName = pi.metadata?.purchaserName || 'Anonymous';
+
+      if (!metaTemplateId || !recipientEmail || !recipientName) {
+        return res.status(400).json({ message: "PaymentIntent metadata is incomplete" });
+      }
+
+      // Load the template using the server-authoritative templateId from PI metadata
+      const template = await storage.getPunchCardTemplateById(Number(metaTemplateId));
+      if (!template || !template.isActive || !template.availableOnKiosk) {
+        return res.status(404).json({ message: "Package not found or no longer available" });
+      }
+
+      // Verify the amount paid exactly matches the template price (prevent partial-payment fraud)
+      if (pi.amount !== template.totalPrice || pi.currency !== 'usd') {
+        return res.status(400).json({ message: "Payment amount does not match package price" });
+      }
+
+      // Idempotency: if a gift card was already created for this PI, return it
+      const [duplicate] = await db.select().from(giftCardsTable)
+        .where(eq(giftCardsTable.stripePaymentIntentId, paymentIntentId))
+        .limit(1);
+      if (duplicate) {
+        return res.json({ giftCard: duplicate });
+      }
+
+      const code = randomBytes(8).toString('hex').toUpperCase();
+
+      const card = await storage.createGiftCard({
+        code,
+        type: 'day_pass_bundle',
+        initialAmount: template.totalPunches,
+        remainingAmount: template.totalPunches,
+        status: 'active',
+        purchaserEmail,
+        purchaserName,
+        recipientEmail,
+        recipientName,
+        personalMessage: personalMessage || null,
+        stripePaymentIntentId: paymentIntentId,
+        redeemedByUserId: null,
+        expiresAt: null,
+      });
+
+      // Build waiver URL from request host
+      const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+      const host = req.headers.host;
+      const waiverUrl = `${proto}://${host}/kiosk`;
+
+      sendGiftCardEmail(
+        recipientEmail,
+        recipientName,
+        purchaserName,
+        code,
+        'day_pass_bundle',
+        template.totalPunches,
+        personalMessage || undefined,
+        waiverUrl,
+        template.name,
+      ).then(async (sent) => {
+        if (sent) {
+          await storage.updateGiftCard(card.id, { emailSent: true, emailSentAt: new Date() });
+        }
+      }).catch(err => console.error('Failed to send kiosk gift card email:', err));
+
+      res.status(201).json({ giftCard: card });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -350,7 +350,9 @@ export async function sendGiftCardEmail(
   giftCardCode: string,
   giftCardType: string,
   amount: number,
-  personalMessage?: string | null
+  personalMessage?: string | null,
+  waiverUrl?: string,
+  packageName?: string,
 ): Promise<boolean> {
   try {
     const transporter = createTransporter();
@@ -359,13 +361,23 @@ export async function sendGiftCardEmail(
     const valueDisplay = isMonetary 
       ? `$${(amount / 100).toFixed(2)}` 
       : `${amount} Day Pass${amount > 1 ? 'es' : ''}`;
-    const cardTitle = isMonetary ? 'Gift Card' : 'Day Pass Bundle';
+    const cardTitle = packageName || (isMonetary ? 'Gift Card' : 'Day Pass Bundle');
+
+    const waiverSection = waiverUrl ? `\n\nBefore your first visit, please sign our facility waiver at: ${waiverUrl}\nClick "Guest Check-In (Waiver Only)" to complete your waiver — it only takes a minute.` : '';
+
+    const waiverHtml = waiverUrl ? `
+      <div style="background-color: #fff8e6; border: 1px solid #f5c842; padding: 16px 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+        <p style="font-size: 15px; font-weight: bold; color: #7a5c00; margin: 0 0 8px 0;">📋 Sign Your Waiver Before Visiting</p>
+        <p style="color: #7a5c00; font-size: 14px; margin: 0 0 14px 0;">Stop by the kiosk and click "Guest Check-In (Waiver Only)" to sign your liability waiver — it only takes a minute and is required before your first visit.</p>
+        <a href="${waiverUrl}" style="background-color: #4a5d4a; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Sign Waiver at Kiosk →</a>
+      </div>
+    ` : '';
 
     const msg = {
       from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
       to: recipientEmail,
       subject: `You've received a Wolf Mother Wellness ${cardTitle}!`,
-      text: `Hi ${recipientName},\n\n${purchaserName} has sent you a ${cardTitle} worth ${valueDisplay}!\n\nYour gift card code is: ${giftCardCode}\n\n${personalMessage ? `Personal message: "${personalMessage}"\n\n` : ''}To redeem, visit Wolf Mother Wellness and enter this code during checkout.\n\nBest regards,\nWolf Mother Wellness Team`,
+      text: `Hi ${recipientName},\n\n${purchaserName} has sent you a ${cardTitle} worth ${valueDisplay}!\n\nYour gift card code is: ${giftCardCode}\n\n${personalMessage ? `Personal message: "${personalMessage}"\n\n` : ''}To redeem, visit Wolf Mother Wellness and enter this code during checkout or at the front desk.${waiverSection}\n\nBest regards,\nWolf Mother Wellness Team`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #4a5d4a;">Wolf Mother Wellness</h2>
@@ -386,6 +398,7 @@ export async function sendGiftCardEmail(
               <p style="margin: 5px 0 0 0; color: #888; font-size: 12px;">— ${purchaserName}</p>
             </div>
           ` : ''}
+          ${waiverHtml}
           <p>To redeem your ${cardTitle.toLowerCase()}, visit Wolf Mother Wellness and enter your code during checkout or at the front desk.</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
           <p style="color: #999; font-size: 12px;">Best regards,<br>Wolf Mother Wellness Team</p>

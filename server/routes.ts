@@ -2256,14 +2256,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateUserStripeCustomerId(memberId, trimmed);
 
+      // ── Auto-link any existing Stripe subscriptions to this member's membership ──
+      // After the customer ID is saved, scan their active/trialing subscriptions.
+      // If the member has a membership record without a stripeSubscriptionId, link it now
+      // so admins don't have to run a manual full sync afterward.
+      let autoLinkedSubscriptionId: string | undefined;
+      let autoLinkedNote: string | undefined;
+      try {
+        const freshStripe = createStripeClient();
+        const membership = await storage.getMembershipByUserId(memberId);
+        if (membership && !membership.stripeSubscriptionId) {
+          const subs = await freshStripe.subscriptions.list({
+            customer: trimmed,
+            status: 'all',
+            limit: 20,
+          });
+          const linkableSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+          if (linkableSub) {
+            // Make sure this subscription isn't already linked to a different membership
+            const existingLink = await storage.getMembershipByStripeSubscriptionId(linkableSub.id);
+            if (!existingLink) {
+              const mapStripeStatus = (s: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
+                if (s === 'active' || s === 'trialing') return 'active';
+                if (s === 'canceled' || s === 'unpaid') return 'expired';
+                if (s === 'past_due') return 'frozen';
+                return 'inactive';
+              };
+              const currentPeriodEnd = (linkableSub as any).current_period_end;
+              await storage.updateMembership(membership.membershipId, {
+                stripeSubscriptionId: linkableSub.id,
+                status: mapStripeStatus(linkableSub.status),
+                endDate: currentPeriodEnd
+                  ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0]
+                  : membership.endDate,
+                autoRenew: !linkableSub.cancel_at_period_end,
+              });
+              autoLinkedSubscriptionId = linkableSub.id;
+              autoLinkedNote = `Subscription ${linkableSub.id} was automatically linked to membership ${membership.membershipId}.`;
+              console.log(`✅ [Link Stripe Customer] Auto-linked subscription ${linkableSub.id} → membership ${membership.membershipId} for user ${memberId}`);
+            }
+          }
+        }
+      } catch (autoLinkErr: any) {
+        // Non-fatal — customer is still linked, just couldn't auto-link subscription
+        console.warn(`⚠️ [Link Stripe Customer] Auto-link subscription scan failed for user ${memberId}: ${autoLinkErr.message}`);
+      }
+
       res.json({
         success: true,
         stripeCustomerId: trimmed,
         stripeEmail: stripeCustomer.email,
         emailMismatch: !!emailMismatch,
+        autoLinkedSubscriptionId,
         message: emailMismatch
-          ? `Linked with email override. Stripe email (${stripeCustomer.email}) differs from member email (${member.email}).`
-          : "Stripe customer linked successfully.",
+          ? `Linked with email override. Stripe email (${stripeCustomer.email}) differs from member email (${member.email}).${autoLinkedNote ? ' ' + autoLinkedNote : ''}`
+          : autoLinkedNote
+            ? `Stripe customer linked and subscription auto-linked: ${autoLinkedNote}`
+            : "Stripe customer linked successfully.",
       });
     } catch (error: any) {
       console.error('[Link Stripe Customer] Error:', error);
@@ -3080,7 +3129,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUserStripeCustomerId(user.id, customerId);
       }
       
-      // Check if user has a payment method
+      // ── Check for an existing active/trialing subscription on this customer ──
+      // If one already exists (e.g. created directly in Stripe), link it rather than
+      // creating a duplicate. This covers the common case where an admin creates a
+      // subscription in the Stripe dashboard and then uses "Create Subscription" here.
+      const mapStatus = (s: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
+        if (s === 'active' || s === 'trialing') return 'active';
+        if (s === 'canceled' || s === 'unpaid') return 'expired';
+        if (s === 'past_due') return 'frozen';
+        return 'inactive';
+      };
+
+      const existingSubs = await freshStripe.subscriptions.list({
+        customer: customerId,
+        status: 'all',
+        limit: 20,
+      });
+      const existingActiveSub = existingSubs.data.find(
+        s => s.status === 'active' || s.status === 'trialing'
+      );
+
+      if (existingActiveSub) {
+        // Make sure it isn't already linked to a different membership
+        const alreadyLinked = await storage.getMembershipByStripeSubscriptionId(existingActiveSub.id);
+        if (alreadyLinked && alreadyLinked.membershipId !== membership.membershipId) {
+          return res.status(409).json({
+            message: `This customer already has a Stripe subscription (${existingActiveSub.id}) but it is linked to a different membership (${alreadyLinked.membershipId}). Resolve that membership first.`,
+          });
+        }
+        // Link the existing subscription to this membership
+        const currentPeriodEnd = (existingActiveSub as any).current_period_end;
+        const nextBillingDate = currentPeriodEnd
+          ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0]
+          : membership.endDate;
+        await storage.updateMembership(membership.membershipId, {
+          stripeSubscriptionId: existingActiveSub.id,
+          status: mapStatus(existingActiveSub.status),
+          endDate: nextBillingDate,
+          autoRenew: !existingActiveSub.cancel_at_period_end,
+        });
+        console.log(`✅ [Create Subscription] Linked existing subscription ${existingActiveSub.id} → membership ${membershipId}`);
+        return res.json({
+          message: "Existing Stripe subscription linked to this membership successfully.",
+          subscriptionId: existingActiveSub.id,
+          linkedExisting: true,
+          nextBillingDate,
+        });
+      }
+
+      // No existing subscription — check for a payment method and create one
       const paymentMethods = await freshStripe.paymentMethods.list({
         customer: customerId,
         type: 'card',
@@ -3089,7 +3186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paymentMethods.data.length === 0) {
         // No payment method, return info for manual setup
         return res.status(400).json({ 
-          message: "No payment method on file. The member needs to add a card before creating a subscription.",
+          message: "No payment method on file. Add a card in the Payments tab, then try again.",
           customerId,
           needsPaymentMethod: true
         });
@@ -3104,20 +3201,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate trial period based on membership end date
       const endDate = new Date(membership.endDate);
       const now = new Date();
-      
-      // Calculate days until membership ends (for trial period)
-      let trialDays = 0;
       let trialEnd: number | undefined;
       
       if (endDate > now) {
-        // Membership still active - set trial until end date so first charge is when membership expires
-        const daysRemaining = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         trialEnd = Math.floor(endDate.getTime() / 1000);
-        trialDays = daysRemaining;
-      } else {
-        // Membership already expired - charge immediately (no trial)
-        trialEnd = undefined;
-        trialDays = 0;
       }
       
       // Create subscription with trial if membership is still active
@@ -3132,7 +3219,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       };
       
-      // Add trial_end if membership hasn't expired yet
       if (trialEnd) {
         subscriptionParams.trial_end = trialEnd;
       }
@@ -3146,7 +3232,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`✅ Created subscription for membership ${membershipId}:`, subscription.id);
       
-      // Calculate next billing date
       const nextBillingDate = trialEnd 
         ? new Date(trialEnd * 1000).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];

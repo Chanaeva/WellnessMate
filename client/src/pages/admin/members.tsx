@@ -388,7 +388,18 @@ export default function AdminMembers() {
       });
       // Update selectedMember so "Currently linked" reflects the new ID immediately
       if (data.stripeCustomerId) {
-        setSelectedMember((prev) => prev ? { ...prev, stripeCustomerId: data.stripeCustomerId } : prev);
+        setSelectedMember((prev) => {
+          if (!prev) return prev;
+          const updated = { ...prev, stripeCustomerId: data.stripeCustomerId };
+          // Also patch the membership subscription ID if one was auto-linked
+          if (data.autoLinkedSubscriptionId && updated.membership) {
+            updated.membership = {
+              ...updated.membership,
+              stripeSubscriptionId: data.autoLinkedSubscriptionId,
+            };
+          }
+          return updated;
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
     },
@@ -549,19 +560,34 @@ export default function AdminMembers() {
   const createSubscriptionMutation = useMutation({
     mutationFn: async (membershipId: string) => {
       const response = await apiRequest("POST", `/api/admin/memberships/${membershipId}/create-subscription`);
-      return response.json();
+      const data = await response.json();
+      if (!response.ok) throw data;
+      return data;
     },
     onSuccess: (data) => {
+      const isLinked = data.linkedExisting;
       toast({
-        title: "Subscription Created",
-        description: `Subscription created successfully. Next billing: ${data.nextBillingDate}`,
+        title: isLinked ? "Subscription Linked" : "Subscription Created",
+        description: isLinked
+          ? `Existing Stripe subscription was linked to this membership.${data.nextBillingDate ? ` Next billing: ${data.nextBillingDate}` : ''}`
+          : `Subscription created successfully.${data.nextBillingDate ? ` Next billing: ${data.nextBillingDate}` : ''}`,
       });
+      // Patch selectedMember immediately so the UI reflects the new subscription ID
+      if (data.subscriptionId) {
+        setSelectedMember((prev) => {
+          if (!prev?.membership) return prev;
+          return {
+            ...prev,
+            membership: { ...prev.membership, stripeSubscriptionId: data.subscriptionId },
+          };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Error Creating Subscription",
-        description: error.message || "Failed to create subscription. The member may need to add a payment method first.",
+        title: "Error",
+        description: error.message || "Failed to link or create subscription. The member may need to add a payment method first.",
         variant: "destructive",
       });
     },

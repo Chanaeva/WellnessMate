@@ -55,7 +55,8 @@ import {
 } from "@/components/ui/accordion";
 import { FaqItem } from "@shared/schema";
 import MemberCard from "@/components/dashboard/member-card";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useCart } from "@/hooks/use-cart";
 import {
   Calendar,
   Users,
@@ -152,6 +153,8 @@ function SmsOptInToggle() {
 export default function MemberDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const { addItem } = useCart();
   const [purchasingPunchCardId, setPurchasingPunchCardId] = useState<
     string | null
   >(null);
@@ -363,50 +366,6 @@ export default function MemberDashboard() {
   }, [refetchMembership, refetchPunchCards, refetchPaymentMethods, toast]);
 
   // Purchase membership mutation
-  const purchaseMembershipMutation = useMutation({
-    mutationFn: async (plan: MembershipPlan) => {
-      // Create payment intent
-      const paymentIntentRes = await apiRequest(
-        "POST",
-        "/api/create-payment-intent",
-        {
-          amount: plan.monthlyPrice / 100,
-          description: `Wolf Mother Wellness - ${plan.name}`,
-        },
-      );
-      const { clientSecret, paymentIntentId } = await paymentIntentRes.json();
-
-      // Confirm payment and create membership
-      const confirmRes = await apiRequest("POST", "/api/confirm-payment", {
-        paymentIntentId,
-        membershipId: null,
-        description: `Wolf Mother Wellness - ${plan.name}`,
-        planType: plan.planType,
-      });
-
-      if (!confirmRes.ok) {
-        throw new Error("Payment confirmation failed");
-      }
-
-      return await confirmRes.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Membership Purchased!",
-        description: "Your membership has been activated successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/membership"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Purchase Failed",
-        description: error.message || "Failed to purchase membership",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Helper function to check if user has a payment method
   const hasPaymentMethod = paymentMethods && paymentMethods.length > 0;
 
@@ -419,13 +378,20 @@ export default function MemberDashboard() {
     purchasePunchCardMutation.mutate(punchCardData);
   };
 
-  // Handle membership purchase attempts
+  // Handle membership purchase — routes through the checkout page so a real
+  // Stripe subscription is created and linked to the membership record.
   const handleMembershipPurchaseAttempt = (plan: MembershipPlan) => {
-    if (!hasPaymentMethod) {
-      setShowPaymentMethodAlert(true);
-      return;
-    }
-    purchaseMembershipMutation.mutate(plan);
+    addItem(
+      {
+        id: `membership-${plan.planType}`,
+        type: 'membership',
+        name: plan.name,
+        price: plan.monthlyPrice,
+        data: plan,
+      },
+      { skipAutoOpen: true },
+    );
+    navigate('/checkout');
   };
 
   // Handle redirect to payments page

@@ -344,11 +344,10 @@ export default function AdminMembers() {
         
         // Only make the request if there are actual updates
         if (Object.keys(membershipUpdate).length > 0) {
-          try {
-            await apiRequest("PATCH", `/api/admin/memberships/${selectedMember.membership.membershipId}`, membershipUpdate);
-          } catch (error) {
-            // Log but don't fail the whole operation if membership update fails
-            console.warn("Membership update failed, member data was updated successfully");
+          const patchRes = await apiRequest("PATCH", `/api/admin/memberships/${selectedMember.membership.membershipId}`, membershipUpdate);
+          if (!patchRes.ok) {
+            const err = await patchRes.json().catch(() => ({ message: "Failed to update membership" }));
+            throw new Error(err.message || "Failed to update membership fields");
           }
         }
       }
@@ -383,7 +382,7 @@ export default function AdminMembers() {
     },
     onSuccess: (data) => {
       setLinkStripeStatus({
-        type: "success",
+        type: data.autoLinkedWarning ? "warning" : "success",
         message: data.message,
       });
       // Update selectedMember so "Currently linked" reflects the new ID immediately
@@ -415,6 +414,32 @@ export default function AdminMembers() {
       } else {
         setLinkStripeStatus({ type: "error", message: error.message || "Failed to link Stripe customer" });
       }
+    },
+  });
+
+  // Sync Stripe subscription mutation — force-links the correct subscription from Stripe
+  const syncStripeSubscriptionMutation = useMutation({
+    mutationFn: async (memberId: number) => {
+      const res = await apiRequest("POST", `/api/admin/members/${memberId}/sync-stripe-subscription`);
+      const data = await res.json();
+      if (!res.ok) throw data;
+      return data;
+    },
+    onSuccess: (data) => {
+      setLinkStripeStatus({ type: "success", message: data.message });
+      if (data.subscriptionId) {
+        setSelectedMember((prev) => {
+          if (!prev?.membership) return prev;
+          return {
+            ...prev,
+            membership: { ...prev.membership, stripeSubscriptionId: data.subscriptionId },
+          };
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
+    },
+    onError: (error: any) => {
+      setLinkStripeStatus({ type: "error", message: error.message || "Failed to sync subscription from Stripe" });
     },
   });
 
@@ -2227,7 +2252,9 @@ export default function AdminMembers() {
                     className={`mt-2 text-xs flex items-start gap-1.5 rounded-md px-3 py-2 ${
                       linkStripeStatus.type === "success"
                         ? "bg-green-50 text-green-700"
-                        : "bg-red-50 text-red-700"
+                        : linkStripeStatus.type === "warning"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-red-50 text-red-700"
                     }`}
                   >
                     {linkStripeStatus.type === "success" ? (
@@ -2259,7 +2286,50 @@ export default function AdminMembers() {
                           </Button>
                         </div>
                       )}
+                      {/* Offer Sync Subscription when warning says a subscription was found but blocked */}
+                      {linkStripeStatus.type === "warning" && selectedMember?.stripeCustomerId && (
+                        <div className="mt-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-xs px-2 border-amber-400 text-amber-800 hover:bg-amber-100"
+                            disabled={syncStripeSubscriptionMutation.isPending}
+                            onClick={() => {
+                              if (selectedMember) {
+                                syncStripeSubscriptionMutation.mutate(selectedMember.id);
+                              }
+                            }}
+                          >
+                            {syncStripeSubscriptionMutation.isPending ? "Syncing…" : "Force sync subscription from Stripe"}
+                          </Button>
+                        </div>
+                      )}
                     </div>
+                  </div>
+                )}
+
+                {/* Sync Subscription button — shown when customer is linked but subscription isn't */}
+                {selectedMember?.stripeCustomerId && !selectedMember?.membership?.stripeSubscriptionId && !linkStripeStatus && (
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <p className="text-xs text-amber-800 mb-2">
+                      <strong>Stripe customer is linked</strong> but no subscription is connected to this membership.
+                      Use this to pull the active subscription from Stripe automatically.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs border-amber-400 text-amber-800 hover:bg-amber-100"
+                      disabled={syncStripeSubscriptionMutation.isPending}
+                      onClick={() => {
+                        if (selectedMember) {
+                          syncStripeSubscriptionMutation.mutate(selectedMember.id);
+                        }
+                      }}
+                    >
+                      {syncStripeSubscriptionMutation.isPending ? "Syncing…" : "Sync Subscription from Stripe"}
+                    </Button>
                   </div>
                 )}
               </div>

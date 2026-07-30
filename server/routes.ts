@@ -2259,49 +2259,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ── Auto-link any existing Stripe subscriptions to this member's membership ──
       // After the customer ID is saved, scan their active/trialing subscriptions.
-      // If the member has a membership record without a stripeSubscriptionId, link it now
-      // so admins don't have to run a manual full sync afterward.
+      // If the member has a membership record, link the best active subscription now.
+      // Handles stale/canceled existing subscription IDs by verifying them in Stripe first.
       let autoLinkedSubscriptionId: string | undefined;
       let autoLinkedNote: string | undefined;
+      let autoLinkedWarning: string | undefined;
       try {
         const freshStripe = createStripeClient();
         const membership = await storage.getMembershipByUserId(memberId);
-        if (membership && !membership.stripeSubscriptionId) {
-          const subs = await freshStripe.subscriptions.list({
-            customer: trimmed,
-            status: 'all',
-            limit: 20,
-          });
-          const linkableSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
-          if (linkableSub) {
-            // Make sure this subscription isn't already linked to a different membership
-            const existingLink = await storage.getMembershipByStripeSubscriptionId(linkableSub.id);
-            if (!existingLink) {
-              const mapStripeStatus = (s: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
-                if (s === 'active' || s === 'trialing') return 'active';
-                if (s === 'canceled' || s === 'unpaid') return 'expired';
-                if (s === 'past_due') return 'frozen';
-                return 'inactive';
-              };
-              const currentPeriodEnd = (linkableSub as any).current_period_end;
-              await storage.updateMembership(membership.membershipId, {
-                stripeSubscriptionId: linkableSub.id,
-                status: mapStripeStatus(linkableSub.status),
-                endDate: currentPeriodEnd
-                  ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0]
-                  : membership.endDate,
-                autoRenew: !linkableSub.cancel_at_period_end,
-              });
-              autoLinkedSubscriptionId = linkableSub.id;
-              autoLinkedNote = `Subscription ${linkableSub.id} was automatically linked to membership ${membership.membershipId}.`;
-              console.log(`✅ [Link Stripe Customer] Auto-linked subscription ${linkableSub.id} → membership ${membership.membershipId} for user ${memberId}`);
+        if (membership) {
+          // If an existing stripeSubscriptionId is set, verify it's still active in Stripe.
+          // If it's canceled/invalid, clear it so we can link the correct one.
+          let existingSubIsValid = false;
+          if (membership.stripeSubscriptionId) {
+            try {
+              const existingSub = await freshStripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+              existingSubIsValid = existingSub.status === 'active' || existingSub.status === 'trialing';
+              if (existingSubIsValid) {
+                autoLinkedNote = `Subscription ${membership.stripeSubscriptionId} is already linked and active — no change needed.`;
+                autoLinkedSubscriptionId = membership.stripeSubscriptionId;
+              } else {
+                console.log(`[Link Stripe Customer] Existing subscription ${membership.stripeSubscriptionId} is ${existingSub.status} — will replace with active one.`);
+              }
+            } catch {
+              // Subscription not found in Stripe — treat as stale, proceed to find a new one
+              console.log(`[Link Stripe Customer] Existing subscription ${membership.stripeSubscriptionId} not found in Stripe — will search for active one.`);
+            }
+          }
+
+          if (!existingSubIsValid) {
+            const subs = await freshStripe.subscriptions.list({
+              customer: trimmed,
+              status: 'all',
+              limit: 20,
+            });
+            const linkableSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing');
+            if (linkableSub) {
+              // Check if this subscription is already linked to a DIFFERENT membership
+              const existingLink = await storage.getMembershipByStripeSubscriptionId(linkableSub.id);
+              if (existingLink && existingLink.membershipId !== membership.membershipId) {
+                // Subscription is claimed by another membership — surface this to the admin
+                autoLinkedWarning = `Active subscription ${linkableSub.id} is currently linked to a different membership (${existingLink.membershipId}). Use "Sync Subscription" to force-transfer it.`;
+                console.warn(`⚠️ [Link Stripe Customer] Subscription ${linkableSub.id} already linked to ${existingLink.membershipId}, cannot auto-link to ${membership.membershipId}`);
+              } else {
+                const mapStripeStatus = (s: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
+                  if (s === 'active' || s === 'trialing') return 'active';
+                  if (s === 'canceled' || s === 'unpaid') return 'expired';
+                  if (s === 'past_due') return 'frozen';
+                  return 'inactive';
+                };
+                const currentPeriodEnd = (linkableSub as any).current_period_end;
+                await storage.updateMembership(membership.membershipId, {
+                  stripeSubscriptionId: linkableSub.id,
+                  status: mapStripeStatus(linkableSub.status),
+                  endDate: currentPeriodEnd
+                    ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0]
+                    : membership.endDate,
+                  autoRenew: !linkableSub.cancel_at_period_end,
+                });
+                autoLinkedSubscriptionId = linkableSub.id;
+                autoLinkedNote = `Subscription ${linkableSub.id} linked to membership ${membership.membershipId}.`;
+                console.log(`✅ [Link Stripe Customer] Auto-linked subscription ${linkableSub.id} → membership ${membership.membershipId} for user ${memberId}`);
+              }
+            } else {
+              autoLinkedWarning = 'No active subscription found on this Stripe customer.';
+              console.log(`[Link Stripe Customer] No active/trialing subscription found for customer ${trimmed}`);
             }
           }
         }
       } catch (autoLinkErr: any) {
         // Non-fatal — customer is still linked, just couldn't auto-link subscription
         console.warn(`⚠️ [Link Stripe Customer] Auto-link subscription scan failed for user ${memberId}: ${autoLinkErr.message}`);
+        autoLinkedWarning = `Customer linked, but subscription scan failed: ${autoLinkErr.message}`;
       }
+
+      const baseMessage = emailMismatch
+        ? `Linked with email override. Stripe email (${stripeCustomer.email}) differs from member email (${member.email}).`
+        : 'Stripe customer linked successfully.';
 
       res.json({
         success: true,
@@ -2309,15 +2343,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stripeEmail: stripeCustomer.email,
         emailMismatch: !!emailMismatch,
         autoLinkedSubscriptionId,
-        message: emailMismatch
-          ? `Linked with email override. Stripe email (${stripeCustomer.email}) differs from member email (${member.email}).${autoLinkedNote ? ' ' + autoLinkedNote : ''}`
-          : autoLinkedNote
-            ? `Stripe customer linked and subscription auto-linked: ${autoLinkedNote}`
-            : "Stripe customer linked successfully.",
+        autoLinkedWarning,
+        message: autoLinkedNote
+          ? `${baseMessage} ${autoLinkedNote}`
+          : autoLinkedWarning
+            ? `${baseMessage} Note: ${autoLinkedWarning}`
+            : baseMessage,
       });
     } catch (error: any) {
       console.error('[Link Stripe Customer] Error:', error);
       res.status(500).json({ message: error.message || "Failed to link Stripe customer" });
+    }
+  });
+
+  // Force-sync the Stripe subscription for a member (Admin only)
+  // Finds the best active subscription on the member's Stripe customer and links it,
+  // overriding any stale subscription ID and transferring from another membership if needed.
+  app.post("/api/admin/members/:id/sync-stripe-subscription", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      const member = await storage.getUser(memberId);
+      if (!member) return res.status(404).json({ message: "Member not found" });
+      if (!member.stripeCustomerId) {
+        return res.status(400).json({ message: "This member has no Stripe customer linked. Link a Stripe customer first." });
+      }
+
+      const membership = await storage.getMembershipByUserId(memberId);
+      if (!membership) {
+        return res.status(400).json({ message: "This member has no membership record to link." });
+      }
+
+      const freshStripe = createStripeClient();
+      const subs = await freshStripe.subscriptions.list({
+        customer: member.stripeCustomerId,
+        status: 'all',
+        limit: 20,
+      });
+
+      const mapStripeStatus = (s: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
+        if (s === 'active' || s === 'trialing') return 'active';
+        if (s === 'canceled' || s === 'unpaid') return 'expired';
+        if (s === 'past_due') return 'frozen';
+        return 'inactive';
+      };
+
+      // Prefer active/trialing; fall back to most recent past_due
+      const activeSub = subs.data.find(s => s.status === 'active' || s.status === 'trialing')
+        || subs.data.find(s => s.status === 'past_due');
+
+      if (!activeSub) {
+        return res.status(404).json({
+          message: `No active, trialing, or past-due subscription found on Stripe customer ${member.stripeCustomerId}. The customer may have no subscriptions, or all subscriptions are canceled.`,
+        });
+      }
+
+      // If the subscription is linked to a different membership, unlink it from there first
+      const existingLink = await storage.getMembershipByStripeSubscriptionId(activeSub.id);
+      if (existingLink && existingLink.membershipId !== membership.membershipId) {
+        console.log(`[Sync Subscription] Unlinking ${activeSub.id} from ${existingLink.membershipId} to re-link to ${membership.membershipId}`);
+        await storage.updateMembership(existingLink.membershipId, { stripeSubscriptionId: null as any });
+      }
+
+      const currentPeriodEnd = (activeSub as any).current_period_end;
+      await storage.updateMembership(membership.membershipId, {
+        stripeSubscriptionId: activeSub.id,
+        status: mapStripeStatus(activeSub.status),
+        endDate: currentPeriodEnd
+          ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0]
+          : membership.endDate,
+        autoRenew: !activeSub.cancel_at_period_end,
+      });
+
+      console.log(`✅ [Sync Subscription] Linked ${activeSub.id} (${activeSub.status}) → membership ${membership.membershipId} for user ${memberId}`);
+
+      res.json({
+        success: true,
+        subscriptionId: activeSub.id,
+        status: activeSub.status,
+        movedFrom: existingLink && existingLink.membershipId !== membership.membershipId ? existingLink.membershipId : undefined,
+        message: `Subscription ${activeSub.id} (${activeSub.status}) successfully linked to membership ${membership.membershipId}.${existingLink && existingLink.membershipId !== membership.membershipId ? ` (Transferred from ${existingLink.membershipId})` : ''}`,
+      });
+    } catch (error: any) {
+      console.error('[Sync Subscription] Error:', error);
+      res.status(500).json({ message: error.message || "Failed to sync Stripe subscription" });
     }
   });
 

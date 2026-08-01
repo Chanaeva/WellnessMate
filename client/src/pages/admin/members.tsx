@@ -115,7 +115,7 @@ const editMemberSchema = z.object({
   role: z.enum(["member", "staff", "admin"]),
   // Membership fields
   membershipStatus: z.enum(["active", "inactive", "expired", "frozen"]).optional(),
-  membershipPlanType: z.enum(["basic", "premium", "vip", "daily"]).optional(),
+  membershipPlanType: z.string().optional(),
   membershipStartDate: z.string().optional(),
   membershipEndDate: z.string().optional(),
 });
@@ -390,15 +390,22 @@ export default function AdminMembers() {
         setSelectedMember((prev) => {
           if (!prev) return prev;
           const updated = { ...prev, stripeCustomerId: data.stripeCustomerId };
-          // Also patch the membership subscription ID if one was auto-linked
+          // Also patch the membership status/subscription if one was auto-linked
           if (data.autoLinkedSubscriptionId && updated.membership) {
             updated.membership = {
               ...updated.membership,
               stripeSubscriptionId: data.autoLinkedSubscriptionId,
+              status: "active",
             };
           }
           return updated;
         });
+      }
+      // If a subscription was auto-linked (meaning it's active in Stripe), update the
+      // form field so a subsequent "Save Changes" doesn't overwrite the DB status back
+      // to whatever stale value the form was initialized with.
+      if (data.autoLinkedSubscriptionId) {
+        editMemberForm.setValue("membershipStatus", "active");
       }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
     },
@@ -432,9 +439,15 @@ export default function AdminMembers() {
           if (!prev?.membership) return prev;
           return {
             ...prev,
-            membership: { ...prev.membership, stripeSubscriptionId: data.subscriptionId },
+            membership: {
+              ...prev.membership,
+              stripeSubscriptionId: data.subscriptionId,
+              status: "active",
+            },
           };
         });
+        // Keep the form in sync so Save won't revert status to the pre-sync value
+        editMemberForm.setValue("membershipStatus", "active");
       }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
     },
@@ -1120,27 +1133,40 @@ export default function AdminMembers() {
                         {member.membership?.membershipId || "N/A"}
                       </td>
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap">
-                        <Badge
-                          className={
-                            member.membership?.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : member.membership?.status === "inactive"
-                                ? "bg-red-100 text-red-800"
-                                : member.membership?.status === "expired"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : member.membership?.status === "frozen"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-gray-100 text-gray-800"
-                          }
-                          data-testid={`badge-status-${member.id}`}
-                        >
-                          {member.membership?.status
-                            ? member.membership.status
-                                .charAt(0)
-                                .toUpperCase() +
-                              member.membership.status.slice(1)
-                            : "None"}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge
+                            className={
+                              member.membership?.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : member.membership?.status === "inactive"
+                                  ? "bg-red-100 text-red-800"
+                                  : member.membership?.status === "expired"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : member.membership?.status === "frozen"
+                                      ? "bg-blue-100 text-blue-800"
+                                      : "bg-gray-100 text-gray-800"
+                            }
+                            data-testid={`badge-status-${member.id}`}
+                          >
+                            {member.membership?.status
+                              ? member.membership.status
+                                  .charAt(0)
+                                  .toUpperCase() +
+                                member.membership.status.slice(1)
+                              : "None"}
+                          </Badge>
+                          {/* Warn when a Stripe subscription is linked but status isn't active —
+                              indicates a sync is needed */}
+                          {member.membership?.stripeSubscriptionId &&
+                            member.membership.status !== "active" && (
+                              <span
+                                title="Stripe subscription linked but membership status is not active. Open the member and use 'Sync Subscription from Stripe'."
+                                className="text-amber-500 cursor-help"
+                              >
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                              </span>
+                            )}
+                        </div>
                       </td>
                       <td className="px-3 md:px-6 py-4 whitespace-nowrap text-gray-900 capitalize hidden md:table-cell" data-testid={`text-plan-type-${member.id}`}>
                         {member.membership?.planType || "N/A"}
@@ -2064,10 +2090,22 @@ export default function AdminMembers() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="basic">Basic</SelectItem>
-                            <SelectItem value="premium">Premium</SelectItem>
-                            <SelectItem value="vip">VIP</SelectItem>
-                            <SelectItem value="daily">Daily</SelectItem>
+                            {membershipPlans.length > 0 ? (
+                              membershipPlans
+                                .filter((p) => p.isActive)
+                                .map((p) => (
+                                  <SelectItem key={p.id} value={p.planType}>
+                                    {p.name}
+                                  </SelectItem>
+                                ))
+                            ) : (
+                              <>
+                                <SelectItem value="basic">Basic</SelectItem>
+                                <SelectItem value="premium">Premium</SelectItem>
+                                <SelectItem value="vip">VIP</SelectItem>
+                                <SelectItem value="daily">Daily</SelectItem>
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                         <FormMessage />

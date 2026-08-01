@@ -263,6 +263,26 @@ export default function AdminMembers() {
           ? data.stripeNote || `Membership created with subscription. Next billing: ${data.nextBillingDate}`
           : data.stripeNote || "Membership record created successfully.",
       });
+      // Update selectedMember in-place so the view dialog reflects the new membership
+      // immediately without requiring a reopen.
+      if (data.membershipId) {
+        setSelectedMember((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            membership: {
+              membershipId: data.membershipId,
+              planType: selectedPlanType as any,
+              status: "active" as any,
+              userId: prev.id,
+              stripeSubscriptionId: data.subscriptionId ?? null,
+              autoRenew: !!data.subscriptionId,
+              startDate: new Date().toISOString().split("T")[0],
+              endDate: data.nextBillingDate ?? null,
+            } as any,
+          };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
       setIsCreateMembershipOpen(false);
       setSelectedPlanType("");

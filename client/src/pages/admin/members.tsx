@@ -1612,7 +1612,7 @@ export default function AdminMembers() {
                     <div className="bg-gray-50 p-4 rounded-lg text-center">
                       <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600 mb-3">No active membership</p>
-                      {memberPaymentMethods && memberPaymentMethods.length > 0 ? (
+                      <div className="flex flex-col items-center gap-2">
                         <Button
                           size="sm"
                           onClick={() => {
@@ -1623,9 +1623,7 @@ export default function AdminMembers() {
                           <Plus className="h-4 w-4 mr-2" />
                           Create Membership
                         </Button>
-                      ) : (
-                        <div className="space-y-2">
-                          <p className="text-xs text-gray-500">Add a payment method first to create a membership</p>
+                        {(!memberPaymentMethods || memberPaymentMethods.length === 0) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1635,8 +1633,8 @@ export default function AdminMembers() {
                             <CreditCard className="h-4 w-4 mr-2" />
                             {addingPaymentMethod ? "Setting up..." : "Add Payment Method"}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

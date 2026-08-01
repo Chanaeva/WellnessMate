@@ -259,9 +259,9 @@ export default function AdminMembers() {
     onSuccess: (data) => {
       toast({
         title: "Membership Created",
-        description: data.subscriptionId 
-          ? `Membership created with subscription. Next billing: ${data.nextBillingDate}`
-          : "Membership created successfully.",
+        description: data.subscriptionId
+          ? data.stripeNote || `Membership created with subscription. Next billing: ${data.nextBillingDate}`
+          : data.stripeNote || "Membership record created successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/members"] });
       setIsCreateMembershipOpen(false);
@@ -2641,9 +2641,9 @@ export default function AdminMembers() {
               <div className="bg-blue-50 p-3 rounded-lg text-sm">
                 <p className="font-medium text-blue-800">What will happen:</p>
                 <ul className="list-disc list-inside text-blue-700 mt-1 space-y-1">
-                  <li>Membership starts today for 30 days</li>
-                  <li>Card charged immediately for first month</li>
-                  <li>Subscription set up for monthly recurring billing</li>
+                  <li>If the member already has an active Stripe subscription, it will be linked automatically — <strong>no new charge</strong></li>
+                  <li>If no existing subscription is found and a card is on file, a new subscription will be created</li>
+                  <li>If no card is on file, the membership record is created and billing can be set up separately</li>
                 </ul>
               </div>
             )}

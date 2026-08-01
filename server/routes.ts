@@ -3363,12 +3363,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate request body
       const bodySchema = z.object({
-        planType: z.enum(['basic', 'premium', 'vip']),
+        planType: z.enum(['basic', 'premium', 'vip', 'daily']),
       });
       
       const parseResult = bodySchema.safeParse(req.body);
       if (!parseResult.success) {
-        return res.status(400).json({ message: "Invalid plan type. Must be basic, premium, or vip." });
+        return res.status(400).json({ message: "Invalid plan type. Must be basic, premium, vip, or daily." });
       }
       
       const { planType } = parseResult.data;
@@ -3431,44 +3431,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let needsPaymentMethod = false;
       let stripeNote: string | undefined;
 
-      if (customerId && plan.stripePriceId) {
+      if (customerId) {
         try {
-          const paymentMethods = await freshStripe.paymentMethods.list({
-            customer: customerId,
-            type: 'card',
-          });
+          const mapStatus = (s: string): 'active' | 'inactive' | 'expired' | 'frozen' => {
+            if (s === 'active' || s === 'trialing') return 'active';
+            if (s === 'canceled' || s === 'unpaid') return 'expired';
+            if (s === 'past_due') return 'frozen';
+            return 'inactive';
+          };
 
-          if (paymentMethods.data.length > 0) {
-            const defaultPM = paymentMethods.data[0].id;
-            await freshStripe.customers.update(customerId, {
-              invoice_settings: { default_payment_method: defaultPM },
+          // ── Step 1: look for an existing active subscription on this customer ──
+          const existingSubs = await freshStripe.subscriptions.list({
+            customer: customerId,
+            status: 'all',
+            limit: 20,
+          });
+          const existingActiveSub = existingSubs.data.find(
+            s => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
+          );
+
+          if (existingActiveSub) {
+            // Member already has a subscription — link it without charging again
+            const currentPeriodEnd = (existingActiveSub as any).current_period_end;
+            await storage.updateMembership(membershipId, {
+              stripeSubscriptionId: existingActiveSub.id,
+              status: mapStatus(existingActiveSub.status),
+              endDate: currentPeriodEnd
+                ? new Date(currentPeriodEnd * 1000).toISOString().split('T')[0]
+                : endDate.toISOString().split('T')[0],
+              autoRenew: !existingActiveSub.cancel_at_period_end,
             });
-            // trial_end = membership end date so recurring billing aligns with renewal
-            const trialEnd = Math.floor(endDate.getTime() / 1000);
-            const subscription = await freshStripe.subscriptions.create({
+            subscriptionId = existingActiveSub.id;
+            stripeNote = `Existing subscription ${existingActiveSub.id} (${existingActiveSub.status}) linked — no new charge created.`;
+            console.log(`✅ [Admin membership] Linked existing subscription ${existingActiveSub.id} → membership ${membershipId}`);
+          } else if (plan.stripePriceId) {
+            // ── Step 2: no existing subscription — create one if a payment method is available ──
+            const paymentMethods = await freshStripe.paymentMethods.list({
               customer: customerId,
-              items: [{ price: plan.stripePriceId }],
-              default_payment_method: defaultPM,
-              trial_end: trialEnd,
-              metadata: {
-                source: 'admin_portal',
-                userId: userId.toString(),
-                membershipId,
-              },
+              type: 'card',
             });
-            subscriptionId = subscription.id;
-            await storage.updateMembership(membershipId, { stripeSubscriptionId: subscriptionId });
-            console.log(`✅ [Admin membership] Created subscription ${subscriptionId} for membership ${membershipId}`);
+
+            if (paymentMethods.data.length > 0) {
+              const defaultPM = paymentMethods.data[0].id;
+              await freshStripe.customers.update(customerId, {
+                invoice_settings: { default_payment_method: defaultPM },
+              });
+              const trialEnd = Math.floor(endDate.getTime() / 1000);
+              const subscription = await freshStripe.subscriptions.create({
+                customer: customerId,
+                items: [{ price: plan.stripePriceId }],
+                default_payment_method: defaultPM,
+                trial_end: trialEnd,
+                metadata: {
+                  source: 'admin_portal',
+                  userId: userId.toString(),
+                  membershipId,
+                },
+              });
+              subscriptionId = subscription.id;
+              await storage.updateMembership(membershipId, { stripeSubscriptionId: subscriptionId });
+              console.log(`✅ [Admin membership] Created new subscription ${subscriptionId} for membership ${membershipId}`);
+            } else {
+              needsPaymentMethod = true;
+              stripeNote = 'Membership created. Add a payment card in the Payments tab, then use "Create Subscription" to activate recurring billing.';
+            }
           } else {
-            needsPaymentMethod = true;
-            stripeNote = 'Membership created. Add a payment card in the Payments tab, then use "Create Subscription" to activate recurring billing.';
+            stripeNote = 'Membership created. No Stripe price is configured for this plan — sync plans with Stripe to enable auto-billing.';
           }
         } catch (subErr: any) {
-          console.warn(`⚠️ [Admin membership] Could not create subscription for ${membershipId}: ${subErr.message}`);
-          stripeNote = 'Membership created but subscription could not be set up automatically. Use "Create Subscription" in the member profile.';
+          console.warn(`⚠️ [Admin membership] Subscription handling failed for ${membershipId}: ${subErr.message}`);
+          stripeNote = 'Membership created but subscription could not be linked automatically. Use "Sync Subscription from Stripe" in the edit dialog.';
         }
-      } else if (!plan.stripePriceId) {
-        stripeNote = 'Membership created. No Stripe price is configured for this plan — sync plans with Stripe to enable auto-billing.';
+      } else if (plan.stripePriceId) {
+        stripeNote = 'Membership created. No Stripe customer found — a customer will be created when the member adds a payment method.';
       }
 
       console.log(`✅ Admin created membership for user ${userId}:`, membershipId);

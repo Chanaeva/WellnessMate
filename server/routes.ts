@@ -4550,12 +4550,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!paymentMethod.card) {
         return res.status(400).json({ message: "Invalid payment method" });
       }
-      
-      // Check if this is the user's first payment method to make it default
+
+      const customerId = user.stripeCustomerId;
+
+      // --- Step 1: Idempotency guard (before any mutation) ---
+      //
+      // If this exact PM is already saved, return it immediately.  This makes retries
+      // and duplicate POSTs safe — no Stripe mutations are re-run.
       const existingMethods = await storage.getPaymentMethodsByUserId(user.id);
-      const isDefault = existingMethods.length === 0;
-      
-      // Save to database
+      const alreadySaved = existingMethods.find(
+        (m) => m.stripePaymentMethodId === paymentMethod.id
+      );
+      if (alreadySaved) {
+        return res.json(alreadySaved);
+      }
+
+      // --- Step 2: Ownership enforcement ---
+      //
+      // A logged-in member must not be able to set another Stripe customer's card as
+      // their default.
+      if (paymentMethod.customer && paymentMethod.customer !== customerId) {
+        return res.status(403).json({ message: "Payment method does not belong to this account." });
+      }
+
+      // --- Step 3: Attach if unattached ---
+      //
+      // PMs produced by a confirmed SetupIntent are attached by Stripe automatically,
+      // but guard against the unattached case.  Track didAttach for rollback.
+      let didAttach = false;
+      if (!paymentMethod.customer) {
+        if (!customerId) {
+          return res.status(400).json({ message: "No Stripe customer found for this account. Please contact support." });
+        }
+        try {
+          await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+          didAttach = true;
+          console.log(`✅ Attached unattached PM ${paymentMethodId} to customer ${customerId}`);
+        } catch (attachErr: any) {
+          if (attachErr.code !== 'resource_already_exists') {
+            return res.status(400).json({ message: "Failed to attach payment method: " + attachErr.message });
+          }
+          // Already attached by Stripe — fine.
+        }
+      }
+
+      // --- Step 4: Identify same-card duplicates via Stripe fingerprint ---
+      //
+      // The fingerprint is stable across reissues of the same physical card number
+      // (e.g. same debit card, refreshed expiry).  We never rely on last4+brand alone —
+      // two distinct cards can share those display fields.  Skip on retrieval error to
+      // avoid a false-positive deletion.
+      const newFingerprint = paymentMethod.card.fingerprint;
+      const duplicates: typeof existingMethods = [];
+
+      if (newFingerprint) {
+        for (const existing of existingMethods) {
+          try {
+            const existingPm = await stripe.paymentMethods.retrieve(existing.stripePaymentMethodId);
+            if (existingPm.card?.fingerprint && existingPm.card.fingerprint === newFingerprint) {
+              duplicates.push(existing);
+            }
+          } catch (retrieveErr: any) {
+            if (retrieveErr.code === 'resource_missing') {
+              // PM already gone in Stripe — clean it from the DB too.
+              duplicates.push(existing);
+            } else {
+              console.warn(`⚠️ Could not retrieve PM ${existing.stripePaymentMethodId} for fingerprint check:`, retrieveErr.message);
+            }
+          }
+        }
+      }
+
+      // --- Step 5: Determine isDefault ---
+      //
+      // Saving a card via the self-serve UI is always a "use this card for billing"
+      // action — the form is labelled "Update Payment Method" and there is no explicit
+      // "add a secondary card" concept.  Always set the new card as the default so
+      // Stripe billing and the local DB stay in sync regardless of how many cards the
+      // member already has on file.
+      const isDefault = true;
+
+      // --- Step 6: Stripe mutations — only when this card becomes the default ---
+      //
+      // Updating the Stripe customer/subscription default when isDefault is false would
+      // cause Stripe to charge a card the member did not select as their billing card,
+      // creating a UI/billing mismatch.  We only propagate the new default to Stripe
+      // when this card is actually becoming the member's default payment method.
+      //
+      // All mutations must succeed before any DB write.  On failure we restore the prior
+      // Stripe state via a compensating rollback (including the null/"unset" case).
+
+      if (isDefault && customerId) {
+        // Capture prior defaults for rollback.
+        let priorCustomerDefault: string | null = null;
+        let liveSub: { status: string; id: string } | null = null;
+
+        // Hard precondition: we must know the prior customer default before mutating,
+        // so that rollback restores the exact prior value — not a presumed null.
+        // Abort with error rather than proceeding without a reliable restore point.
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (customer && !('deleted' in customer)) {
+            const inv = (customer as any).invoice_settings;
+            const def = inv?.default_payment_method;
+            priorCustomerDefault = typeof def === 'string' ? def : ((def as any)?.id ?? null);
+          }
+        } catch (custReadErr: any) {
+          if (didAttach) { try { await stripe.paymentMethods.detach(paymentMethodId); } catch {} }
+          throw new Error(`Failed to retrieve Stripe customer state before update: ${custReadErr.message}`);
+        }
+
+        const membership = await storage.getMembershipByUserId(user.id);
+        if (membership?.stripeSubscriptionId) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+            if (['active', 'trialing', 'past_due'].includes(sub.status)) {
+              liveSub = { status: sub.status, id: membership.stripeSubscriptionId };
+            }
+          } catch (retrieveSubErr: any) {
+            if (retrieveSubErr.code !== 'resource_missing') {
+              if (didAttach) { try { await stripe.paymentMethods.detach(paymentMethodId); } catch {} }
+              throw new Error(`Failed to retrieve subscription: ${retrieveSubErr.message}`);
+            }
+            // resource_missing: subscription purged in Stripe, skip.
+          }
+        }
+
+        // Compensating rollback: restores captured defaults and detaches a freshly
+        // attached PM so billing state is no worse than before the request.
+        // Handles the null/"unset" case: passes '' to clear an unset prior default.
+        const rollback = async (restoreCustomer: boolean) => {
+          if (restoreCustomer) {
+            try {
+              await stripe.customers.update(customerId, {
+                invoice_settings: {
+                  default_payment_method: (priorCustomerDefault ?? '') as any
+                }
+              });
+              console.log(`↩️ Restored customer ${customerId} default PM → ${priorCustomerDefault ?? '(cleared)'}`);
+            } catch (e: any) {
+              console.error(`⚠️ Could not restore customer default PM:`, e.message);
+            }
+          }
+          if (didAttach) {
+            try {
+              await stripe.paymentMethods.detach(paymentMethodId);
+              console.log(`↩️ Rolled back PM attachment for ${paymentMethodId}`);
+            } catch (e: any) {
+              console.error(`⚠️ Could not roll back PM attachment:`, e.message);
+            }
+          }
+        };
+
+        // 6a. Update customer invoice default.
+        try {
+          await stripe.customers.update(customerId, {
+            invoice_settings: { default_payment_method: paymentMethod.id }
+          });
+          console.log(`✅ Updated Stripe customer ${customerId} default PM → ${paymentMethod.id}`);
+        } catch (custErr: any) {
+          await rollback(false);
+          throw new Error(`Failed to update customer default payment method: ${custErr.message}`);
+        }
+
+        // 6b. Update subscription default (live status: active / trialing / past_due).
+        //     On failure, restore the customer default we just set.
+        if (liveSub) {
+          try {
+            await stripe.subscriptions.update(liveSub.id, {
+              default_payment_method: paymentMethod.id
+            });
+            console.log(`✅ Updated subscription ${liveSub.id} (live: ${liveSub.status}) default PM → ${paymentMethod.id}`);
+          } catch (subErr: any) {
+            await rollback(true);
+            throw new Error(`Failed to update subscription default payment method: ${subErr.message}`);
+          }
+        }
+      }
+
+      // --- Step 7: DB write (only reached if all Stripe mutations succeeded) ---
       const savedMethod = await storage.createPaymentMethod({
         userId: user.id,
         stripePaymentMethodId: paymentMethod.id,
@@ -4565,7 +4738,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cardExpYear: paymentMethod.card.exp_year,
         isDefault
       });
-      
+
+      // Reconcile the isDefault flag across all saved methods in the DB.
+      if (isDefault) {
+        await storage.setDefaultPaymentMethod(user.id, paymentMethod.id);
+      }
+
+      // --- Step 8: Remove duplicate cards (safe now that new card is live) ---
+      for (const dup of duplicates) {
+        try {
+          await stripe.paymentMethods.detach(dup.stripePaymentMethodId);
+        } catch (detachErr: any) {
+          if (!['resource_missing', 'resource_already_exists'].includes((detachErr as any).code)) {
+            console.warn(`⚠️ Could not detach old PM ${dup.stripePaymentMethodId}:`, detachErr.message);
+          }
+        }
+        await storage.deletePaymentMethod(dup.stripePaymentMethodId);
+        console.log(`🗑️ Removed duplicate (fingerprint match) PM ${dup.stripePaymentMethodId} for user ${user.id}`);
+      }
+
       res.json(savedMethod);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to save payment method: " + error.message });
@@ -4577,7 +4768,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const { paymentMethodId } = req.params;
-      
+
+      // Verify ownership: the PM must belong to this user's Stripe customer.
+      const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+      if (pm.customer && pm.customer !== user.stripeCustomerId) {
+        return res.status(403).json({ message: "Payment method does not belong to this account." });
+      }
+
+      // Propagate the new default to Stripe before committing locally.
+      // Mirrors the POST path: customer invoice default + live subscription default,
+      // with a compensating rollback if the subscription update fails after the
+      // customer default has already been changed.
+      const customerId = user.stripeCustomerId;
+      if (customerId) {
+        // Capture prior customer default — required for a reliable rollback.
+        let priorCustomerDefault: string | null = null;
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (customer && !('deleted' in customer)) {
+            const inv = (customer as any).invoice_settings;
+            const def = inv?.default_payment_method;
+            priorCustomerDefault = typeof def === 'string' ? def : ((def as any)?.id ?? null);
+          }
+        } catch (custReadErr: any) {
+          throw new Error(`Failed to retrieve Stripe customer state before update: ${custReadErr.message}`);
+        }
+
+        // Update customer invoice default.
+        await stripe.customers.update(customerId, {
+          invoice_settings: { default_payment_method: paymentMethodId }
+        });
+        console.log(`✅ [set-default] Updated Stripe customer ${customerId} default PM → ${paymentMethodId}`);
+
+        // Update live subscription default — restore customer default on failure.
+        const membership = await storage.getMembershipByUserId(user.id);
+        if (membership?.stripeSubscriptionId) {
+          try {
+            const liveSub = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId);
+            if (['active', 'trialing', 'past_due'].includes(liveSub.status)) {
+              try {
+                await stripe.subscriptions.update(membership.stripeSubscriptionId, {
+                  default_payment_method: paymentMethodId
+                });
+                console.log(`✅ [set-default] Updated subscription ${membership.stripeSubscriptionId} (live: ${liveSub.status}) default PM → ${paymentMethodId}`);
+              } catch (subErr: any) {
+                // Restore customer default before surfacing the error.
+                try {
+                  await stripe.customers.update(customerId, {
+                    invoice_settings: { default_payment_method: (priorCustomerDefault ?? '') as any }
+                  });
+                  console.log(`↩️ [set-default] Restored customer ${customerId} default PM → ${priorCustomerDefault ?? '(cleared)'}`);
+                } catch (restoreErr: any) {
+                  console.error(`⚠️ [set-default] Could not restore customer default PM:`, restoreErr.message);
+                }
+                throw new Error(`Failed to update subscription default payment method: ${subErr.message}`);
+              }
+            }
+          } catch (subErr: any) {
+            if ((subErr as any).code !== 'resource_missing') throw subErr;
+            // resource_missing: subscription purged in Stripe, skip.
+          }
+        }
+      }
+
       await storage.setDefaultPaymentMethod(user.id, paymentMethodId);
       res.json({ message: "Default payment method updated" });
     } catch (error: any) {

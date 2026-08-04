@@ -363,13 +363,13 @@ export async function sendGiftCardEmail(
       : `${amount} Day Pass${amount > 1 ? 'es' : ''}`;
     const cardTitle = packageName || (isMonetary ? 'Gift Card' : 'Day Pass Bundle');
 
-    const waiverSection = waiverUrl ? `\n\nBefore your first visit, please sign our facility waiver at: ${waiverUrl}\nClick "Guest Check-In (Waiver Only)" to complete your waiver — it only takes a minute.` : '';
+    const waiverSection = waiverUrl ? `\n\nBefore your first visit, please sign our facility waiver here: ${waiverUrl}\nIt only takes a minute and is required before your first visit.` : '';
 
     const waiverHtml = waiverUrl ? `
       <div style="background-color: #fff8e6; border: 1px solid #f5c842; padding: 16px 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
         <p style="font-size: 15px; font-weight: bold; color: #7a5c00; margin: 0 0 8px 0;">📋 Sign Your Waiver Before Visiting</p>
-        <p style="color: #7a5c00; font-size: 14px; margin: 0 0 14px 0;">Stop by the kiosk and click "Guest Check-In (Waiver Only)" to sign your liability waiver — it only takes a minute and is required before your first visit.</p>
-        <a href="${waiverUrl}" style="background-color: #4a5d4a; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Sign Waiver at Kiosk →</a>
+        <p style="color: #7a5c00; font-size: 14px; margin: 0 0 14px 0;">Please sign our facility waiver before your first visit — it only takes a minute.</p>
+        <a href="${waiverUrl}" style="background-color: #4a5d4a; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Sign Waiver →</a>
       </div>
     ` : '';
 

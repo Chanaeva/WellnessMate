@@ -33,6 +33,7 @@ import AdminGallery from "@/pages/admin/gallery";
 import AdminCheckIns from "@/pages/admin/check-ins";
 import GiftCardsPage from "@/pages/gift-cards";
 
+import GuestWaiverPage from "@/pages/guest-waiver";
 import KioskCheckIn from "@/pages/kiosk-checkin";
 import KioskMemberCreation from "@/pages/kiosk-member-creation";
 import MembershipAgreement from "@/pages/membership-agreement";
@@ -97,6 +98,7 @@ function Router() {
       <ProtectedRoute path="/admin/gallery" component={AdminGallery} />
       <ProtectedRoute path="/admin/check-ins" component={AdminCheckIns} />
 
+      <Route path="/waiver" component={GuestWaiverPage} />
       <Route path="/kiosk" component={KioskCheckIn} />
       <Route path="/kiosk-checkin" component={KioskCheckIn} />
       <Route path="/kiosk/member-creation" component={KioskMemberCreationWrapper} />

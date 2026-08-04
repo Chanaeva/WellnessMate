@@ -6798,7 +6798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build waiver URL from request host
       const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
       const host = req.headers.host;
-      const waiverUrl = `${proto}://${host}/kiosk`;
+      const waiverUrl = `${proto}://${host}/waiver`;
 
       sendGiftCardEmail(
         recipientEmail,

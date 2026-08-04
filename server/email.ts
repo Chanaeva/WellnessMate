@@ -415,6 +415,113 @@ export async function sendGiftCardEmail(
   }
 }
 
+export interface DayPassReceiptItem {
+  name: string;
+  totalPunches: number;
+  quantity: number;
+  unitPriceCents: number;
+}
+
+export async function sendDayPassReceiptEmail(
+  toEmail: string,
+  firstName: string,
+  items: DayPassReceiptItem[],
+  totalAmountCents: number,
+  purchasedAt?: Date
+): Promise<boolean> {
+  try {
+    const transporter = createTransporter();
+
+    const dateStr = (purchasedAt ?? new Date()).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      timeZone: 'America/Chicago'
+    });
+
+    const itemRows = items.map(item => {
+      const unitDisplay = `$${(item.unitPriceCents / 100).toFixed(2)}`;
+      const lineTotal = `$${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}`;
+      const visitLabel = item.totalPunches === 1 ? '1 visit' : `${item.totalPunches} visits`;
+      const qtyLabel = item.quantity > 1 ? ` × ${item.quantity}` : '';
+      return `
+        <tr>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee;">${item.name}${qtyLabel}<br>
+            <span style="font-size: 12px; color: #888;">${visitLabel} per pass</span>
+          </td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; white-space: nowrap;">${unitDisplay}</td>
+          <td style="padding: 10px 0; border-bottom: 1px solid #eee; text-align: right; white-space: nowrap; font-weight: bold;">${lineTotal}</td>
+        </tr>`;
+    }).join('');
+
+    const itemText = items.map(item => {
+      const visitLabel = item.totalPunches === 1 ? '1 visit' : `${item.totalPunches} visits`;
+      const qtyLabel = item.quantity > 1 ? ` × ${item.quantity}` : '';
+      return `  • ${item.name}${qtyLabel} (${visitLabel} per pass) — $${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}`;
+    }).join('\n');
+
+    const totalDisplay = `$${(totalAmountCents / 100).toFixed(2)}`;
+
+    const msg = {
+      from: `"Wolf Mother Wellness" <${GMAIL_USER}>`,
+      to: toEmail,
+      subject: 'Wolf Mother Wellness — Day Pass Receipt',
+      text: `Hi ${firstName},\n\nThank you for your purchase! Here's your receipt.\n\nDate: ${dateStr}\n\n${itemText}\n\nTotal: ${totalDisplay}\n\nYour day pass${items.reduce((n, i) => n + i.quantity, 0) > 1 ? 'es are' : ' is'} ready to use. Simply check in at the kiosk or front desk.\n\nSee you soon!\nWolf Mother Wellness Team`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #4a5d4a 0%, #6b8e5a 100%); padding: 24px 32px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 22px; letter-spacing: 1px;">Wolf Mother Wellness</h1>
+            <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0 0; font-size: 14px;">Day Pass Receipt</p>
+          </div>
+          <div style="padding: 28px 32px; border: 1px solid #e8e8e8; border-top: none; border-radius: 0 0 8px 8px;">
+            <p style="margin: 0 0 20px 0;">Hi ${firstName},</p>
+            <p style="margin: 0 0 20px 0;">Thank you for your purchase! Your day pass${items.reduce((n, i) => n + i.quantity, 0) > 1 ? 'es are' : ' is'} ready to use.</p>
+
+            <div style="background-color: #f8f8f8; padding: 4px 20px 4px 20px; border-radius: 8px; margin: 0 0 24px 0;">
+              <p style="font-size: 12px; color: #888; margin: 14px 0 6px 0;">DATE</p>
+              <p style="margin: 0 0 14px 0; font-weight: bold;">${dateStr}</p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 0 0 8px 0;">
+              <thead>
+                <tr>
+                  <th style="text-align: left; padding: 8px 0; border-bottom: 2px solid #4a5d4a; color: #4a5d4a; font-size: 13px;">Package</th>
+                  <th style="text-align: right; padding: 8px 0; border-bottom: 2px solid #4a5d4a; color: #4a5d4a; font-size: 13px;">Unit Price</th>
+                  <th style="text-align: right; padding: 8px 0; border-bottom: 2px solid #4a5d4a; color: #4a5d4a; font-size: 13px;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemRows}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" style="padding: 14px 0 0 0; text-align: right; font-weight: bold; font-size: 15px;">Total Paid:</td>
+                  <td style="padding: 14px 0 0 0; text-align: right; font-weight: bold; font-size: 15px; color: #4a5d4a;">${totalDisplay}</td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <div style="background-color: #f0f4f0; border-left: 4px solid #4a5d4a; padding: 14px 18px; border-radius: 4px; margin: 24px 0;">
+              <p style="margin: 0; color: #3a4a3a; font-size: 14px;">
+                To check in, visit the kiosk or let the front desk know you have a day pass. Your pass will be punched each visit.
+              </p>
+            </div>
+
+            <p style="margin: 0 0 6px 0;">See you soon!</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0 16px 0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">Best regards,<br>Wolf Mother Wellness Team</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(msg);
+    console.log(`Day pass receipt sent to ${toEmail}`);
+    return true;
+  } catch (error) {
+    console.error('Day pass receipt email error:', error);
+    return false;
+  }
+}
+
 export async function sendBackupAlertEmail(
   toEmail: string,
   schedule: string,

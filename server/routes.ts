@@ -14,7 +14,7 @@ import { walletService } from "./wallet/wallet-service";
 import { and, eq, or, sql } from "drizzle-orm";
 import multer from "multer";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
-import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail, sendWaitlistNotificationEmail } from "./email";
+import { sendSessionBookingNotification, sendPasswordResetEmail, sendGiftCardEmail, sendWaitlistNotificationEmail, sendDayPassReceiptEmail, type DayPassReceiptItem } from "./email";
 import { sendWaitlistNotificationSMS, sendSMS } from "./sms";
 
 const scryptAsync = promisify(scrypt);
@@ -4482,6 +4482,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, message: "Order finalized successfully" });
       }
 
+      const receiptItems: DayPassReceiptItem[] = [];
+      let receiptTotalCents = 0;
+
       for (const item of items) {
         if (item.type === 'punch_card') {
           const templates = await storage.getAllPunchCardTemplates();
@@ -4527,8 +4530,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 stripePaymentMethodId: resolvedPaymentMethodId || "default"
               });
             }
+
+            receiptItems.push({
+              name: template.name,
+              totalPunches: template.totalPunches,
+              quantity,
+              unitPriceCents: template.totalPrice,
+            });
+            receiptTotalCents += template.totalPrice * quantity;
           }
         }
+      }
+
+      // Send receipt email (fire-and-forget — don't block the response).
+      if (receiptItems.length > 0 && user.email) {
+        sendDayPassReceiptEmail(user.email, user.firstName || 'there', receiptItems, receiptTotalCents)
+          .catch(err => console.error('Failed to send day pass receipt:', err));
       }
 
       res.json({ success: true, message: "Order finalized successfully" });
@@ -8839,6 +8856,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`✅ Day pass user ${newUser.firstName} ${newUser.lastName} automatically checked in`);
         } else {
           console.log(`📋 ${dayPassQuantity} day pass(es) purchased for ${newUser.firstName} ${newUser.lastName} - saved for later use`);
+        }
+
+        // Send receipt email (fire-and-forget).
+        if (newUser.email) {
+          sendDayPassReceiptEmail(
+            newUser.email,
+            newUser.firstName || 'there',
+            [{
+              name: packageData.name || 'Day Pass Package',
+              totalPunches: totalPunches,
+              quantity: dayPassQuantity,
+              unitPriceCents: unitPrice,
+            }],
+            unitPrice * dayPassQuantity
+          ).catch(err => console.error('Failed to send kiosk day pass receipt:', err));
         }
       }
       

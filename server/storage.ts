@@ -2247,11 +2247,10 @@ export class DatabaseStorage implements IStorage {
       return updated;
     }
 
-    const username = `guest_${email}`;
     const [created] = await db
       .insert(users)
       .values({
-        username,
+        username: email,
         email,
         password: '__guest_no_login__',
         firstName: data.firstName,

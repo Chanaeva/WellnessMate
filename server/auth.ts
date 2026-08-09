@@ -25,10 +25,21 @@ export async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    const parts = stored.split(".");
+    // Expect exactly "hash.salt" — any other format is not a valid scrypt hash.
+    if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
+    const [hashed, salt] = parts;
+    const hashedBuf = Buffer.from(hashed, "hex");
+    // Guard against a zero-length buffer (non-hex stored value).
+    if (hashedBuf.length === 0) return false;
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    if (hashedBuf.length !== suppliedBuf.length) return false;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch {
+    // Malformed stored password — treat as invalid credentials, not a server error.
+    return false;
+  }
 }
 
 export function setupAuth(app: Express) {

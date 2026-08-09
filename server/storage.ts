@@ -41,7 +41,7 @@ import {
   smsBroadcasts, type SmsBroadcast, type InsertSmsBroadcast,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, and, lt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
+import { eq, desc, and, lt, gt, gte, lte, sql, or, inArray, ilike, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -511,10 +511,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    // Return only the most recent unused, non-expired token matching this code.
+    // Without ordering + filtering, multiple reset requests for the same user could
+    // cause an old used token to be returned, producing a false "already used" error.
     const [resetToken] = await db
       .select()
       .from(passwordResetTokens)
-      .where(eq(passwordResetTokens.token, token));
+      .where(
+        and(
+          eq(passwordResetTokens.token, token),
+          eq(passwordResetTokens.used, false),
+          gt(passwordResetTokens.expiresAt, new Date())
+        )
+      )
+      .orderBy(desc(passwordResetTokens.id))
+      .limit(1);
     return resetToken || undefined;
   }
 

@@ -88,6 +88,10 @@ export interface IStorage {
   getMembershipsWithoutSubscription(): Promise<(Membership & { user: User })[]>;
   getManagedMemberships(managedByUserId: number): Promise<(Membership & { user: User })[]>;
 
+  // Analytics search methods
+  searchMembersForAnalytics(q: string): Promise<any[]>;
+  getMemberVisitStats(userId: number): Promise<any>;
+
   // Check-in methods
   getCheckInsByUserId(userId: number): Promise<CheckIn[]>;
   createCheckIn(checkIn: InsertCheckIn): Promise<CheckIn>;
@@ -1182,6 +1186,101 @@ export class DatabaseStorage implements IStorage {
       .orderBy(punchCardTemplates.sortOrder, punchCardTemplates.totalPunches);
     
     return templates;
+  }
+
+  async searchMembersForAnalytics(q: string): Promise<any[]> {
+    const term = q.trim();
+    if (!term) return [];
+
+    const numId = parseInt(term);
+    const isNumeric = !isNaN(numId);
+
+    const conditions = [
+      ilike(users.firstName, `%${term}%`),
+      ilike(users.lastName, `%${term}%`),
+      ilike(users.email, `%${term}%`),
+    ];
+    if (isNumeric) {
+      conditions.push(eq(users.id, numId) as any);
+    }
+
+    const results = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      })
+      .from(users)
+      .where(or(...conditions))
+      .orderBy(users.firstName, users.lastName)
+      .limit(10);
+
+    const withStatus = await Promise.all(
+      results.map(async (u) => {
+        const m = await this.getMembershipByUserId(u.id);
+        return { ...u, membershipStatus: m?.status ?? null };
+      })
+    );
+
+    return withStatus;
+  }
+
+  async getMemberVisitStats(userId: number): Promise<any> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const allCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(eq(checkIns.userId, userId))
+      .orderBy(desc(checkIns.timestamp));
+
+    const totalVisits = allCheckIns.length;
+    const lastVisit = allCheckIns[0]?.timestamp ?? null;
+
+    const thisMonthVisits = allCheckIns.filter(
+      (c) => c.timestamp && c.timestamp >= startOfMonth
+    ).length;
+    const thisYearVisits = allCheckIns.filter(
+      (c) => c.timestamp && c.timestamp >= startOfYear
+    ).length;
+
+    // Average monthly visits since first check-in
+    let avgMonthlyVisits = 0;
+    if (allCheckIns.length > 0) {
+      const firstVisit = allCheckIns[allCheckIns.length - 1].timestamp!;
+      const monthsActive = Math.max(
+        1,
+        (now.getFullYear() - firstVisit.getFullYear()) * 12 +
+          (now.getMonth() - firstVisit.getMonth()) +
+          1
+      );
+      avgMonthlyVisits = Math.round((totalVisits / monthsActive) * 10) / 10;
+    }
+
+    // Last 6 months breakdown
+    const monthlyBreakdown: { month: string; visits: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      const label = start.toLocaleString('en-US', { month: 'short' }) +
+        " '" + String(start.getFullYear()).slice(2);
+      const visits = allCheckIns.filter(
+        (c) => c.timestamp && c.timestamp >= start && c.timestamp < end
+      ).length;
+      monthlyBreakdown.push({ month: label, visits });
+    }
+
+    return {
+      totalVisits,
+      thisMonthVisits,
+      thisYearVisits,
+      lastVisit: lastVisit?.toISOString() ?? null,
+      avgMonthlyVisits,
+      monthlyBreakdown,
+    };
   }
 
   async getVisitAnalytics(period: string): Promise<any> {

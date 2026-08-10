@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { User, Membership, insertUserSchema } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +33,8 @@ import {
   CheckCircle2,
   CircleDashed,
   ArrowRight,
+  X,
+  Activity,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -77,6 +79,13 @@ export default function AdminDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState("week");
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Member stats search
+  const [memberSearch, setMemberSearch] = useState("");
+  const [debouncedMemberSearch, setDebouncedMemberSearch] = useState("");
+  const [selectedMemberForStats, setSelectedMemberForStats] = useState<any>(null);
+  const [showMemberDropdown, setShowMemberDropdown] = useState(false);
+  const memberSearchRef = useRef<HTMLDivElement>(null);
 
   // Queries
   const { data: members, isLoading: membersLoading } = useQuery<(User & {membership?: Membership})[]>({
@@ -125,6 +134,42 @@ export default function AdminDashboard() {
       const res = await apiRequest("GET", "/api/admin/dashboard-summary");
       return res.json();
     },
+  });
+
+  // Debounce member search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMemberSearch(memberSearch), 300);
+    return () => clearTimeout(t);
+  }, [memberSearch]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (memberSearchRef.current && !memberSearchRef.current.contains(e.target as Node)) {
+        setShowMemberDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const { data: memberSearchResults = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/members/search", debouncedMemberSearch],
+    queryFn: async () => {
+      if (debouncedMemberSearch.trim().length < 2) return [];
+      const res = await apiRequest("GET", `/api/admin/members/search?q=${encodeURIComponent(debouncedMemberSearch)}`);
+      return res.json();
+    },
+    enabled: debouncedMemberSearch.trim().length >= 2,
+  });
+
+  const { data: memberVisitStats, isLoading: memberStatsLoading } = useQuery<any>({
+    queryKey: ["/api/admin/members/visit-stats", selectedMemberForStats?.id],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/members/${selectedMemberForStats.id}/visit-stats`);
+      return res.json();
+    },
+    enabled: !!selectedMemberForStats,
   });
 
   const { data: upcomingBookings = [] } = useQuery<any[]>({
@@ -685,6 +730,180 @@ export default function AdminDashboard() {
                     <Bar dataKey="visits" fill="#6b8e5a" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Member Stats Lookup */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Member Stats Lookup
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">Search a member by name or ID to see their visit history</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Search input */}
+                <div className="relative" ref={memberSearchRef}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9 pr-9"
+                      placeholder="Search by name or member ID…"
+                      value={memberSearch}
+                      onChange={(e) => {
+                        setMemberSearch(e.target.value);
+                        setShowMemberDropdown(true);
+                        if (!e.target.value) setSelectedMemberForStats(null);
+                      }}
+                      onFocus={() => memberSearch.length >= 2 && setShowMemberDropdown(true)}
+                    />
+                    {(memberSearch || selectedMemberForStats) && (
+                      <button
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setMemberSearch("");
+                          setDebouncedMemberSearch("");
+                          setSelectedMemberForStats(null);
+                          setShowMemberDropdown(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Autocomplete dropdown */}
+                  {showMemberDropdown && debouncedMemberSearch.trim().length >= 2 && (
+                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
+                      {memberSearchResults.length === 0 ? (
+                        <p className="p-3 text-sm text-muted-foreground">No members found</p>
+                      ) : (
+                        <ul className="max-h-60 overflow-auto py-1">
+                          {memberSearchResults.map((m: any) => (
+                            <li key={m.id}>
+                              <button
+                                className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setSelectedMemberForStats(m);
+                                  setMemberSearch(`${m.firstName} ${m.lastName}`);
+                                  setShowMemberDropdown(false);
+                                }}
+                              >
+                                <span className="flex flex-col">
+                                  <span className="text-sm font-medium">{m.firstName} {m.lastName}</span>
+                                  <span className="text-xs text-muted-foreground">{m.email} · ID {m.id}</span>
+                                </span>
+                                {m.membershipStatus && (
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      m.membershipStatus === "active"
+                                        ? "border-green-300 text-green-700 bg-green-50"
+                                        : m.membershipStatus === "frozen"
+                                        ? "border-blue-300 text-blue-700 bg-blue-50"
+                                        : "border-slate-300 text-slate-600"
+                                    }
+                                  >
+                                    {m.membershipStatus}
+                                  </Badge>
+                                )}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Stats card */}
+                {selectedMemberForStats && (
+                  <div className="space-y-4 pt-2">
+                    {/* Member header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-lg">
+                          {selectedMemberForStats.firstName} {selectedMemberForStats.lastName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{selectedMemberForStats.email}</p>
+                      </div>
+                      {selectedMemberForStats.membershipStatus && (
+                        <Badge
+                          variant="outline"
+                          className={
+                            selectedMemberForStats.membershipStatus === "active"
+                              ? "border-green-300 text-green-700 bg-green-50"
+                              : selectedMemberForStats.membershipStatus === "frozen"
+                              ? "border-blue-300 text-blue-700 bg-blue-50"
+                              : "border-slate-300 text-slate-600"
+                          }
+                        >
+                          {selectedMemberForStats.membershipStatus}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {memberStatsLoading ? (
+                      <div className="flex items-center justify-center h-32 text-muted-foreground">
+                        <p className="text-sm">Loading stats…</p>
+                      </div>
+                    ) : memberVisitStats?.totalVisits === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-32 text-muted-foreground border rounded-lg">
+                        <Calendar className="h-8 w-8 mb-2 opacity-30" />
+                        <p className="text-sm font-medium">No visits on record</p>
+                        <p className="text-xs">This member hasn't checked in yet</p>
+                      </div>
+                    ) : memberVisitStats ? (
+                      <>
+                        {/* Stat tiles */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900">
+                            <p className="text-xs text-muted-foreground">Total Visits</p>
+                            <p className="text-2xl font-bold">{memberVisitStats.totalVisits}</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900">
+                            <p className="text-xs text-muted-foreground">This Month</p>
+                            <p className="text-2xl font-bold">{memberVisitStats.thisMonthVisits}</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900">
+                            <p className="text-xs text-muted-foreground">This Year</p>
+                            <p className="text-2xl font-bold">{memberVisitStats.thisYearVisits}</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900">
+                            <p className="text-xs text-muted-foreground">Avg / Month</p>
+                            <p className="text-2xl font-bold">{memberVisitStats.avgMonthlyVisits}</p>
+                          </div>
+                        </div>
+
+                        {/* Last visit */}
+                        {memberVisitStats.lastVisit && (
+                          <p className="text-xs text-muted-foreground">
+                            Last visit:{" "}
+                            <span className="font-medium text-foreground">
+                              {format(new Date(memberVisitStats.lastVisit), "EEEE, MMMM d, yyyy 'at' h:mm a")}
+                            </span>
+                          </p>
+                        )}
+
+                        {/* 6-month bar chart */}
+                        <div>
+                          <p className="text-sm font-medium mb-2">Visits — last 6 months</p>
+                          <ResponsiveContainer width="100%" height={180}>
+                            <BarChart data={memberVisitStats.monthlyBreakdown || []}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                              <Tooltip />
+                              <Bar dataKey="visits" fill="#4a6741" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

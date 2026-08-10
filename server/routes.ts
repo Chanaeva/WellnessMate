@@ -2014,6 +2014,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Member search for analytics autocomplete
+  app.get("/api/admin/members/search", isAdmin, async (req, res) => {
+    try {
+      const q = (req.query.q as string) || "";
+      if (q.trim().length < 2) return res.json([]);
+      const results = await storage.searchMembersForAnalytics(q);
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get all guests (role='guest') with visit counts
   app.get("/api/admin/guests", isAdmin, async (req, res) => {
     try {
@@ -2698,6 +2710,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const memberId = parseInt(req.params.id);
       const checkIns = await storage.getCheckInsByUserId(memberId);
       res.json(checkIns);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Per-member visit stats for analytics
+  app.get("/api/admin/members/:id/visit-stats", isAdmin, async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id);
+      if (isNaN(memberId)) return res.status(400).json({ message: "Invalid member ID" });
+      const stats = await storage.getMemberVisitStats(memberId);
+      res.json(stats);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

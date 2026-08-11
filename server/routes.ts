@@ -3500,12 +3500,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await freshStripe.customers.update(customerId, {
                 invoice_settings: { default_payment_method: defaultPM },
               });
-              const trialEnd = Math.floor(endDate.getTime() / 1000);
               const subscription = await freshStripe.subscriptions.create({
                 customer: customerId,
                 items: [{ price: plan.stripePriceId }],
                 default_payment_method: defaultPM,
-                trial_end: trialEnd,
                 metadata: {
                   source: 'admin_portal',
                   userId: userId.toString(),
@@ -3513,8 +3511,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 },
               });
               subscriptionId = subscription.id;
-              await storage.updateMembership(membershipId, { stripeSubscriptionId: subscriptionId });
-              console.log(`✅ [Admin membership] Created new subscription ${subscriptionId} for membership ${membershipId}`);
+              // Use Stripe's billing period end as the membership end date
+              const periodEnd = (subscription as any).current_period_end;
+              if (periodEnd) {
+                endDate.setTime(periodEnd * 1000);
+              }
+              await storage.updateMembership(membershipId, {
+                stripeSubscriptionId: subscriptionId,
+                endDate: endDate.toISOString().split('T')[0],
+              });
+              stripeNote = `Membership created and payment collected. Next billing: ${endDate.toISOString().split('T')[0]}`;
+              console.log(`✅ [Admin membership] Created new subscription ${subscriptionId} with immediate charge for membership ${membershipId}`);
             } else {
               needsPaymentMethod = true;
               stripeNote = 'Membership created. Add a payment card in the Payments tab, then use "Create Subscription" to activate recurring billing.';

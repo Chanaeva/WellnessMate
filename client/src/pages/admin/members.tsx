@@ -2111,6 +2111,7 @@ export default function AdminMembers() {
                             {membershipPlans.length > 0 ? (
                               membershipPlans
                                 .filter((p) => p.isActive)
+                                .filter((p, idx, arr) => arr.findIndex(q => q.planType === p.planType) === idx)
                                 .map((p) => (
                                   <SelectItem key={p.id} value={p.planType}>
                                     {p.name}
@@ -2649,6 +2650,7 @@ export default function AdminMembers() {
                 <SelectContent>
                   {membershipPlans
                     .filter(plan => plan.isActive && plan.planType !== 'daily')
+                    .filter((plan, idx, arr) => arr.findIndex(p => p.planType === plan.planType) === idx)
                     .map(plan => (
                       <SelectItem key={plan.id} value={plan.planType}>
                         {plan.name} - ${plan.monthlyPrice}/month

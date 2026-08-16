@@ -102,6 +102,7 @@ function ChecklistPanel({ type }: { type: ChecklistType }) {
   } | null>(null);
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteRunConfirm, setDeleteRunConfirm] = useState(false);
 
   const cfg = TYPE_CONFIG[type];
   const Icon = cfg.icon;
@@ -169,6 +170,33 @@ function ChecklistPanel({ type }: { type: ChecklistType }) {
       refetchRuns();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/checklist-summary"] });
       toast({ title: `${cfg.label} checklist marked complete!` });
+    },
+  });
+
+  const reopenRunMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PUT", `/api/admin/checklist-runs/${run!.id}`, {
+        completedAt: null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchRuns();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/checklist-summary"] });
+      toast({ title: `${cfg.label} checklist re-opened` });
+    },
+  });
+
+  const deleteRunMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/admin/checklist-runs/${run!.id}`);
+    },
+    onSuccess: () => {
+      refetchRuns();
+      refetchRunItems();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/checklist-summary"] });
+      setDeleteRunConfirm(false);
+      toast({ title: `${cfg.label} checklist reset` });
     },
   });
 
@@ -273,6 +301,17 @@ function ChecklistPanel({ type }: { type: ChecklistType }) {
               <CircleDashed className="h-3 w-3 mr-1" />
               Not Started
             </Badge>
+          )}
+          {run && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2"
+              title="Reset this checklist run"
+              onClick={() => setDeleteRunConfirm(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           )}
           <Button
             variant="outline"
@@ -553,18 +592,64 @@ function ChecklistPanel({ type }: { type: ChecklistType }) {
 
           {run?.completedAt && (
             <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
-              <CardContent className="py-4 flex items-center gap-3">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-800 dark:text-green-200">Checklist completed</p>
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    Finished at {format(new Date(run.completedAt), "h:mm a")}
-                    {run.notes && ` · "${run.notes}"`}
-                  </p>
+              <CardContent className="py-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-6 w-6 text-green-600 shrink-0" />
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200">Checklist completed</p>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      Finished at {format(new Date(run.completedAt), "h:mm a")}
+                      {run.notes && ` · "${run.notes}"`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-800 border-green-300 hover:bg-green-100"
+                    onClick={() => reopenRunMutation.mutate()}
+                    disabled={reopenRunMutation.isPending}
+                  >
+                    Re-open
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-green-800 border-green-300 hover:bg-green-100"
+                    onClick={() => startRunMutation.mutate()}
+                    disabled={startRunMutation.isPending}
+                  >
+                    <PlayCircle className="h-3.5 w-3.5 mr-1" />
+                    Start New
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           )}
+
+          {/* Delete run confirmation dialog */}
+          <Dialog open={deleteRunConfirm} onOpenChange={setDeleteRunConfirm}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reset this checklist?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                This will delete the current run and all checked items, so the checklist can be
+                started fresh. This cannot be undone.
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteRunConfirm(false)}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteRunMutation.mutate()}
+                  disabled={deleteRunMutation.isPending}
+                >
+                  Reset Checklist
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
     </div>

@@ -8997,10 +8997,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/checklist-items/:id", isAdminOrStaff, async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const item = await storage.updateChecklistItem(id, req.body);
+      // Strip read-only fields that drizzle cannot set
+      const { id: _id, createdAt: _createdAt, ...updateData } = req.body;
+      const item = await storage.updateChecklistItem(id, updateData);
       res.json(item);
-    } catch (error) {
-      res.status(500).json({ message: "Server error" });
+    } catch (error: any) {
+      console.error("updateChecklistItem error:", error?.message, error?.stack);
+      res.status(500).json({ message: error?.message ?? "Server error" });
     }
   });
 
@@ -9029,6 +9032,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/checklist-runs", isAdminOrStaff, async (req, res) => {
     try {
       const userId = req.user?.id;
+      const { type, date } = req.body;
+      // Prevent duplicate incomplete runs for the same type+date
+      if (type && date) {
+        const existing = await storage.getChecklistRuns(type, date);
+        const incompleteRun = existing.find((r) => !r.completedAt);
+        if (incompleteRun) {
+          return res.status(409).json({ message: "A checklist run is already in progress for this type and date." });
+        }
+      }
       const run = await storage.createChecklistRun({ ...req.body, startedByUserId: userId });
       res.status(201).json(run);
     } catch (error) {
@@ -9039,8 +9051,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/checklist-runs/:id", isAdminOrStaff, async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const run = await storage.updateChecklistRun(id, req.body);
+      // Strip read-only fields; allow completedAt: null to re-open a run
+      const { id: _id, startedAt: _startedAt, startedByUserId: _starter, ...updateData } = req.body;
+      const run = await storage.updateChecklistRun(id, updateData);
       res.json(run);
+    } catch (error: any) {
+      console.error("updateChecklistRun error:", error?.message, error?.stack);
+      res.status(500).json({ message: error?.message ?? "Server error" });
+    }
+  });
+
+  app.delete("/api/admin/checklist-runs/:id", isAdminOrStaff, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteChecklistRun(id);
+      res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }

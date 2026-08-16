@@ -315,6 +315,7 @@ export interface IStorage {
   getChecklistRuns(type: string, date: string): Promise<ChecklistRun[]>;
   createChecklistRun(run: InsertChecklistRun): Promise<ChecklistRun>;
   updateChecklistRun(id: number, data: Partial<ChecklistRun>): Promise<ChecklistRun>;
+  deleteChecklistRun(id: number): Promise<void>;
   getChecklistRunItems(runId: number): Promise<ChecklistRunItem[]>;
   checkChecklistItem(runId: number, itemId: number, userId?: number): Promise<ChecklistRunItem>;
   uncheckChecklistItem(runId: number, itemId: number): Promise<void>;
@@ -2747,6 +2748,11 @@ export class DatabaseStorage implements IStorage {
   async updateChecklistRun(id: number, data: Partial<ChecklistRun>): Promise<ChecklistRun> {
     const [updated] = await db.update(checklistRuns).set(data).where(eq(checklistRuns.id, id)).returning();
     return updated;
+  }
+
+  async deleteChecklistRun(id: number): Promise<void> {
+    // checklistRunItems cascade-deletes automatically via FK onDelete: "cascade"
+    await db.delete(checklistRuns).where(eq(checklistRuns.id, id));
   }
 
   async getChecklistRunItems(runId: number): Promise<ChecklistRunItem[]> {

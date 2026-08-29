@@ -133,6 +133,7 @@ export interface IStorage {
   getPunchCardById(id: number): Promise<PunchCard | undefined>;
   createPunchCard(punchCard: InsertPunchCard): Promise<PunchCard>;
   usePunchCardEntry(id: number): Promise<PunchCard>;
+  usePunchCardsForCheckIn(userId: number, quantity: number, checkIn: InsertCheckIn): Promise<{ checkIns: CheckIn[]; cards: PunchCard[] }>;
   addPunchesToCard(id: number, punchesToAdd: number): Promise<PunchCard>;
   getAvailablePunchCardOptions(): Promise<PunchCardTemplate[]>;
   getActiveDayPassHolders(): Promise<(PunchCard & { user?: User })[]>;
@@ -1095,6 +1096,75 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updatedCard;
+  }
+
+  async usePunchCardsForCheckIn(
+    userId: number,
+    quantity: number,
+    checkIn: InsertCheckIn,
+  ): Promise<{ checkIns: CheckIn[]; cards: PunchCard[] }> {
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new Error("Day pass quantity must be a positive whole number");
+    }
+
+    return await db.transaction(async (tx) => {
+      const now = new Date();
+      const eligibleCards = await tx
+        .select()
+        .from(punchCards)
+        .where(and(
+          eq(punchCards.userId, userId),
+          eq(punchCards.status, "active"),
+          gt(punchCards.remainingPunches, 0),
+          or(isNull(punchCards.expiresAt), gt(punchCards.expiresAt, now)),
+        ))
+        .orderBy(punchCards.purchasedAt, punchCards.id)
+        .for("update");
+
+      const available = eligibleCards.reduce((sum, card) => sum + card.remainingPunches, 0);
+      if (available < quantity) {
+        const error = new Error(`Only ${available} day pass${available === 1 ? "" : "es"} available`);
+        (error as any).code = "INSUFFICIENT_DAY_PASSES";
+        throw error;
+      }
+
+      let remainingToUse = quantity;
+      const updatedCards: PunchCard[] = [];
+      for (const card of eligibleCards) {
+        if (remainingToUse === 0) break;
+
+        const usedFromCard = Math.min(remainingToUse, card.remainingPunches);
+        const newRemaining = card.remainingPunches - usedFromCard;
+        const [updatedCard] = await tx
+          .update(punchCards)
+          .set({
+            remainingPunches: newRemaining,
+            status: newRemaining === 0 ? "exhausted" : card.status,
+          })
+          .where(and(
+            eq(punchCards.id, card.id),
+            eq(punchCards.status, "active"),
+            gt(punchCards.remainingPunches, 0),
+          ))
+          .returning();
+
+        if (!updatedCard) {
+          const error = new Error("Day pass balance changed. Please try again.");
+          (error as any).code = "DAY_PASS_BALANCE_CHANGED";
+          throw error;
+        }
+
+        updatedCards.push(updatedCard);
+        remainingToUse -= usedFromCard;
+      }
+
+      const createdCheckIns = await tx
+        .insert(checkIns)
+        .values(Array.from({ length: quantity }, () => ({ ...checkIn, userId })))
+        .returning();
+
+      return { checkIns: createdCheckIns, cards: updatedCards };
+    });
   }
 
   async addPunchesToCard(id: number, punchesToAdd: number): Promise<PunchCard> {

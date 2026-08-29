@@ -1293,7 +1293,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kiosk check-in using membership ID from QR code or user ID for day pass users
   app.post("/api/kiosk-check-in", async (req, res) => {
     try {
-      const { membershipId, userId, useDayPass } = req.body;
+      const { membershipId, userId, useDayPass, dayPassQuantity: requestedQuantity } = req.body;
+      const dayPassQuantity = requestedQuantity === undefined ? 1 : Number(requestedQuantity);
+
+      if (
+        requestedQuantity !== undefined &&
+        (!Number.isInteger(dayPassQuantity) || dayPassQuantity < 1)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Day pass quantity must be a positive whole number",
+        });
+      }
       
       if (!membershipId && !userId) {
         return res.status(400).json({ 
@@ -1322,8 +1333,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user has day pass packages (punch cards)
       const userPunchCards = await storage.getPunchCardsByUserId(user.id);
-      const activeDayPasses = userPunchCards.filter(card => 
-        card.status === 'active' && card.remainingPunches > 0
+      const now = new Date();
+      const activeDayPasses = userPunchCards.filter(card =>
+        card.status === 'active' &&
+        card.remainingPunches > 0 &&
+        (!card.expiresAt || card.expiresAt > now)
       );
       
       // Staff can check in any member - membership/day pass status is for information only
@@ -1415,25 +1429,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let membershipType = membership?.planType || (activeDayPasses.length > 0 ? 'Day Pass' : 'Guest');
       let usedDayPass = false;
       
-      // Process day pass usage ONLY if explicitly requested (useDayPass === true)
-      // Punches don't count as check-ins, so we don't automatically deduct
-      if (useDayPass === true && activeDayPasses.length > 0) {
-        const oldestDayPass = activeDayPasses.sort((a, b) => 
-          new Date(a.purchasedAt || '1970-01-01').getTime() - new Date(b.purchasedAt || '1970-01-01').getTime()
-        )[0];
-        
-        // Use one visit from the day pass
-        const updatedCard = await storage.usePunchCardEntry(oldestDayPass.id);
+      // Process day pass usage ONLY if explicitly requested (useDayPass === true).
+      // The storage method locks eligible cards and creates all check-ins atomically.
+      if (useDayPass === true && activeDayPasses.length === 0) {
+        const error = new Error("No active day passes are available. Please scan again or see staff for assistance.");
+        (error as any).code = "INSUFFICIENT_DAY_PASSES";
+        throw error;
+      }
+
+      if (useDayPass === true) {
         membershipType = 'Day Pass';
         usedDayPass = true;
       }
       
-      // Create check-in record
-      const checkIn = await storage.createCheckIn({
+      const checkInData = {
         userId: user.id,
         membershipId: membership?.membershipId || 'day-pass-checkin',
         location: "Kiosk Check-in"
-      });
+      };
+      let usedDayPassCount = 0;
+
+      if (usedDayPass) {
+        await storage.usePunchCardsForCheckIn(user.id, dayPassQuantity, checkInData);
+        usedDayPassCount = dayPassQuantity;
+      } else {
+        await storage.createCheckIn(checkInData);
+      }
 
       // Mark session booking as checked in if sessions are enabled and user is a member
       if (!usedDayPass && membership && membership.status === 'active') {
@@ -1466,13 +1487,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let dayPassInfo = null;
       if (usedDayPass) {
         const updatedPunchCards = await storage.getPunchCardsByUserId(user.id);
-        const updatedActiveDayPasses = updatedPunchCards.filter(card => 
-          card.status === 'active' && card.remainingPunches >= 0
+        const updatedActiveDayPasses = updatedPunchCards.filter(card =>
+          card.status === 'active' &&
+          card.remainingPunches > 0 &&
+          (!card.expiresAt || card.expiresAt > new Date())
         );
         const totalRemaining = updatedActiveDayPasses.reduce((sum, card) => sum + card.remainingPunches, 0);
         
         dayPassInfo = {
           used: true,
+          usedCount: usedDayPassCount,
           totalRemaining: totalRemaining,
           packages: updatedActiveDayPasses.map(card => ({
             id: card.id,
@@ -1501,6 +1525,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error: any) {
       console.error("Kiosk check-in error:", error);
+      if (error?.code === "INSUFFICIENT_DAY_PASSES" || error?.code === "DAY_PASS_BALANCE_CHANGED") {
+        return res.status(409).json({
+          success: false,
+          message: error.message,
+        });
+      }
       res.status(500).json({ 
         success: false,
         message: "System error. Please see staff for assistance." 

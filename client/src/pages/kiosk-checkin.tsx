@@ -69,6 +69,7 @@ interface CheckInResponse {
   };
   dayPassInfo?: {
     used: boolean;
+    usedCount?: number;
     totalRemaining: number;
     packages: Array<{
       id: number;
@@ -1263,6 +1264,7 @@ export default function KioskCheckIn() {
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
+  const [dayPassQuantity, setDayPassQuantity] = useState(1);
   const [manualSearchTerm, setManualSearchTerm] = useState("");
   const [guestPrefill, setGuestPrefill] = useState<GuestPrefill | undefined>(undefined);
   // Unified purchase flow state
@@ -1305,14 +1307,15 @@ export default function KioskCheckIn() {
   });
 
   const checkInMutation = useMutation({
-    mutationFn: async ({ membershipId, userId, useDayPass }: { membershipId?: string; userId?: number; useDayPass?: boolean }) => {
-      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId, userId, useDayPass });
+    mutationFn: async ({ membershipId, userId, useDayPass, dayPassQuantity }: { membershipId?: string; userId?: number; useDayPass?: boolean; dayPassQuantity?: number }) => {
+      const res = await apiRequest("POST", "/api/kiosk-check-in", { membershipId, userId, useDayPass, dayPassQuantity });
       return await res.json() as CheckInResponse;
     },
     onSuccess: (data) => {
       setScanResult(data);
       
       if (data.requiresConfirmation) {
+        setDayPassQuantity(1);
         setScannerMode('confirmation');
         // Don't auto-reset on confirmation
       } else if (data.success) {
@@ -1335,11 +1338,22 @@ export default function KioskCheckIn() {
       }
     },
     onError: (error: any) => {
+      let message = error.message || "Failed to process check-in";
+      const responseBody = message.match(/^\d+:\s*(\{[\s\S]*\})$/)?.[1];
+      if (responseBody) {
+        try {
+          message = JSON.parse(responseBody).message || message;
+        } catch {
+          // Keep the original message when the server response is not JSON.
+        }
+      }
       setScanResult({
         success: false,
-        message: error.message || "Failed to process check-in"
+        message
       });
       setScannerMode('error');
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/active-punch-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/punch-cards"] });
       
       // Auto-resume scanning after 4 seconds on error
       autoResumeTimerRef.current = setTimeout(() => {
@@ -1349,12 +1363,21 @@ export default function KioskCheckIn() {
   });
 
   const confirmCheckIn = (useDayPass: boolean) => {
+    if (checkInMutation.isPending) return;
     if (pendingUserId) {
       // Day pass user - use userId
-      checkInMutation.mutate({ userId: pendingUserId, useDayPass });
+      checkInMutation.mutate({
+        userId: pendingUserId,
+        useDayPass,
+        dayPassQuantity: useDayPass ? dayPassQuantity : undefined,
+      });
     } else if (pendingMembershipId) {
       // Membership user - use membershipId
-      checkInMutation.mutate({ membershipId: pendingMembershipId, useDayPass });
+      checkInMutation.mutate({
+        membershipId: pendingMembershipId,
+        useDayPass,
+        dayPassQuantity: useDayPass ? dayPassQuantity : undefined,
+      });
     }
   };
 
@@ -1367,6 +1390,7 @@ export default function KioskCheckIn() {
     setScanResult(null);
     setPendingMembershipId(null);
     setPendingUserId(null);
+    setDayPassQuantity(1);
     setManualSearchTerm("");
     setGuestPrefill(undefined);
     setPurchaseSearchTerm("");
@@ -1382,6 +1406,7 @@ export default function KioskCheckIn() {
     setScanResult(null);
     setPendingMembershipId(null);
     setPendingUserId(null);
+    setDayPassQuantity(1);
     setManualSearchTerm("");
     setGuestPrefill(undefined);
     setPurchaseSearchTerm("");
@@ -1896,20 +1921,53 @@ export default function KioskCheckIn() {
                     )}
                     
                     {scanResult.dayPasses && scanResult.dayPasses.totalRemaining > 0 && (
-                      <Button 
-                        size="lg"
-                        variant="outline"
-                        onClick={() => confirmCheckIn(true)}
-                        className="border-2 border-primary text-primary hover:bg-primary/10 py-6 text-xl font-bold"
-                        disabled={checkInMutation.isPending}
-                      >
-                        {checkInMutation.isPending ? (
-                          <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full mr-3" />
-                        ) : (
-                          <Sparkles className="h-6 w-6 mr-3" />
+                      <div className="space-y-3">
+                        {scanResult.dayPasses.totalRemaining > 1 && (
+                          <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+                            <div className="text-left">
+                              <Label htmlFor="day-pass-quantity" className="font-semibold text-primary">
+                                Number of passes to use
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                {scanResult.dayPasses.totalRemaining} available
+                              </p>
+                            </div>
+                            <Select
+                              value={String(Math.min(dayPassQuantity, scanResult.dayPasses.totalRemaining))}
+                              onValueChange={(value) => setDayPassQuantity(Number(value))}
+                              disabled={checkInMutation.isPending}
+                            >
+                              <SelectTrigger id="day-pass-quantity" className="w-24 bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from(
+                                  { length: scanResult.dayPasses.totalRemaining },
+                                  (_, index) => index + 1,
+                                ).map((quantity) => (
+                                  <SelectItem key={quantity} value={String(quantity)}>
+                                    {quantity}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         )}
-                        Use Day Pass ({scanResult.dayPasses.totalRemaining} left)
-                      </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => confirmCheckIn(true)}
+                          className="w-full border-2 border-primary text-primary hover:bg-primary/10 py-6 text-xl font-bold"
+                          disabled={checkInMutation.isPending}
+                        >
+                          {checkInMutation.isPending ? (
+                            <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full mr-3" />
+                          ) : (
+                            <Sparkles className="h-6 w-6 mr-3" />
+                          )}
+                          Use {dayPassQuantity} Day Pass{dayPassQuantity === 1 ? "" : "es"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                   
@@ -1966,7 +2024,11 @@ export default function KioskCheckIn() {
                       <div className="bg-white rounded-lg p-4 border border-green-200 mt-4">
                         <div className="flex items-center justify-center mb-2">
                           <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-                          <span className="font-semibold text-green-800">Day Pass Used</span>
+                          <span className="font-semibold text-green-800">
+                            {scanResult.dayPassInfo.usedCount && scanResult.dayPassInfo.usedCount > 1
+                              ? `${scanResult.dayPassInfo.usedCount} Day Passes Used`
+                              : "Day Pass Used"}
+                          </span>
                         </div>
                         <div className="text-lg font-bold text-green-700 mb-2">
                           {scanResult.dayPassInfo.totalRemaining} days remaining

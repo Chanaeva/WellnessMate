@@ -57,6 +57,9 @@ import {
   HelpCircle,
   Radio,
 } from "lucide-react";
+import {
+  kioskAgreementSchema,
+} from "@shared/schema";
 
 // Stripe setup - fetch the public key from the server to support test/live key switching
 const stripePromise = fetch("/api/stripe/config")
@@ -77,16 +80,7 @@ const memberFormSchema = z.object({
 type MemberFormData = z.infer<typeof memberFormSchema>;
 
 // Agreement form schema
-const agreementFormSchema = z.object({
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
-  emergencyContact: z.string().min(1, "Emergency contact name is required"),
-  emergencyPhone: z.string().min(1, "Emergency contact phone is required"),
-  healthConfirmation: z.boolean().refine(val => val === true, "You must confirm your health status"),
-  riskAcknowledgment: z.boolean().refine(val => val === true, "You must acknowledge the risks"),
-  liabilityWaiver: z.boolean().refine(val => val === true, "You must accept the liability waiver"),
-  rulesAcceptance: z.boolean().refine(val => val === true, "You must accept the facility rules"),
-  ageConfirmation: z.boolean().refine(val => val === true, "You must confirm you are 18 or older"),
-});
+const agreementFormSchema = kioskAgreementSchema;
 
 type AgreementFormData = z.infer<typeof agreementFormSchema>;
 
@@ -158,8 +152,19 @@ function AgreementForm({
                   <FormItem>
                     <FormLabel>Date of Birth *</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} data-testid="input-dob" />
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="bday"
+                        placeholder="MM/DD/YYYY"
+                        aria-describedby="dob-help"
+                        {...field}
+                        data-testid="input-dob"
+                      />
                     </FormControl>
+                    <p id="dob-help" className="text-sm text-muted-foreground">
+                      Enter your date of birth as MM/DD/YYYY (for example, 03/20/1985).
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -171,7 +176,7 @@ function AgreementForm({
                   name="emergencyContact"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Emergency Contact Name *</FormLabel>
+                      <FormLabel>Emergency Contact Name (Optional)</FormLabel>
                       <FormControl>
                         <Input placeholder="Contact name" {...field} data-testid="input-emergency-contact" />
                       </FormControl>
@@ -184,7 +189,7 @@ function AgreementForm({
                   name="emergencyPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Emergency Contact Phone *</FormLabel>
+                      <FormLabel>Emergency Contact Phone (Optional)</FormLabel>
                       <FormControl>
                         <Input placeholder="(555) 123-4567" {...field} data-testid="input-emergency-phone" />
                       </FormControl>

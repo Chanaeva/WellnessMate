@@ -41,6 +41,78 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Kiosk waiver data is shared by the browser form and payment endpoints so
+// validation and date normalization stay consistent across the payment flow.
+export function normalizeKioskDateOfBirth(value: string): string | null {
+  const trimmed = value.trim();
+  let year: number;
+  let month: number;
+  let day: number;
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const slashMatch = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+
+  if (isoMatch) {
+    year = Number(isoMatch[1]);
+    month = Number(isoMatch[2]);
+    day = Number(isoMatch[3]);
+  } else if (slashMatch) {
+    month = Number(slashMatch[1]);
+    day = Number(slashMatch[2]);
+    year = Number(slashMatch[3]);
+  } else {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+}
+
+export const kioskAgreementSchema = z.object({
+  dateOfBirth: z.string()
+    .trim()
+    .min(1, "Date of birth is required")
+    .refine(
+      value => normalizeKioskDateOfBirth(value) !== null,
+      "Enter a valid date of birth as MM/DD/YYYY (for example, 03/20/1985)",
+    )
+    .transform(value => normalizeKioskDateOfBirth(value)!),
+  emergencyContact: z.string()
+    .trim()
+    .max(100, "Emergency contact name is too long")
+    .optional()
+    .transform(value => value || ""),
+  emergencyPhone: z.string()
+    .trim()
+    .max(30, "Emergency contact phone is too long")
+    .optional()
+    .transform(value => value || ""),
+  healthConfirmation: z.boolean().refine(val => val === true, "Health confirmation required"),
+  riskAcknowledgment: z.boolean().refine(val => val === true, "Risk acknowledgment required"),
+  liabilityWaiver: z.boolean().refine(val => val === true, "Liability waiver required"),
+  rulesAcceptance: z.boolean().refine(val => val === true, "Rules acceptance required"),
+  ageConfirmation: z.boolean().refine(val => val === true, "Age confirmation required"),
+}).superRefine((data, ctx) => {
+  if (data.dateOfBirth > new Date().toISOString().slice(0, 10)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["dateOfBirth"],
+      message: "Date of birth cannot be in the future",
+    });
+  }
+});
+
 // Reset method enum
 export const resetMethodEnum = pgEnum('reset_method', ['email', 'sms']);
 

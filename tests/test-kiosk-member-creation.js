@@ -15,6 +15,20 @@ class KioskMemberCreationTestRunner {
     this.paymentIntentId = null;
   }
 
+  getValidAgreement(overrides = {}) {
+    return {
+      dateOfBirth: '03/20/1985',
+      emergencyContact: '',
+      emergencyPhone: '',
+      healthConfirmation: true,
+      riskAcknowledgment: true,
+      liabilityWaiver: true,
+      rulesAcceptance: true,
+      ageConfirmation: true,
+      ...overrides,
+    };
+  }
+
   async makeRequest(method, path, data = null) {
     return new Promise((resolve, reject) => {
       const options = {
@@ -108,7 +122,8 @@ class KioskMemberCreationTestRunner {
           name: 'Basic Membership',
           price: 99, // $99.00
           planType: 'basic'
-        }
+        },
+        agreementData: this.getValidAgreement()
       };
 
       const response = await this.makeRequest('POST', '/api/kiosk/create-member-payment', requestData);
@@ -146,7 +161,8 @@ class KioskMemberCreationTestRunner {
           name: '5-Day Pass',
           price: 35, // $35.00
           totalPunches: 5
-        }
+        },
+        agreementData: this.getValidAgreement()
       };
 
       const response = await this.makeRequest('POST', '/api/kiosk/create-member-payment', requestData);
@@ -185,7 +201,11 @@ class KioskMemberCreationTestRunner {
           name: 'Basic Membership',
           price: 99,
           planType: 'basic'
-        }
+        },
+        agreementData: this.getValidAgreement({
+          emergencyContact: 'Emergency Contact',
+          emergencyPhone: '555-0100',
+        })
       };
 
       const response = await this.makeRequest('POST', '/api/kiosk/confirm-member-creation', confirmationData);
@@ -323,6 +343,40 @@ class KioskMemberCreationTestRunner {
     }
   }
 
+  async testWaiverValidation() {
+    try {
+      const invalidWaiverData = {
+        memberData: {
+          firstName: 'Invalid',
+          lastName: 'Waiver',
+          email: `invalid_waiver_${this.testSessionId}@test.com`,
+          packageType: 'daypass',
+          packageId: '1'
+        },
+        packageData: {
+          name: '1-Day Pass',
+          price: 10,
+          totalPunches: 1
+        },
+        agreementData: this.getValidAgreement({
+          dateOfBirth: '02/30/1985',
+        }),
+      };
+
+      const response = await this.makeRequest('POST', '/api/kiosk/create-member-payment', invalidWaiverData);
+      const properlyRejects = response.statusCode === 400 &&
+        /valid date|date of birth/i.test(response.data.message || '');
+
+      this.logTest('Kiosk Waiver Validation', properlyRejects,
+        properlyRejects ? 'Rejects invalid dates before payment creation' :
+          `Failed: ${response.statusCode} - ${JSON.stringify(response.data)}`);
+      return properlyRejects;
+    } catch (error) {
+      this.logTest('Kiosk Waiver Validation', false, `Error: ${error.message}`);
+      return false;
+    }
+  }
+
   async runAllTests() {
     console.log('\n🏪 Wolf Mother Wellness - Kiosk Member Creation E2E Tests');
     console.log('='.repeat(70));
@@ -364,6 +418,7 @@ class KioskMemberCreationTestRunner {
     
     await this.testAgeVerificationHandling();
     await this.testEmailValidation();
+    await this.testWaiverValidation();
 
     return this.printSummary();
   }

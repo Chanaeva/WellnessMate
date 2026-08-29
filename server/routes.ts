@@ -51,6 +51,7 @@ import {
   hoursOfOperation,
   insertHoursOfOperationSchema,
   giftCards as giftCardsTable,
+  kioskAgreementSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -8226,7 +8227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // For day passes: Creates one-time PaymentIntent
   app.post("/api/kiosk/create-member-payment", async (req, res) => {
     try {
-      const { memberData, packageData, discountData, useTerminal, existingMemberId } = req.body;
+      const { memberData, packageData, agreementData, discountData, useTerminal, existingMemberId } = req.body;
       console.log('🎫 Kiosk create-member-payment request:', { memberData, packageData, discountData, useTerminal, existingMemberId });
       
       // Validate the request data
@@ -8241,6 +8242,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedMemberData = memberFormSchema.parse(memberData);
       console.log('✅ Validated member data:', validatedMemberData);
+
+      let validatedAgreement: z.infer<typeof kioskAgreementSchema> | undefined;
+      if (!existingMemberId) {
+        const agreementResult = kioskAgreementSchema.safeParse(agreementData);
+        if (!agreementResult.success) {
+          return res.status(400).json({
+            message: agreementResult.error.issues[0]?.message || "Please complete the waiver",
+          });
+        }
+        validatedAgreement = agreementResult.data;
+      }
+
+      const waiverMetadata = validatedAgreement
+        ? {
+            waiverSigned: 'true',
+            waiverDateOfBirth: validatedAgreement.dateOfBirth,
+            waiverEmergencyContact: validatedAgreement.emergencyContact,
+            waiverEmergencyPhone: validatedAgreement.emergencyPhone,
+          }
+        : {};
       
       // Skip email check for existing members (they're purchasing additional day passes)
       if (!existingMemberId) {
@@ -8338,6 +8359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               customerId: customerId,
               isSubscription: 'true',
               useTerminal: 'true',
+              ...waiverMetadata,
             },
           });
           
@@ -8374,6 +8396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               isSubscription: 'true',
               useTerminal: 'false',
               source: 'kiosk',
+              ...waiverMetadata,
             },
           });
           
@@ -8398,7 +8421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Extract agreement/waiver data so webhook recovery can store it if confirm-member-creation
       // never reaches the server (reader timeout, network drop, etc.)
-      const agreementDataFromBody = req.body.agreementData || null;
+      const agreementDataFromBody = validatedAgreement;
       
       const paymentIntentConfig: any = {
         amount: Math.round(finalAmount),
@@ -8421,9 +8444,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           useTerminal: useTerminal ? 'true' : 'false',
           // Waiver fields for webhook recovery (stored so the webhook can mark the agreement)
           waiverSigned: agreementDataFromBody ? 'true' : 'false',
-          waiverDateOfBirth: agreementDataFromBody?.dateOfBirth?.slice(0, 50) || '',
-          waiverEmergencyContact: (agreementDataFromBody?.emergencyContact || '').slice(0, 100),
-          waiverEmergencyPhone: (agreementDataFromBody?.emergencyPhone || '').slice(0, 30),
+          waiverDateOfBirth: agreementDataFromBody?.dateOfBirth || '',
+          waiverEmergencyContact: agreementDataFromBody?.emergencyContact || '',
+          waiverEmergencyPhone: agreementDataFromBody?.emergencyPhone || '',
         },
       };
       
@@ -8471,18 +8494,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate agreement data only for new members (returning members already have waiver on file)
       let validatedAgreement = agreementData;
       if (!existingMemberId) {
-        const agreementSchema = z.object({
-          dateOfBirth: z.string().min(1, "Date of birth is required"),
-          emergencyContact: z.string().min(1, "Emergency contact is required"),
-          emergencyPhone: z.string().min(1, "Emergency phone is required"),
-          healthConfirmation: z.boolean().refine(val => val === true, "Health confirmation required"),
-          riskAcknowledgment: z.boolean().refine(val => val === true, "Risk acknowledgment required"),
-          liabilityWaiver: z.boolean().refine(val => val === true, "Liability waiver required"),
-          rulesAcceptance: z.boolean().refine(val => val === true, "Rules acceptance required"),
-          ageConfirmation: z.boolean().refine(val => val === true, "Age confirmation required"),
-        });
-        
-        validatedAgreement = agreementSchema.parse(agreementData);
+        const agreementResult = kioskAgreementSchema.safeParse(agreementData);
+        if (!agreementResult.success) {
+          return res.status(400).json({
+            message: agreementResult.error.issues[0]?.message || "Please complete the waiver",
+          });
+        }
+        validatedAgreement = agreementResult.data;
         console.log('✅ Validated agreement data:', validatedAgreement);
       } else {
         console.log('⏭️ Skipping agreement validation for returning member:', existingMemberId);
@@ -8630,10 +8648,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: 'member' as const,
           membershipAgreementCompleted: true,
           membershipAgreementDate: new Date(),
-          membershipAgreementData: agreementData,
-          dateOfBirth: agreementData?.dateOfBirth,
-          emergencyContact: agreementData?.emergencyContact,
-          emergencyPhone: agreementData?.emergencyPhone,
+          membershipAgreementData: validatedAgreement,
+          dateOfBirth: validatedAgreement?.dateOfBirth,
+          emergencyContact: validatedAgreement?.emergencyContact,
+          emergencyPhone: validatedAgreement?.emergencyPhone,
         };
 
         try {
@@ -8657,14 +8675,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Patch waiver data onto the existing user if it was created by the
           // webhook recovery (which has no access to the agreement form data).
-          if (!existingUser.membershipAgreementCompleted && agreementData) {
+          if (!existingUser.membershipAgreementCompleted && validatedAgreement) {
             await storage.updateUser(existingUser.id, {
               membershipAgreementCompleted: true,
               membershipAgreementDate: new Date(),
-              membershipAgreementData: agreementData,
-              dateOfBirth: agreementData.dateOfBirth || existingUser.dateOfBirth,
-              emergencyContact: agreementData.emergencyContact || existingUser.emergencyContact,
-              emergencyPhone: agreementData.emergencyPhone || existingUser.emergencyPhone,
+              membershipAgreementData: validatedAgreement,
+              dateOfBirth: validatedAgreement.dateOfBirth || existingUser.dateOfBirth,
+              emergencyContact: validatedAgreement.emergencyContact || existingUser.emergencyContact,
+              emergencyPhone: validatedAgreement.emergencyPhone || existingUser.emergencyPhone,
             });
             console.log('✅ Patched waiver data onto webhook-recovered user:', existingUser.email);
           }
